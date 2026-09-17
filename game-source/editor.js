@@ -1,0 +1,305 @@
+"use strict";
+
+// The editor supplies data and mode controls. The C engine and app.js own every
+// board, clue, interaction, history operation and effect, including exported play.
+const exportTemplate = document.documentElement.cloneNode(true);
+for (const id of ["levels", "clues", "strip-label"])
+  exportTemplate.querySelector("#" + id)?.replaceChildren();
+exportTemplate.querySelector("#embedded-puzzle")?.remove();
+const menu = el("puzzle-menu");
+
+el("menu-tools").append(el("utilities"));
+el("utilities").hidden = false;
+function toggleMenu(open) {
+  menu.hidden = !open;
+  el("menu-toggle").setAttribute("aria-expanded", String(open));
+  (open ? el("menu-close") : el("menu-toggle")).focus();
+  window.triSyncHistory?.();
+}
+el("menu-toggle").onclick = () => toggleMenu(menu.hidden);
+el("menu-close").onclick = () => toggleMenu(false);
+el("replay").onclick = () => {
+  window.triShowPlay?.();
+  call("replay");
+  toggleMenu(false);
+};
+el("memory").onclick = () => {
+  toggleMenu(false);
+  memoryToggle(true);
+};
+// Retain the keyboard shortcut without hiding menu contents.
+el("caret").onclick = () => toggleMenu(menu.hidden);
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !menu.hidden) toggleMenu(false);
+});
+document.addEventListener("pointerdown", (event) => {
+  if (
+    !menu.hidden &&
+    !menu.contains(event.target) &&
+    !el("menu-toggle").contains(event.target)
+  )
+    toggleMenu(false);
+});
+
+const directionCodes = ["S", "E", "N", "W"];
+function validPuzzle(value) {
+  return (
+    value &&
+    Number.isInteger(value.size) &&
+    value.size >= 2 &&
+    value.size <= 10 &&
+    Array.isArray(value.solution) &&
+    value.solution.length === value.size ** 2 &&
+    value.solution.every((v) => v === 0 || v === 1) &&
+    (!value.orientation || directionCodes.includes(value.orientation))
+  );
+}
+function normalizePuzzle(value) {
+  return {
+    format: "tri-logic",
+    version: 2,
+    cellOrder: "north-row-major",
+    name: String(value.name || "My puzzle").slice(0, 80),
+    size: value.size,
+    orientation: value.orientation || "S",
+    solution: value.solution.slice(),
+    ...(Number.isInteger(value.seed) &&
+    value.seed >= 0 &&
+    value.seed <= 0xffffffff &&
+    Number.isInteger(value.difficulty) &&
+    value.difficulty >= 0 &&
+    value.difficulty <= 3
+      ? { seed: value.seed, difficulty: value.difficulty }
+      : {}),
+  };
+}
+let draft;
+try {
+  draft = JSON.parse(localStorage.getItem("tri-logic-editor"));
+} catch {}
+if (!validPuzzle(draft))
+  draft = {
+    name: "My puzzle",
+    size: 5,
+    orientation: "S",
+    solution: Array(25).fill(0),
+  };
+draft = normalizePuzzle(draft);
+let currentPuzzle = null,
+  authorSession = false;
+
+const settings = document.createElement("section");
+settings.id = "editor-settings";
+settings.hidden = true;
+settings.innerHTML = `<h3>Puzzle settings</h3><label>Name <input id="editor-name" maxlength="80"></label><label>Size <select id="editor-size">${Array.from({ length: 9 }, (_, i) => `<option>${i + 2}</option>`).join("")}</select></label><label>Tip direction <select id="editor-orientation"><option value="N">North ↑</option><option value="E">East →</option><option value="S">South ↓ · base up</option><option value="W">West ←</option></select></label><p class="editor-note">Paint the solution on the board. Clues update automatically. Uniqueness is not checked.</p><div class="menu-actions"><button id="editor-export">Export playable HTML</button><button id="editor-json">Export puzzle JSON</button><button id="editor-share">Copy puzzle link</button></div><input id="share-output" aria-label="Puzzle link" readonly hidden>`;
+menu.insertBefore(settings, el("menu-tools").previousElementSibling);
+const workshop = document.createElement("section");
+workshop.id = "workshop";
+workshop.hidden = true;
+workshop.innerHTML = `<div id="workshop-title"></div><p id="workshop-help"></p><div class="lesson-actions" id="workshop-actions"><button id="editor-test">Try</button><button id="editor-configure" title="Settings / export">Settings</button><button id="editor-close">Done</button></div>`;
+el("side").insertBefore(workshop, el("corner"));
+el("bottom-controls").prepend(el("workshop-actions"));
+menu.append(el("controls-hint"));
+function saveDraft() {
+  try {
+    localStorage.setItem("tri-logic-editor", JSON.stringify(draft));
+  } catch {}
+}
+function loadCustom(puzzle, editing, ownsDraft, endlessRun = null) {
+  if (!appReady) return toast("The game is still loading.");
+  if (!validPuzzle(puzzle)) return toast("Invalid puzzle data.");
+  window.triCancelGeneration?.();
+  window.triEndlessRun = endlessRun;
+  window.triShowPlay?.();
+  currentPuzzle = normalizePuzzle(puzzle);
+  authorSession = ownsDraft;
+  const ok = Module.ccall(
+    "game_custom",
+    "number",
+    ["number", "number", "string", "number"],
+    [
+      currentPuzzle.size,
+      directionCodes.indexOf(currentPuzzle.orientation),
+      currentPuzzle.solution.join(""),
+      editing ? 1 : 0,
+    ],
+  );
+  if (!ok) toast("The puzzle could not be loaded.");
+}
+window.triCustomState = (next) => {
+  const active = !!next.custom;
+  workshop.hidden = !active;
+  el("workshop-actions").hidden = !active;
+  settings.hidden = !active;
+  if (!active || !currentPuzzle) {
+    el("reset").title = "Reset (R); undo restores it";
+    return;
+  }
+  currentPuzzle.solution = next.solution.slice();
+  currentPuzzle.size = next.n;
+  currentPuzzle.orientation = directionCodes[next.orientation];
+  currentPuzzle.clues = next.clues.map((axis) =>
+    axis.map((line) => line.runs.slice()),
+  );
+  if (authorSession) {
+    delete currentPuzzle.seed;
+    delete currentPuzzle.difficulty;
+    draft = normalizePuzzle(currentPuzzle);
+    saveDraft();
+  }
+  el("workshop-title").textContent =
+    (next.editing ? "Editing · " : "Trying · ") + currentPuzzle.name;
+  el("workshop-help").textContent = next.editing
+    ? "Tap or drag to paint. Select any clue to highlight its strip."
+    : "Solve it using the same clues and controls as every level.";
+  el("editor-test").textContent = next.editing ? "Try" : "Edit";
+  el("editor-name").value = currentPuzzle.name;
+  el("editor-size").value = String(next.n);
+  el("editor-orientation").value = currentPuzzle.orientation;
+  el("editor-size").disabled = !next.editing;
+  el("editor-orientation").disabled = !next.editing;
+  el("reset").title = next.editing
+    ? "Clear solution (R); undo restores it"
+    : "Reset (R); undo restores it";
+};
+el("editor-open").onclick = () => {
+  loadCustom(draft, true, true);
+  toggleMenu(false);
+};
+el("editor-test").onclick = () => {
+  if (!state?.custom) return;
+  if (!state.editing) authorSession = true;
+  call("editing", state.editing ? 0 : 1);
+};
+el("editor-close").onclick = () => {
+  call("leave_custom");
+  window.triShowHome?.();
+  toggleMenu(false);
+};
+el("editor-configure").onclick = () => {
+  toggleMenu(true);
+  settings.scrollIntoView?.({ block: "nearest" });
+};
+el("editor-name").oninput = () => {
+  if (!currentPuzzle) return;
+  currentPuzzle.name = el("editor-name").value.trim() || "My puzzle";
+  el("workshop-title").textContent =
+    (state.editing ? "Editing · " : "Trying · ") + currentPuzzle.name;
+  if (authorSession) {
+    draft.name = currentPuzzle.name;
+    saveDraft();
+  }
+};
+el("editor-size").onchange = () => {
+  const n = Number(el("editor-size").value);
+  if (
+    currentPuzzle.solution.some(Boolean) &&
+    !confirm("Changing size clears this solution. Continue?")
+  ) {
+    el("editor-size").value = currentPuzzle.size;
+    return;
+  }
+  loadCustom(
+    { ...currentPuzzle, size: n, solution: Array(n * n).fill(0) },
+    true,
+    true,
+  );
+};
+el("editor-orientation").onchange = () =>
+  call("orientation", directionCodes.indexOf(el("editor-orientation").value));
+function downloadPuzzle(text, extension, type) {
+  const url = URL.createObjectURL(new Blob([text], { type })),
+    link = document.createElement("a");
+  link.href = url;
+  link.download =
+    (currentPuzzle.name.replace(/[^a-z0-9_-]+/gi, "-") || "tri-puzzle") +
+    extension;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+el("editor-json").onclick = () =>
+  downloadPuzzle(
+    JSON.stringify(currentPuzzle, null, 2),
+    ".json",
+    "application/json",
+  );
+el("editor-export").onclick = () => {
+  const copy = exportTemplate.cloneNode(true);
+  const embedded = document.createElement("script");
+  embedded.id = "embedded-puzzle";
+  embedded.type = "application/json";
+  embedded.textContent = JSON.stringify(currentPuzzle).replace(/</g, "\\u003c");
+  copy.querySelector("head").append(embedded);
+  copy.querySelector("title").textContent =
+    currentPuzzle.name + " · Delta Triplex";
+  downloadPuzzle("<!doctype html>\n" + copy.outerHTML, ".html", "text/html");
+};
+let initializedCustom = false;
+window.triInitializeCustom = () => {
+  if (initializedCustom) return;
+  initializedCustom = true;
+  const params = new URLSearchParams(location.hash.slice(1));
+  if (params.has("seed")) {
+    try {
+      loadCustom(
+        TriShare.seedPuzzle(
+          params.get("seed"),
+          params.get("difficulty"),
+          params.get("orientation") || "S",
+        ),
+        false,
+        false,
+      );
+    } catch {
+      window.triShowHome?.();
+      el("load-error").textContent =
+        "This seed link is invalid or no longer matches the generator.";
+      el("load-error").hidden = false;
+    }
+    return;
+  }
+  const code = params.get("p");
+  if (code !== null) {
+    try {
+      loadCustom(TriShare.decode(code), false, false);
+    } catch {
+      window.triShowHome?.();
+      el("load-error").textContent =
+        "This puzzle link is invalid or uses an unsupported version.";
+      el("load-error").hidden = false;
+    }
+    return;
+  }
+  const embedded = el("embedded-puzzle");
+  if (!embedded) {
+    window.triShowHome?.();
+    return;
+  }
+  try {
+    const puzzle = JSON.parse(embedded.textContent);
+    if (!validPuzzle(puzzle)) throw Error("Invalid puzzle data");
+    loadCustom(puzzle, false, false);
+  } catch {
+    toast("The embedded puzzle is invalid.");
+  }
+};
+
+el("editor-share").onclick = async () => {
+  if (!currentPuzzle) return;
+  const url = TriShare.url(currentPuzzle);
+  const output = el("share-output");
+  output.value = url;
+  output.hidden = false;
+  try {
+    await navigator.clipboard.writeText(url);
+    toast("Puzzle link copied.");
+  } catch {
+    output.focus();
+    output.select();
+    toast("Select and copy the puzzle link.");
+  }
+};
+window.addEventListener("hashchange", () => {
+  initializedCustom = false;
+  window.triInitializeCustom();
+});

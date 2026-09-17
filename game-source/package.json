@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "scripts": {"test": "node test_wasm.cjs && node test_shared.cjs && node test_palette.cjs"},
+  "devDependencies": {"jsdom": "30.1.0"}
+}

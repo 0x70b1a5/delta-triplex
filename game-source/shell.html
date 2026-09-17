@@ -1,0 +1,1100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+      name="viewport"
+    />
+    <title>Delta Triplex</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --surface: #21303d;
+        --hover: #354958;
+        --border: #354552;
+        --bg: #121a23;
+        --ink: #e7ece4;
+        --muted: #94a5ac;
+        --mint: #86ddb8;
+        --a: #8bc5ef;
+        --b: #dda4d2;
+        --c: #f2c373;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body,
+      html {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          15px system-ui,
+          sans-serif;
+      }
+      button {
+        font: inherit;
+        color: inherit;
+        border: 0;
+        border-radius: 6px;
+        background: var(--surface);
+        cursor: pointer;
+        min-height: 40px;
+        padding: 8px 12px;
+      }
+      button:hover {
+        background: var(--hover);
+      }
+      button:focus-visible {
+        outline: 2px solid var(--mint);
+        outline-offset: 2px;
+      }
+      button:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      #app {
+        height: 100%;
+        height: 100dvh;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) clamp(240px, 27vw, 350px);
+        gap: 12px;
+        padding: max(12px, env(safe-area-inset-top))
+          max(16px, env(safe-area-inset-right))
+          max(12px, env(safe-area-inset-bottom))
+          max(16px, env(safe-area-inset-left));
+      }
+      #stage {
+        min-width: 0;
+        min-height: 0;
+        position: relative;
+      }
+      canvas {
+        display: block;
+        position: absolute;
+        inset: 0;
+        width: 100% !important;
+        height: 100% !important;
+        outline: 0;
+        touch-action: none;
+      }
+      #side {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        gap: 14px;
+        padding-top: 2px;
+      }
+      #navigation {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 32px;
+      }
+      #levels {
+        display: flex;
+        gap: 4px;
+        flex: 1;
+      }
+      #levels button {
+        background: 0 0;
+        min-height: 32px;
+        padding: 5px 11px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      #levels button[aria-pressed="true"] {
+        background: var(--surface);
+        color: var(--mint);
+      }
+      #caret {
+        margin-left: auto;
+        background: 0 0;
+        color: var(--muted);
+        width: 34px;
+        min-height: 32px;
+        padding: 4px;
+        font-size: 20px;
+      }
+      #clues {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 7px;
+        align-content: start;
+      }
+      .clue-column {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .axis {
+        font-size: 14px;
+        letter-spacing: 0.03em;
+        padding: 2px 6px 5px;
+      }
+      .clue {
+        position: relative;
+        text-align: left;
+        min-height: 42px;
+        padding: 8px 6px;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        border: 1px solid transparent;
+        background: var(--surface);
+      }
+      .clue small {
+        color: var(--muted);
+        font-size: 10px;
+        min-width: 15px;
+      }
+      .clue span {
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        font-size: clamp(13px, 1.6vw, 20px);
+      }
+      .clue[data-match="true"] span {
+        color: var(--mint);
+      }
+      .clue[data-hover="true"] {
+        background: var(--hover);
+      }
+      .clue[aria-pressed="true"] {
+        border-color: var(--axis);
+        background: var(--hover);
+      }
+      #lesson {
+        font-size: 14px;
+        line-height: 1.5;
+        color: var(--muted);
+      }
+      #lesson h1 {
+        font-size: 15px;
+        margin: 0 0 8px;
+        color: var(--ink);
+        font-weight: 600;
+      }
+      #lesson p {
+        margin: 0 0 10px;
+      }
+      .lesson-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      #skip {
+        background: 0 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      #continue {
+        background: var(--surface);
+        color: var(--mint);
+      }
+      #corner {
+        margin-top: auto;
+        align-self: flex-end;
+        text-align: right;
+      }
+      #controls-hint {
+        font-size: 11px;
+        line-height: 1.6;
+        color: var(--muted);
+        margin-bottom: 8px;
+      }
+      .mobile-hint {
+        display: none;
+      }
+      .icons {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+      }
+      .icon {
+        width: 44px;
+        height: 44px;
+        padding: 10px;
+        background: 0 0;
+        border: 1px solid var(--border);
+      }
+      .icon svg {
+        width: 22px;
+        height: 22px;
+        display: block;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.7;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      #toast {
+        position: fixed;
+        z-index: 30;
+        left: 50%;
+        bottom: max(22px, env(safe-area-inset-bottom));
+        transform: translateX(-50%);
+        padding: 11px 20px;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        border-radius: 8px;
+        box-shadow: 0 6px 25px #0004;
+        pointer-events: none;
+        font-size: 14px;
+        max-width: 90vw;
+        text-align: center;
+      }
+      #utilities {
+        position: fixed;
+        right: 20px;
+        top: 54px;
+        z-index: 20;
+        padding: 10px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        display: flex;
+        gap: 6px;
+        box-shadow: 0 6px 20px #0006;
+      }
+      #utilities button {
+        font-size: 12px;
+      }
+      #error,
+      #status {
+        position: fixed;
+        z-index: 40;
+        left: 20px;
+        top: 20px;
+        background: var(--bg);
+        padding: 10px;
+      }
+      #error {
+        color: var(--c);
+        max-width: 500px;
+      }
+      #memory-panel {
+        position: fixed;
+        z-index: 25;
+        right: 12px;
+        top: 64px;
+        width: min(350px, calc(100vw - 24px));
+        max-height: 80dvh;
+        overflow: auto;
+        background: var(--surface);
+        border: 1px solid var(--mint);
+        border-radius: 10px;
+        padding: 16px;
+        box-shadow: 0 8px 30px #0008;
+        font-size: 12px;
+      }
+      #memory-panel h2 {
+        font-size: 16px;
+        margin: 0 0 12px;
+      }
+      #memory-panel dl {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        margin: 0;
+      }
+      #memory-panel dd {
+        margin: 0;
+        font-variant-numeric: tabular-nums;
+        color: var(--mint);
+      }
+      #memory-panel p {
+        line-height: 1.5;
+        color: var(--muted);
+      }
+      #memory-panel .actions {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+      }
+      #memory-panel button {
+        font-size: 12px;
+        padding: 7px;
+      }
+      @media (max-width: 700px) and (orientation: portrait) {
+        #app {
+          grid-template-columns: 1fr;
+          grid-template-rows: minmax(170px, 1fr) auto;
+          gap: 2px;
+          padding: 8px 14px max(10px, env(safe-area-inset-bottom));
+        }
+        #side {
+          gap: 8px;
+          padding: 0;
+          display: grid;
+          grid-template-columns: 1fr auto;
+        }
+        #navigation {
+          grid-column: 1/-1;
+          order: 1;
+        }
+        #clues {
+          grid-column: 1/-1;
+          order: 2;
+          gap: 7px;
+        }
+        .clue {
+          min-height: 36px;
+          padding: 6px 9px;
+        }
+        .clue span {
+          font-size: 17px;
+        }
+        .axis {
+          padding: 0 6px 3px;
+        }
+        .clue-column {
+          gap: 3px;
+        }
+        #lesson {
+          grid-column: 1/-1;
+          order: 3;
+          font-size: 12px;
+          line-height: 1.4;
+        }
+        #lesson h1 {
+          font-size: 13px;
+          margin-bottom: 4px;
+        }
+        #lesson p {
+          margin-bottom: 6px;
+        }
+        .lesson-actions button {
+          min-height: 32px;
+          padding: 4px 10px;
+        }
+        #corner {
+          grid-column: 1/-1;
+          order: 4;
+          margin-top: 0;
+          justify-self: end;
+        }
+        #controls-hint {
+          margin: 0 0 5px;
+          text-align: right;
+          font-size: 10px;
+        }
+        .icon {
+          width: 38px;
+          height: 38px;
+          padding: 7px;
+        }
+        #navigation {
+          position: absolute;
+          top: max(8px, env(safe-area-inset-top));
+          right: 14px;
+          z-index: 2;
+        }
+        #levels {
+          display: none;
+        }
+        #app[data-tutorial="false"] #levels {
+          display: flex;
+        }
+        #utilities {
+          top: 46px;
+        }
+        #memory-panel {
+          top: 52px;
+        }
+      }
+      @media (pointer: coarse) {
+        .mobile-hint {
+          display: block;
+        }
+        .desktop-hint {
+          display: none;
+        }
+      }
+      @media (max-height: 500px) and (orientation: landscape) {
+        #app {
+          gap: 4px;
+          padding: 6px 10px;
+          grid-template-columns: minmax(0, 1fr) 265px;
+        }
+        #side {
+          gap: 6px;
+        }
+        .clue {
+          min-height: 28px;
+          padding: 3px 6px;
+        }
+        .clue-column {
+          gap: 3px;
+        }
+        .axis {
+          padding-bottom: 0;
+        }
+        #navigation {
+          min-height: 28px;
+        }
+        #lesson {
+          font-size: 11px;
+          line-height: 1.25;
+        }
+        #lesson h1 {
+          font-size: 12px;
+          margin-bottom: 3px;
+        }
+        #lesson p {
+          margin-bottom: 4px;
+        }
+        .lesson-actions button {
+          min-height: 26px;
+          padding: 3px 8px;
+          font-size: 11px;
+        }
+        #corner {
+          display: block;
+        }
+        #controls-hint {
+          margin: 0 0 3px;
+          font-size: 9px;
+        }
+        .icon {
+          width: 32px;
+          height: 32px;
+          padding: 5px;
+        }
+      }
+      .clue {
+        justify-content: center;
+        gap: 0;
+      }
+      .clue small {
+        position: absolute;
+        top: 2px;
+        left: 5px;
+        font-size: 9px;
+      }
+      .clue span {
+        padding-top: 5px;
+      }
+      .clue[data-long="true"] span {
+        font-size: clamp(11px, 1.3vw, 15px);
+      }
+      @media (max-width: 700px) and (orientation: portrait) {
+        .clue[data-long="true"] span {
+          font-size: 15px;
+        }
+      }
+      @media (min-width: 900px) and (orientation: landscape) {
+        #app {
+          display: block;
+          position: relative;
+        }
+        #stage {
+          position: absolute;
+          inset: 54px 16px 16px;
+        }
+        #side {
+          display: contents;
+        }
+        #navigation {
+          position: absolute;
+          right: 16px;
+          top: 12px;
+        }
+        #clues {
+          position: absolute;
+          left: 16px;
+          bottom: 16px;
+          width: clamp(240px, 27vw, 350px);
+        }
+        #lesson {
+          position: absolute;
+          right: 16px;
+          bottom: 120px;
+          width: clamp(240px, 27vw, 350px);
+        }
+        #corner {
+          position: absolute;
+          right: 16px;
+          bottom: 16px;
+        }
+      }
+      input[type="color"] {
+        width: 44px;
+        height: 44px;
+        padding: 5px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--surface);
+        cursor: pointer;
+      }
+      input[type="color"]:focus-visible {
+        outline: 2px solid var(--ink);
+        outline-offset: 2px;
+      }
+      @media (max-width: 700px) {
+        input[type="color"] {
+          width: 38px;
+          height: 38px;
+        }
+      }
+      @media (max-height: 500px) and (orientation: landscape) {
+        input[type="color"] {
+          width: 32px;
+          height: 32px;
+        }
+      }
+      #strip-label {
+        position: absolute;
+        z-index: 1;
+        transform: translateY(-100%);
+        white-space: pre;
+        pointer-events: none;
+        text-align: left;
+        font-variant-numeric: tabular-nums;
+        line-height: 1.1;
+        font-size: 20px;
+      }
+      #navigation {
+        display: none !important;
+      }
+      #puzzle-menu {
+        position: fixed;
+        z-index: 24;
+        right: max(14px, env(safe-area-inset-right));
+        bottom: max(66px, calc(env(safe-area-inset-bottom) + 58px));
+        width: min(340px, calc(100vw - 28px));
+        max-height: calc(100dvh - 100px);
+        overflow: auto;
+        overscroll-behavior: contain;
+        padding: 18px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        box-shadow: 0 12px 40px #0008;
+      }
+      .menu-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+      }
+      .menu-heading h2 {
+        font-size: 17px;
+        margin: 0;
+      }
+      #puzzle-menu h3 {
+        font-size: 12px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        margin: 18px 0 8px;
+      }
+      #puzzle-menu #levels {
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr);
+        max-height: 180px;
+        overflow: auto;
+        gap: 6px;
+      }
+      #puzzle-menu #levels button {
+        background: var(--surface);
+        min-height: 44px;
+      }
+      #puzzle-menu #levels button[aria-pressed="true"] {
+        outline: 1px solid var(--mint);
+      }
+      #puzzle-menu .menu-actions {
+        display: grid;
+        gap: 8px;
+      }
+      #puzzle-menu label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin: 10px 0;
+      }
+      #utilities {
+        position: static;
+        display: grid;
+        box-shadow: none;
+        padding: 0;
+        border: 0;
+        background: none;
+        gap: 8px;
+      }
+      #memory-panel {
+        top: auto;
+        bottom: 72px;
+        max-height: calc(100dvh - 90px);
+      }
+      @media (min-width: 900px) and (orientation: landscape) {
+        #stage {
+          inset: 16px;
+        }
+      }
+      #workshop {
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.4;
+      }
+      #workshop-title {
+        font-weight: 600;
+        color: var(--ink);
+        overflow-wrap: anywhere;
+      }
+      #workshop p {
+        margin: 5px 0 8px;
+      }
+      #workshop .lesson-actions {
+        flex-wrap: wrap;
+        gap: 5px;
+      }
+      #workshop button {
+        font-size: 12px;
+        min-height: 32px;
+        padding: 6px 9px;
+      }
+      #editor-settings input,
+      #editor-settings select {
+        font: inherit;
+        color: var(--ink);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 8px;
+        min-width: 0;
+        max-width: 180px;
+      }
+      #editor-settings label {
+        gap: 10px;
+      }
+      .editor-note {
+        font-size: 12px;
+        line-height: 1.5;
+        color: var(--muted);
+      }
+      @media (min-width: 900px) and (orientation: landscape) {
+        #workshop {
+          position: absolute;
+          right: 16px;
+          bottom: 115px;
+          width: clamp(240px, 27vw, 350px);
+        }
+        #app[data-orientation="E"],
+        #app[data-orientation="N"],
+        #app[data-orientation="W"] {
+          display: grid;
+        }
+        #app:not([data-orientation="S"]) #stage {
+          position: relative;
+          inset: auto;
+        }
+        #app:not([data-orientation="S"]) #side {
+          display: flex;
+        }
+        #app:not([data-orientation="S"]) #clues,
+        #app:not([data-orientation="S"]) #lesson,
+        #app:not([data-orientation="S"]) #workshop,
+        #app:not([data-orientation="S"]) #corner {
+          position: static;
+          width: auto;
+        }
+      }
+      @media (max-width: 700px) and (orientation: portrait) {
+        #workshop {
+          grid-column: 1/-1;
+          order: 3;
+        }
+        #clues {
+          max-height: 44dvh;
+          overflow: auto;
+        }
+      }
+      @media (max-height: 600px) and (orientation: landscape) {
+        #side {
+          overflow: auto;
+        }
+        #workshop button {
+          font-size: 11px;
+          min-height: 28px;
+        }
+        #workshop p {
+          display: none;
+        }
+      }
+      @media (max-width: 700px) and (orientation: portrait) {
+        #app {
+          padding-left: 10px;
+          padding-right: 10px;
+          gap: 0;
+        }
+        #side {
+          gap: 6px;
+        }
+        .clue {
+          min-height: 34px;
+        }
+        .clue-column {
+          gap: 2px;
+        }
+      }
+      #home {
+        position: fixed;
+        inset: 0;
+        z-index: 25;
+        background: var(--bg);
+        overflow: auto;
+        display: grid;
+        place-items: center;
+        padding: 32px 24px;
+      }
+      #home[hidden],
+      #completion[hidden] {
+        display: none;
+      }
+      .home-card {
+        width: min(100%, 420px);
+        text-align: center;
+      }
+      .home-card h1 {
+        font-size: clamp(32px, 7vw, 48px);
+        letter-spacing: -0.04em;
+        margin: 8px 0;
+      }
+      .home-card p {
+        color: var(--muted);
+        line-height: 1.5;
+      }
+      .delta-mark {
+        font-size: 68px;
+        color: var(--mint);
+        line-height: 1;
+      }
+      .home-actions {
+        display: grid;
+        gap: 10px;
+        margin: 28px 0;
+      }
+      .home-actions button,
+      #level-grid button {
+        padding: 16px;
+        text-align: left;
+      }
+      .home-actions button:first-child {
+        border: 1px solid var(--mint);
+      }
+      #level-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        margin: 24px 0;
+      }
+      #level-grid small {
+        display: block;
+        color: var(--muted);
+        margin-top: 8px;
+      }
+      #completion {
+        position: fixed;
+        bottom: max(100px, env(safe-area-inset-bottom));
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 12;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        padding: 12px 16px;
+        border-radius: 12px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+      }
+      #completion button {
+        padding: 12px 24px;
+      }
+      #difficulties small {
+        display: block;
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      #load-error {
+        color: var(--ink);
+      }
+      #bottom-controls {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: nowrap;
+      }
+      #workshop-actions {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+      #workshop-actions button {
+        white-space: nowrap;
+        font-size: 12px;
+        padding: 8px;
+        min-height: 40px;
+      }
+      #workshop {
+        display: flex;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 4px 10px;
+      }
+      #workshop p {
+        margin: 0;
+      }
+      #puzzle-menu #controls-hint {
+        text-align: left;
+        margin: 12px 0;
+      }
+      #share-output {
+        width: 100%;
+        max-width: none;
+        font: 12px monospace;
+      }
+      @media (max-width: 700px) and (orientation: portrait) {
+        #corner {
+          width: 100%;
+          justify-self: stretch;
+        }
+        #bottom-controls {
+          justify-content: flex-end;
+          gap: 4px;
+        }
+        #workshop-actions {
+          margin-right: auto;
+          gap: 4px;
+        }
+        #bottom-controls .icon {
+          flex: 0 0 40px;
+          width: 40px;
+          height: 40px;
+          min-width: 40px;
+          min-height: 40px;
+        }
+        #workshop {
+          gap: 2px 8px;
+        }
+      }
+      @media (max-width: 360px) {
+        #workshop-actions button {
+          padding: 6px;
+        }
+      }
+      .colour-controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .colour-die {
+        font-size: 24px;
+        width: 44px;
+        height: 44px;
+        padding: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <main data-tutorial="true" id="app">
+      <div id="stage">
+        <canvas
+          aria-label="Triangle nonogram board. Click to fill, drag to paint, tap a filled one to cross, tap a cross to clear."
+          height="760"
+          id="canvas"
+          tabindex="0"
+          width="900"
+        ></canvas>
+        <div id="strip-label" aria-hidden="true"></div>
+      </div>
+      <section aria-label="Puzzle clues and controls" id="side">
+        <nav aria-label="Puzzles" id="navigation">
+          <div id="levels" hidden></div>
+          <button
+            id="caret"
+            aria-label="Hidden utilities toggle: press three times"
+            title="^^^"
+          >
+            ⌃
+          </button>
+        </nav>
+        <div id="clues" aria-label="Clues in three directions"></div>
+        <section aria-label="Introduction" id="lesson">
+          <h1 id="lesson-title"></h1>
+          <p id="lesson-text"></p>
+          <div class="lesson-actions">
+            <button id="continue" hidden>Continue</button
+            ><button id="skip">Skip introduction</button>
+          </div>
+        </section>
+        <div id="corner">
+          <div id="controls-hint">
+            <span class="desktop-hint"
+              >click: fill · drag: paint<br />rclick: cross</span
+            ><span class="mobile-hint"
+              >tap: fill · drag: paint<br />tap a filled one to cross, tap a
+              cross to clear</span
+            >
+          </div>
+          <div class="icons" id="bottom-controls">
+            <button id="undo" aria-label="Undo" title="Undo (Z)" class="icon">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path
+                  d="M8 5 3 10l5 5M3 10h11a6 6 0 0 1 0 12"
+                  transform="translate(0 -2)"
+                />
+              </svg></button
+            ><button
+              id="reset"
+              aria-label="Reset puzzle"
+              title="Reset (R); undo restores it"
+              class="icon"
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M4 10a8 8 0 1 1 1 8M4 4v6h6" />
+              </svg></button
+            ><button
+              id="menu-toggle"
+              class="icon"
+              aria-label="Open puzzle menu"
+              aria-expanded="false"
+              aria-controls="puzzle-menu"
+              title="Menu"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </section>
+    </main>
+    <aside id="puzzle-menu" aria-label="Puzzle menu" hidden>
+      <div class="menu-heading">
+        <h2>Delta Triplex</h2>
+        <button id="menu-close" aria-label="Close menu">×</button>
+      </div>
+      <button id="return-home">Main menu</button>
+
+      <h3>Create</h3>
+      <div class="menu-actions">
+        <button id="editor-open">Level editor</button>
+      </div>
+      <h3>Appearance</h3>
+      <label
+        >Background
+        <input
+          aria-label="Background colour"
+          id="background-color"
+          title="Background colour"
+          type="color"
+          value="#121a23" /></label
+      ><label
+        >Filled cells
+        <input
+          aria-label="Filled cell colour"
+          id="cell-color"
+          title="Filled cell colour"
+          type="color"
+          value="#86ddb8"
+      /></label>
+      <h3>Tools</h3>
+      <div id="menu-tools"></div>
+    </aside>
+    <section id="home" aria-label="Main menu">
+      <div class="home-card">
+        <div class="delta-mark" aria-hidden="true">▽</div>
+        <h1>Delta Triplex</h1>
+        <p>Three directions. One solution.</p>
+        <div id="home-main" class="home-actions">
+          <button id="new-game">New Game</button
+          ><button id="select-level">Level Select</button
+          ><button id="endless-mode">Endless Mode</button
+          ><button id="create-puzzle">Create Puzzle</button
+          ><button id="load-puzzle">Load Puzzle</button>
+        </div>
+        <section id="home-levels" hidden>
+          <h2>Level Select</h2>
+          <div id="level-grid"></div>
+        </section>
+        <section id="home-endless" hidden>
+          <h2>Endless Mode</h2>
+          <div class="home-actions" id="difficulties">
+            <button>Easy</button><button>Medium</button><button>Hard</button
+            ><button>Impossible</button>
+          </div>
+          <p id="endless-note" role="status">
+            Every puzzle has one solution. Choose your challenge.
+          </p>
+        </section>
+        <p id="load-error" role="alert" hidden></p>
+        <button id="home-back" hidden>Back</button>
+      </div>
+    </section>
+    <input
+      type="file"
+      id="puzzle-file"
+      accept=".json,application/json"
+      hidden
+    />
+    <div id="completion" hidden role="status">
+      <span>Solved</span><button id="next-puzzle">Next →</button>
+    </div>
+    <div id="toast" hidden role="status"></div>
+    <div id="status" role="status">Loading…</div>
+    <div id="error" hidden></div>
+    <div id="utilities" hidden>
+      <button id="memory">Memory</button
+      ><button id="fullscreen">Fullscreen</button
+      ><button id="replay">Introduction</button>
+    </div>
+    <aside aria-label="Memory diagnostics" hidden id="memory-panel">
+      <h2>Memory during play</h2>
+      <dl>
+        <dt>Wasm capacity</dt>
+        <dd id="mem-capacity">—</dd>
+        <dt>C heap allocated</dt>
+        <dd id="mem-allocated">—</dd>
+        <dt>C heap free blocks</dt>
+        <dd id="mem-free">—</dd>
+        <dt>Peak allocated (sampled)</dt>
+        <dd id="mem-peak">—</dd>
+        <dt>Change since opening</dt>
+        <dd id="mem-delta">—</dd>
+        <dt>Board + undo + saves + effects</dt>
+        <dd id="mem-static">—</dd>
+        <dt>Samples retained</dt>
+        <dd id="mem-count">0</dd>
+        <dt>Frames drawn</dt>
+        <dd id="mem-frames">0</dd>
+      </dl>
+      <p>
+        Samples once per second while recording; retains 600. Hide to play. Wasm
+        capacity is buffer size, not physical RAM. Allocations and static data
+        are within capacity; do not add the rows. JavaScript, browser and GPU
+        memory are excluded. Sampling does not redraw the board.
+      </p>
+      <div class="actions">
+        <button id="memory-export" disabled>Export CSV</button
+        ><button id="memory-reset">Restart</button
+        ><button id="memory-pause">Pause</button
+        ><button id="memory-close">Hide</button>
+      </div>
+    </aside>
+    <script src="palette.js"></script>
+    <script src="share.js"></script>
+    <script src="app.js"></script>
+    {{{ SCRIPT }}}
+    <script src="editor.js"></script>
+    <script src="flow.js"></script>
+    <script src="back.js"></script>
+  </body>
+</html>
