@@ -408,7 +408,7 @@ function harness(html, url = "https://tri.test/", storage = {}) {
       h.exports.game_effects(1250);
       assert(Math.abs(h.exports.game_celebration_angle() - 315) < 0.01);
       assert(Math.abs(h.exports.game_celebration_scale() - 1.1) < 0.0001);
-      assert(!h.exports.game_effects(1500));
+      assert(h.exports.game_effects(1500), "solved row sweep continues after the spin");
       assert.equal(h.exports.game_celebration_scale(), 1);
       assert.equal(h.exports.game_celebration_angle(), 0);
       h.exports.game_motion(0);
@@ -453,7 +453,10 @@ function harness(html, url = "https://tri.test/", storage = {}) {
     assert.equal(h.state.row, 1);
     const solution = h.state.solution.slice(),
       n = h.state.n;
-    const half = Math.min((900 - 96) / 2, (760 - 144) / Math.sqrt(3)),
+    const direction = h.state.orientation;
+    const half = direction % 2
+      ? Math.min((760 - 96) / 2, (900 - 144) / Math.sqrt(3))
+      : Math.min((900 - 96) / 2, (760 - 144) / Math.sqrt(3)),
       step = half / n;
     for (let i = 0; i < n; i++)
       for (let j = 0; j < n - i; j++)
@@ -462,13 +465,13 @@ function harness(html, url = "https://tri.test/", storage = {}) {
           const r = i + j + o,
             id = r * r + 2 * i + o;
           if (solution[id]) {
-            h.exports.game_down(
-              450 + (j - i) * step,
-              380 -
-                (half * Math.sqrt(3)) / 2 +
-                (n - i - j - (o ? 4 / 3 : 2 / 3)) * step * Math.sqrt(3),
-              1,
-            );
+            let x = (j - i) * step,
+              y = -(half * Math.sqrt(3)) / 2 +
+                (n - i - j - (o ? 4 / 3 : 2 / 3)) * step * Math.sqrt(3);
+            if (direction === 1) [x, y] = [y, -x];
+            else if (direction === 2) [x, y] = [-x, -y];
+            else if (direction === 3) [x, y] = [-y, x];
+            h.exports.game_down(450 + x, 380 + y, 1);
             h.exports.game_up();
           }
         }
@@ -484,9 +487,10 @@ function harness(html, url = "https://tri.test/", storage = {}) {
     assert.equal(exported.size, n);
     const shareUrl = w.TriShare.url(exported);
     assert(shareUrl.startsWith("https://delta-triplex.example/#seed="));
-    const sharedSeed = harness(source, shareUrl);
+    const sharedSeed = harness(source, shareUrl.replace(/&orientation=[SENW]/, ""));
     assert(sharedSeed.state.custom && !sharedSeed.state.editing);
     assert.deepEqual(sharedSeed.state.solution, h.state.solution);
+    assert.equal(sharedSeed.state.orientation, h.state.orientation);
     sharedSeed.close();
     h.click("editor-share");
     await Promise.resolve();

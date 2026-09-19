@@ -71,17 +71,17 @@ typedef struct { bool active; double start; int distance[MAX_TILES],max_distance
 static Ripple ripples[RIPPLE_COUNT];
 static int next_ripple=0;
 static bool motion=true,shine=false;
-static double shine_start=-1, celebration_start=-1;
+static double shine_start=-1, celebration_start=-1, solved_start=-1;
 static bool celebrating=false;
 static float celebration_angle=0,celebration_scale=1;
-API void game_clear_celebration(void){celebrating=false;celebration_angle=0;celebration_scale=1;}
+API void game_clear_celebration(void){solved_start=-1;celebrating=false;celebration_angle=0;celebration_scale=1;}
 API void game_celebrate(void){if(motion){celebrating=true;celebration_start=-1;}}
 API float game_celebration_angle(void){return celebration_angle;}
 API float game_celebration_scale(void){return celebration_scale;}
 static float light[MAX_TILES];
-API void game_clear_effects(void){memset(ripples,0,sizeof ripples);memset(light,0,sizeof light);shine=false;celebrating=false;celebration_angle=0;celebration_scale=1;}
+API void game_clear_effects(void){memset(ripples,0,sizeof ripples);memset(light,0,sizeof light);solved_start=-1;shine=false;celebrating=false;celebration_angle=0;celebration_scale=1;}
 API void game_motion(int enabled){motion=enabled!=0;if(!motion)game_clear_effects();}
-API void game_shine(void){if(motion){shine=true;shine_start=-1;}}
+API void game_shine(void){if(motion&&!won){shine=true;shine_start=-1;}}
 static bool adjacent(int a,int b){
     Tile x=board.tiles[a],y=board.tiles[b];if(x.o==y.o)return false;
     if(x.o){Tile swap=x;x=y;y=swap;}
@@ -111,6 +111,18 @@ API int game_effects(double now){
                 float pulse=.48f*envelope/(1+.10f*r->distance[t]);light[t]=fmaxf(light[t],pulse);
             }
         }
+    }
+    if(!won||!motion)solved_start=-1;
+    if(won&&motion){
+        if(solved_start<0)solved_start=now;
+        shine=false;active=true;
+        double step=(now-solved_start)/500.0;
+        int row=(int)step%board.n;
+        // Canonical rows run from the point to the base in every orientation.
+        float pulse=.18f+.12f*cosf((step-floor(step))*PI);
+        for(int t=0;t<board.count;t++)
+            if(board.tiles[t].i+board.tiles[t].j+board.tiles[t].o==row)
+                light[t]=fmaxf(light[t],pulse);
     }
     if(shine){
         if(shine_start<0)shine_start=now;
@@ -376,7 +388,7 @@ API const char *game_generate(int difficulty,unsigned int seed){
     if(!puzzle_generate(difficulty,seed,&candidate,&rating))return "";
     int solution[MAX_TILES]={0};
     for(int t=0;t<candidate.count;t++)solution[canonical_id(candidate.tiles[t])]=candidate.tiles[t].solution;
-    int used=snprintf(json,sizeof json,"{\"format\":\"tri-logic\",\"version\":2,\"cellOrder\":\"north-row-major\",\"size\":%d,\"orientation\":\"S\",\"rounds\":%d,\"solution\":[",candidate.n,rating.rounds);
+    int used=snprintf(json,sizeof json,"{\"format\":\"tri-logic\",\"version\":2,\"cellOrder\":\"north-row-major\",\"size\":%d,\"orientation\":\"%c\",\"rounds\":%d,\"solution\":[",candidate.n,"SENW"[(seed ^ (seed >> 16)) & 3],rating.rounds);
     for(int t=0;t<candidate.count;t++)used+=snprintf(json+used,sizeof json-used,"%s%d",t?",":"",solution[t]);
     snprintf(json+used,sizeof json-used,"]}");return json;
 }

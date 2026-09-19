@@ -58,11 +58,11 @@ window.TriShare = {
   },
   // Replace this origin when the public release has an address.
   base: "https://delta-triplex.example/",
-  seedPuzzle(seed, difficulty, orientation = "S") {
+  seedPuzzle(seed, difficulty, orientation) {
     if (
       !/^[0-9a-f]{1,8}$/i.test(seed) ||
       !["easy", "medium", "hard", "impossible"].includes(difficulty) ||
-      !["S", "E", "N", "W"].includes(orientation)
+      (orientation !== undefined && !["S", "E", "N", "W"].includes(orientation))
     )
       throw Error("Invalid seed link.");
     const number = parseInt(seed, 16),
@@ -77,7 +77,7 @@ window.TriShare = {
     return {
       ...JSON.parse(json),
       name: "Shared " + difficulty + " puzzle",
-      orientation,
+      ...(orientation ? { orientation } : {}),
       seed: number,
       difficulty: level,
     };

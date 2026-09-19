@@ -7,7 +7,7 @@ int tile_line(const Board *b,int t,int axis) {
 }
 static int order(Tile t,int axis) {
     int value=2*(axis==0?t.j:t.i)+t.o;
-    // Point-down board: A down-left, B down-right, C left-right.
+    // Engine axes 0/1/2: down-left/down-right/left-right (displayed C/A/B).
     return -value;
 }
 static int runs(const Board *b,const Line *l,bool solution,int *out) {

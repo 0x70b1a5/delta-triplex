@@ -13,6 +13,17 @@ static void fill_solution(void){
  assert(won);
 }
 int main(void){
+ int directions=0;
+ for(unsigned seed=0;seed<256;seed++){
+  const char *generated=game_generate(0,seed);
+  if(!*generated)continue;
+  char first[1024];strcpy(first,generated);
+  assert(!strcmp(first,game_generate(0,seed)));
+  int direction=(seed^(seed>>16))&3;
+  char expected[32];snprintf(expected,sizeof expected,"\"orientation\":\"%c\"","SENW"[direction]);
+  assert(strstr(first,expected));directions|=1<<direction;
+ }
+ assert(directions==15);
  boot();assert(tutorial==0&&board.n==2);
  for(int demo=0;demo<3;demo++){
   assert(tutorial==demo&&board.n==demo+2);
@@ -107,7 +118,19 @@ int main(void){
   assert(history_count==1);game_editing(0);assert(custom&&!editing&&history_count==0);
   assert(selected_axis==2&&selected_row==n-1);
   for(int t=0;t<board.count;t++)assert(board.tiles[t].state==0);
-  fill_solution();assert(won);game_editing(1);assert(editing&&!won&&history_count==1);
+  fill_solution();assert(won);
+  game_clear_effects();game_shine();assert(!shine);
+  for(int tick=0;tick<2*n;tick++){
+   for(int phase=0;phase<2;phase++){
+    assert(game_effects(1000+tick*500+phase*499));
+    for(int t=0;t<board.count;t++){
+     bool lit=board.tiles[t].i+board.tiles[t].j+board.tiles[t].o==tick%n;
+     assert(lit ? light[t]>.05f : light[t]==0);
+    }
+   }
+  }
+  game_motion(0);assert(!game_effects(20000));game_motion(1);
+  game_editing(1);assert(editing&&!won&&history_count==1);
   game_undo();assert(board.tiles[0].solution==old);
   game_reset();for(int t=0;t<board.count;t++)assert(board.tiles[t].solution==0);
   game_undo();for(int t=0;t<board.count;t++)assert(board.tiles[t].solution==asymmetric[canonical_id(board.tiles[t])]-'0');

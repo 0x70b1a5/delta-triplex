@@ -890,6 +890,41 @@
           padding: 6px;
         }
       }
+      @media (min-width: 900px) and (orientation: landscape) {
+        #app #stage {
+          margin-bottom: 64px;
+        }
+        #app[data-orientation="S"] #clues {
+          bottom: 80px;
+        }
+        #app #workshop {
+          position: fixed;
+          left: 16px;
+          right: auto;
+          bottom: 16px;
+          min-height: 44px;
+          max-width: calc(100vw - 580px);
+          width: auto;
+          align-content: center;
+        }
+        #app #corner {
+          position: fixed;
+          right: 16px;
+          bottom: 16px;
+        }
+        #completion {
+          left: auto;
+          right: 300px;
+          bottom: 16px;
+          transform: none;
+          height: 44px;
+          padding: 0 10px;
+          gap: 12px;
+        }
+        #completion button {
+          padding: 8px 12px;
+        }
+      }
       .colour-controls {
         display: flex;
         align-items: center;

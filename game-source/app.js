@@ -23,6 +23,7 @@ function scheduleShine() {
     appReady &&
       !document.hidden &&
       motionEnabled &&
+      !state?.won &&
       (shineTimer = setTimeout(() => {
         ((shineTimer = 0), call("shine"), requestFrame(), scheduleShine());
       }, 4800)));
@@ -39,11 +40,11 @@ let activePointer = null,
 const lessons = [
   [
     "1 / 3 · Four cells",
-    "Fill the triangles to match the numbers. A number is a run of touching filled cells along a strip. Select A1: its 3 means fill all three highlighted cells. A 0 means leave that strip empty.",
+    "Fill the triangles to match the numbers. A number is a run of touching filled cells along a strip. Select C1: its 3 means fill all three highlighted cells. A 0 means leave that strip empty.",
   ],
   [
     "2 / 3 · Nine cells",
-    "Multiple numbers are separate runs, in the arrow’s direction. A1 reads 1 1 1: three filled cells with at least one empty cell between them. Crosses help you mark cells you know are empty.",
+    "Multiple numbers are separate runs, in the arrow’s direction. C1 reads 1 1 1: three filled cells with at least one empty cell between them. Crosses help you mark cells you know are empty.",
   ],
   [
     "3 / 3 · Sixteen cells",
@@ -242,7 +243,7 @@ function requestFrame(e = !0) {
         (call("render"),
           drawCount++,
           e && positionStripLabel(),
-          t && requestFrame(!1));
+          t && !window.triMenuOpen && requestFrame(!1));
       })));
 }
 function positionStripLabel() {
@@ -254,7 +255,14 @@ function positionStripLabel() {
   const n = el(`clue-${state.axis}-${state.row}`).lastElementChild;
   window.getComputedStyle &&
     (t.style.fontSize = window.getComputedStyle(n).fontSize);
+  const label = t.getBoundingClientRect();
+  // Keep the full label visible even on high-DPI desktop canvases.
+  t.style.top = Math.max(parseFloat(t.style.top), label.height + 8 - e.top) + "px";
+  t.style.left = Math.max(8 - e.left, Math.min(parseFloat(t.style.left), window.innerWidth - e.left - label.width - 8)) + "px";
 }
+// Keep engine/save axes stable; display them in rotational A, B, C order.
+const displayAxes = [1, 2, 0];
+const axisLabels = ["C", "A", "B"];
 function axisArrows() {
   return [
     ["↙", "↘", "→"],
@@ -266,10 +274,10 @@ function axisArrows() {
 function makeGrid(e) {
   el("clues").replaceChildren();
   const t = axisArrows().map(
-      (arrow, i) => String.fromCharCode(65 + i) + " " + arrow,
+      (arrow, i) => axisLabels[i] + " " + arrow,
     ),
     n = t;
-  for (let r = 0; r < 3; r++) {
+  for (const r of displayAxes) {
     const a = document.createElement("div");
     ((a.className = "clue-column"),
       a.style.setProperty("--axis", ["var(--a)", "var(--b)", "var(--c)"][r]));
@@ -283,7 +291,7 @@ function makeGrid(e) {
       const e = document.createElement("button");
       ((e.className = "clue"), (e.id = `clue-${r}-${t}`));
       const n = document.createElement("small");
-      n.textContent = String.fromCharCode(65 + r) + (t + 1);
+      n.textContent = axisLabels[r] + (t + 1);
       const o = document.createElement("span");
       (e.append(n, o), (e.onclick = () => call("select", r, t)), a.append(e));
     }
@@ -325,7 +333,7 @@ function makeGrid(e) {
           ),
           n.setAttribute(
             "aria-label",
-            `${String.fromCharCode(65 + e)}${t + 1}: ${a}${r.match ? ", runs match" : ""}`,
+            `${axisLabels[e]}${t + 1}: ${a}${r.match ? ", runs match" : ""}`,
           ));
       }
     const r = state.clues[state.axis][state.row];

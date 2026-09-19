@@ -245,7 +245,7 @@ window.triInitializeCustom = () => {
         TriShare.seedPuzzle(
           params.get("seed"),
           params.get("difficulty"),
-          params.get("orientation") || "S",
+          params.get("orientation") || undefined,
         ),
         false,
         false,
