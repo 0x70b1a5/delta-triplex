@@ -1061,6 +1061,14 @@
       #home #load-error, #home #endless-note { position: fixed; top: 0; left: 10%; width: 80%; z-index: 3; margin: 0; background: var(--bg); font-size: 11px; text-align: center; }
       #home #endless-note { pointer-events: none; }
       #home #endless-note:empty { display: none; }
+      @media (max-width: 700px) {
+        .home-triangle {
+          /* Equilateral and centered, with a little side bleed on the first button row. */
+          --mobile-width: min(140vw, 104dvh);
+          width: var(--mobile-width); height: calc(var(--mobile-width) * .8660254038);
+          top: calc((100dvh - var(--mobile-width) * .8660254038) / 2);
+        }
+      }
       @media (max-height: 450px) {
         .home-triangle { --top: 8px; }
         .home-banner h1, .home-banner h2 { font-size: clamp(18px, 6dvh, 30px); }
