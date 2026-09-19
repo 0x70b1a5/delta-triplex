@@ -10,7 +10,7 @@ The title and triangle menus use bundled Michroma in uppercase (SIL Open Font Li
 
 Level Select and Endless Mode use the same triangular layout, adding complete rows for additional options. Each submenu has a Back button in its bottom tip. Opening a submenu zooms the entire homepage toward the selected cell over 360ms: neighboring cells move offscreen while the full submenu is drawn immediately inside the expanding cell. Both menus stay opaque throughout, with a triangular background behind the submenu covering the old button label. Back reverses that whole-menu camera movement. Both menus are inert during the transition, and resize or reduced-motion changes settle it cleanly.
 
-All triangle menus flash complete rows from point to banner on a 500ms cycle, retaining contrasting label colours throughout each pulse.
+All triangle menus flash outward from the bottom cell in shared-edge distance waves, advancing every 500ms through upward fillers and downward cells to the banner. Corner contact alone does not advance the wave. Labels retain contrasting colours throughout each pulse.
 
 Homepage hues drift at a smoothly varying speed, using the existing OKLCH gamut mapping and contrast calculations on each frame. Colours are scoped to the homepage and do not overwrite saved gameplay colours. Motion pauses while hidden and respects reduced motion. Hovered, pressed and keyboard-focused buttons use the filled-cell colour with contrasting text.
 

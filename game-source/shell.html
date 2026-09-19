@@ -1035,7 +1035,7 @@
         clip-path: polygon(.2% .5%, 99.8% .5%, calc(100% - var(--tip) - .2%) 99.5%, calc(var(--tip) + .2%) 99.5%);
         display: grid; place-items: center;
       }
-      .home-banner h1, .home-banner h2 { position: relative; z-index: 1; font: 400 clamp(20px, 4.4vw, 68px)/1.2 Michroma, sans-serif; letter-spacing: .025em; margin: 0; }
+      .home-banner h1, .home-banner h2 { position: relative; z-index: 1; font: 700 clamp(30px, 6.6vw, 102px)/1.2 Michroma, sans-serif; letter-spacing: .025em; margin: 0; }
       #home .home-cell {
         display: block; position: absolute; left: var(--x); top: var(--y);
         width: calc(100% / var(--rows)); height: calc(100% / var(--rows)); margin: 0; padding: 0; border: 0; border-radius: 0;
@@ -1050,6 +1050,7 @@
       #home .home-filler { pointer-events: none; }
       #home .home-credit, #home .home-back { font-size: var(--label-size, clamp(9px, 1.1vw, 17px)); }
       #home .home-credit > span, #home .home-back > span { top: 24%; }
+      #home .home-credit > span { font-size: 75%; }
       #home .home-credit small { margin: 0 0 .2em; }
       #home .home-cell::after, .home-banner::after { content: ""; position: absolute; inset: 0; background: white; opacity: var(--row-glow, 0); pointer-events: none; }
       #home button.home-cell:active, #home a.home-cell:active,
@@ -1071,7 +1072,7 @@
       }
       @media (max-height: 450px) {
         .home-triangle { --top: 8px; }
-        .home-banner h1, .home-banner h2 { font-size: clamp(18px, 6dvh, 30px); }
+        .home-banner h1, .home-banner h2 { font-size: clamp(27px, 9dvh, 45px); }
       }
     </style>
   </head>

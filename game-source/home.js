@@ -11,6 +11,10 @@
     node.style.setProperty("--x", x * 100 + "%");
     node.style.setProperty("--y", y * 100 + "%");
     node.dataset.row = row;
+    // From the bottom tip, each row takes two shared-edge hops:
+    // first its upward triangle, then the downward triangles beside it.
+    node.dataset.wave = 2 * (+node.closest('.home-triangle').dataset.rows - 1 - row)
+      - (node.classList.contains('home-up') ? 1 : 0);
     if (node.matches("button, a") && !node.querySelector(":scope > span")) {
       const span = document.createElement("span");
       while (node.firstChild) span.append(node.firstChild);
@@ -39,6 +43,7 @@
       scene.style.setProperty("--rows", rows);
       scene.style.setProperty("--tip", 50 / rows + "%");
       scene.querySelector(".home-banner").dataset.row = 0;
+      scene.querySelector(".home-banner").dataset.wave = 2 * rows - 3;
       scene.querySelectorAll(".home-filler").forEach(node => node.remove());
       let index = 0;
       for (let row = 1; row < rows - 1; row++) {
@@ -51,7 +56,7 @@
           if (col < rows - row - 1) {
             const up = document.createElement("i");
             up.className = "home-filler home-up"; up.setAttribute("aria-hidden", "true");
-            cell(up, x + .5 / rows, row / rows, row); scene.append(up);
+            scene.append(up); cell(up, x + .5 / rows, row / rows, row);
           }
         }
       }
@@ -124,7 +129,7 @@
     for (const scene of scenes) {
       const rows = +scene.dataset.rows;
       const step = elapsed * 2;
-      const row = rows - 1 - Math.floor(step) % rows;
+      const wave = Math.floor(step) % (2 * rows - 2);
       const glow = motionEnabled && !home.hidden ? .18 + .12 * Math.cos((step % 1) * Math.PI) : 0;
       const empty = home.style.getPropertyValue("--empty");
       const lit = "#" + [1, 3, 5].map(i => {
@@ -133,7 +138,7 @@
       }).join("");
       const ink = TriPalette.contrast(lit, "#000000") >= TriPalette.contrast(lit, "#ffffff") ? "#000000" : "#ffffff";
       for (const cell of scene.querySelectorAll("[data-row]")) {
-        const active = +cell.dataset.row === row && glow > 0;
+        const active = +cell.dataset.wave === wave && glow > 0;
         cell.style.setProperty("--row-glow", active ? glow : 0);
         cell.style.setProperty("--row-ink", active ? ink : "var(--home-empty-ink)");
       }

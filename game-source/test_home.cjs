@@ -78,9 +78,9 @@ for (const reducedMotion of [false, true]) {
     assert.equal(scene.style.transform, '', 'submenu finishes at the shared outer triangle bounds');
     assert.equal(scene.style.clipPath, '', 'temporary backing is removed after settling');
     assert(d.getElementById('home-main').hidden);
-    const activeRows = new Set([...scene.querySelectorAll('[data-row]')]
-      .filter(cell => +cell.style.getPropertyValue('--row-glow') > 0).map(cell => cell.dataset.row));
-    assert.equal(activeRows.size, reducedMotion ? 0 : 1, 'one complete row shines, unless reduced motion is enabled');
+    const activeWaves = new Set([...scene.querySelectorAll('[data-row]')]
+      .filter(cell => +cell.style.getPropertyValue('--row-glow') > 0).map(cell => cell.dataset.wave));
+    assert.equal(activeWaves.size, reducedMotion ? 0 : 1, 'one edge-distance wave shines, unless reduced motion is enabled');
     h.click('home-back');
     if (!reducedMotion) {
       assert.equal(home.dataset.transition, 'out');
@@ -101,4 +101,32 @@ for (const reducedMotion of [false, true]) {
   assert.equal(new Set(positions).size, 13, 'every level and back button has its own cell');
   h.close();
 }
-console.log('PASS: submenu zoom endpoints/midpoint/reverse, input guard, back tips, row flashes, row growth and reduced motion.');
+console.log('PASS: submenu zoom endpoints/midpoint/reverse, input guard, back tips, wave flashes, row growth and reduced motion.');
+
+// Check visible flashes against the actual shared-edge order, including the
+// upward fillers that touch the next row along an edge (not just a corner).
+{
+  const h = harness(source, 'https://tri.test/', {}, { reducedMotion: false });
+  h.w.triShowHome(); h.frame();
+  const scene = h.d.getElementById('home-main');
+  const expected = [
+    [scene.querySelector('.home-credit')],
+    [...scene.querySelectorAll('.home-up[data-row="2"]')],
+    ['create-puzzle', 'load-puzzle'].map(id => h.d.getElementById(id)),
+    [...scene.querySelectorAll('.home-up[data-row="1"]')],
+    ['new-game', 'select-level', 'endless-mode'].map(id => h.d.getElementById(id)),
+    [scene.querySelector('.home-banner')],
+  ];
+  assert.deepEqual(expected.map(cells => cells.length), [1, 1, 2, 2, 3, 1]);
+  for (let step = 0; step <= expected.length; step++) {
+    const active = [...scene.querySelectorAll('[data-row]')]
+      .filter(cell => +cell.style.getPropertyValue('--row-glow') > 0);
+    assert.deepEqual(new Set(active), new Set(expected[step % expected.length]),
+      `shared-edge wave ${step}, including wraparound`);
+    // Advance just past the next half-second boundary to avoid float rounding.
+    for (let i = 0; i < 5; i++) h.frame(100);
+    h.frame(1);
+  }
+  h.close();
+}
+console.log('PASS: tip-first shared-edge flash sequence, upward fillers and wraparound.');
