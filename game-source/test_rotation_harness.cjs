@@ -122,7 +122,7 @@ function harness(html, url = "https://tri.test/", storage = {}, options = {}) {
   const flush = () => {
     const pending = [...frames.values()];
     frames.clear();
-    pending.forEach((fn) => fn());
+    pending.forEach((fn) => fn(now));
   };
   flush();
   function tapTip() {

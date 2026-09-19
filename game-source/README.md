@@ -2,6 +2,18 @@
 
 A rotating triangular nonogram with a shared C rules engine, an SVG board and DOM controls. The standalone HTML embeds its Emscripten WebAssembly engine and has no runtime network dependencies. The Site wrapper serves `public/game.html`.
 
+## Homepage
+
+The homepage is a four-row triangle: the top seven-cell strip is a filled DELTA TRIPLEX banner, the five downward-facing middle cells hold the menu buttons, three upward-facing cells remain unfilled, and the credit tip links to https://lovecrypt.itch.io/. Half the credit tip extends below the viewport. The triangle adapts its proportions to the screen to keep the title and all five actions visible.
+
+The title and triangle menus use bundled Michroma in uppercase (SIL Open Font License; see `fonts/OFL-Michroma.txt`). The build embeds the font and its license, preserving standalone/offline deployment. Oxanium and Space Grotesk remain alternative title options.
+
+Level Select and Endless Mode use the same triangular layout, adding complete rows for additional options. Each submenu has a Back button in its bottom tip. Opening a submenu zooms the entire homepage toward the selected cell over 360ms: neighboring cells move offscreen while the full submenu is drawn immediately inside the expanding cell. Both menus stay opaque throughout, with a triangular background behind the submenu covering the old button label. Back reverses that whole-menu camera movement. Both menus are inert during the transition, and resize or reduced-motion changes settle it cleanly.
+
+All triangle menus flash complete rows from point to banner on a 500ms cycle, retaining contrasting label colours throughout each pulse.
+
+Homepage hues drift at a smoothly varying speed, using the existing OKLCH gamut mapping and contrast calculations on each frame. Colours are scoped to the homepage and do not overwrite saved gameplay colours. Motion pauses while hidden and respects reduced motion. Hovered, pressed and keyboard-focused buttons use the filled-cell colour with contrasting text.
+
 ## Playing
 
 Tap/click a triangle to cycle empty → filled → crossed → empty. Right-click crosses or clears. Every strip must match its run-length clues; crosses are optional. Two clue sides are visible at a time, with no selected-row highlighting. Read each clue sequence from outside toward the board.

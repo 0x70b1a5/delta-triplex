@@ -11,13 +11,14 @@ window.triCancelGeneration = function () {
 };
 window.triMenuOpen = true;
 window.triShowHome = function (view = "main") {
+  window.triHomePrepare?.(view);
   window.triCancelGeneration();
   window.triEndlessRun = null;
-  el("endless-note").textContent =
-    "Every puzzle has one solution. Choose your challenge.";
+  el("endless-note").textContent = "";
   call("up");
   call("clear_effects");
   window.triMenuOpen = true;
+  el("home").dataset.view = view;
   el("home").hidden = false;
   el("app").inert = true;
   el("completion").hidden = true;
@@ -26,12 +27,14 @@ window.triShowHome = function (view = "main") {
     el("home-" + name).hidden = name !== view;
   el("home-back").hidden = view === "main";
   el("load-error").hidden = true;
+  window.triHomeChanged?.();
   el(view === "main" ? "new-game" : "home-back").focus();
   window.triSyncHistory?.();
 };
 window.triShowPlay = function () {
   window.triMenuOpen = false;
   el("home").hidden = true;
+  window.triHomeChanged?.();
   el("app").inert = false;
   toggleMenu(false);
   requestFrame();
@@ -61,6 +64,7 @@ window.triBuildLevels = function (names) {
       tile.onclick = () => openLevel(index);
       el("level-grid").append(tile);
     });
+    window.triHomeLayout?.();
   }
   names.forEach((_, i) =>
     el("level-" + i).setAttribute(
@@ -165,6 +169,8 @@ async function startEndless(difficulty, number = 1, recent = []) {
     "64 cells · Longer deductions",
     "100 cells · The deepest challenge",
   ][difficulty];
+  button.title = detail.textContent;
+  detail.textContent = detail.textContent.split(" · ")[0];
   button.append(detail);
   button.onclick = () => startEndless(difficulty);
 });
