@@ -936,13 +936,94 @@
         height: 44px;
         padding: 4px;
       }
+      /* Rotating board and responsive controls. */
+      #app { display: block !important; padding: 0 !important; }
+      #app #stage { position: absolute !important; inset: 52px 0 150px !important; margin: 0 !important; }
+      #canvas, #clues, #strip-label { display: none !important; }
+      #app #side { display: contents !important; }
+      #app { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+      #rotate-board, #rotate-board * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+      #rotate-board { display: block; width: 100%; height: 100%; touch-action: none; user-select: none; outline: none; }
+      #app:not([data-solved="true"]) #rotate-board[data-keyboard-focus="true"]:focus { outline: 1px solid var(--muted); outline-offset: -4px; }
+      #rotate-board polygon { cursor: pointer; }
+      #rotate-board text { fill: var(--ink); font-family: system-ui, sans-serif; font-variant-numeric: tabular-nums; pointer-events: none; }
+      #rotate-board text[data-axis] { fill: var(--cell); }
+      #session-bar { position: fixed; top: 14px; left: 24px; right: 20px; display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--muted); font-size: 12px; }
+      #session-clock { font-variant-numeric: tabular-nums; white-space: nowrap; }
+      #turn-controls { display: flex; align-items: center; gap: 6px; }
+      #turn-left svg { transform: rotate(-90deg); }
+      #turn-right svg { transform: scaleX(-1) rotate(-90deg); }
+      #app #workshop { position: fixed !important; left: 24px; bottom: 20px; max-width: calc(100vw - 450px); min-height: 44px; }
+      #app #corner { position: fixed !important; bottom: 20px; right: 20px; width: auto; }
+      #app #lesson { position: fixed !important; left: 24px; right: auto; bottom: 148px; width: 260px; padding: 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; z-index: 3; }
+      #completion { left: 24px !important; right: auto !important; bottom: 88px !important; transform: none !important; height: auto !important; min-height: 48px; padding: 8px 12px; gap: 12px; flex-wrap: wrap; max-width: calc(100vw - 48px); }
+      #result-copy { position: fixed; left: 24px; bottom: 150px; width: min(540px, calc(100vw - 48px)); padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; z-index: 30; }
+      #result-copy textarea { display: block; width: 100%; min-height: 90px; margin: 8px 0; background: var(--surface); color: var(--ink); }
+      #app[data-tutorial="true"] #stage { right: 0 !important; bottom: 310px !important; }
+      #app[data-tutorial="true"] #lesson { left: 24px; right: auto; bottom: 148px; width: min(560px, calc(100vw - 48px)); }
+      @media(max-width: 700px) {
+        #app[data-tutorial="true"] #stage { right: 0 !important; bottom: 340px !important; }
+        #app[data-tutorial="true"] #lesson { left: 24px; right: auto; }
+        #session-bar { font-size: 11px; }
+        #app #stage { bottom: 180px !important; }
+        #app #workshop { bottom: 114px; max-width: calc(100vw - 48px); min-height: 0; font-size: 11px; }
+        #app #corner { bottom: 14px; right: 16px; }
+        #turn-controls { gap: 4px; }
+        #workshop-actions { position: absolute; right: 0; bottom: 52px; margin: 0; }
+        #completion { bottom: 110px !important; font-size: 13px; }
+        #app #lesson { bottom: 185px; width: calc(100vw - 48px); font-size: 12px; }
+        #result-copy { bottom: 184px; }
+      }
+      @media(max-height: 550px) and (orientation: landscape) {
+        #app #stage { inset: 36px 0 120px !important; }
+        #app #lesson { left: auto; right: 20px; bottom: 140px; }
+      }
+      /* Completion participates in the same footer row as every other control. */
+      #app #corner { left: 24px; right: 20px; }
+      #bottom-controls { width: 100%; }
+      #completion {
+        position: static !important; transform: none !important;
+        margin: 0 auto 0 0; padding: 0; gap: 8px; border: 0; background: transparent;
+        border-radius: 0; min-height: 44px; height: auto !important;
+        max-width: none; flex-wrap: nowrap; flex-shrink: 0; font-size: 14px;
+      }
+      #solve-result { white-space: nowrap; text-align: left; }
+      #completion .icon { padding: 10px; min-height: 44px; }
+      #completion #share-result { width: auto; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; }
+      #share-result svg { flex-shrink: 0; }
+      .mobile-share-suffix { display: none; }
+      @media (min-width: 900px) {
+        #app[data-solved="true"] #stage { inset: 52px 0 !important; }
+      }
+      @media (min-width: 900px) and (max-height: 550px) and (orientation: landscape) {
+        #app[data-solved="true"] #stage { inset: 36px 0 !important; }
+      }
+      #app[data-solved="true"] #workshop { bottom: 78px; max-width: calc(100vw - 48px); }
+      #toast { bottom: max(78px, env(safe-area-inset-bottom)); }
+      @media (max-width: 899px) {
+        #solve-result { display: none; }
+        .mobile-share-suffix { display: inline; }
+        #completion { font-size: 13px; gap: 6px; }
+      }
+      @media (max-width: 700px) {
+        #app #corner { left: 16px; right: 16px; }
+        #completion { min-height: 40px; }
+        #completion .icon { min-height: 40px; padding: 7px; }
+        #app[data-solved="true"] #workshop { bottom: 114px; }
+      }
+      @media (max-width: 360px) {
+        #bottom-controls .icon { flex-basis: 32px; width: 32px; min-width: 32px; padding: 5px; }
+        #completion { font-size: 12px; gap: 4px; }
+        #completion #share-result { gap: 4px; padding: 5px; }
+        #completion svg { width: 20px; height: 20px; }
+      }
     </style>
   </head>
   <body>
     <main data-tutorial="true" id="app">
       <div id="stage">
         <canvas
-          aria-label="Triangle nonogram board. Click to fill, drag to paint, tap a filled one to cross, tap a cross to clear."
+          aria-label="Internal rules canvas"
           height="760"
           id="canvas"
           tabindex="0"
@@ -1081,7 +1162,9 @@
       hidden
     />
     <div id="completion" hidden role="status">
-      <span>Solved</span><button id="next-puzzle">Next →</button>
+      <span id="solve-result">Solved<span id="solve-details"></span></span>
+      <button id="share-result" class="icon share-button" aria-label="Share solution" title="Share solution"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V3m-4 4 4-4 4 4M5 11v9h14v-9" /></svg><span>Share<span class="mobile-share-suffix"> solution</span></span></button>
+      <button id="next-puzzle" class="icon" aria-label="Next puzzle" title="Next puzzle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" /></svg></button>
     </div>
     <div id="toast" hidden role="status"></div>
     <div id="status" role="status">Loading…</div>
@@ -1131,5 +1214,6 @@
     <script src="editor.js"></script>
     <script src="flow.js"></script>
     <script src="back.js"></script>
+    <script src="rotate.js"></script>
   </body>
 </html>

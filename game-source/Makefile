@@ -2,6 +2,11 @@ RAYLIB ?= ../.build/raylib-5.5
 EMCC ?= emcc
 CC ?= cc
 CFLAGS = -std=c99 -Wall -Wextra -O2
+ifeq ($(shell uname -s),Darwin)
+TEST_LDFLAGS = -Wl,-dead_strip
+else
+TEST_LDFLAGS = -Wl,--gc-sections
+endif
 
 .PHONY: web desktop test clean
 web:
@@ -22,11 +27,11 @@ test:
 clean:
 	rm -rf build web/index.html
 
-# Linux/GNU-linker integration test; retains only raylib's collision function.
+# Native integration test; retains only raylib's collision function.
 test-game:
 	mkdir -p build
 	$(CC) $(CFLAGS) -ffunction-sections -fdata-sections -I$(RAYLIB)/src -c $(RAYLIB)/src/rshapes.c -o build/rshapes-test.o
-	$(CC) $(CFLAGS) -ffunction-sections -fdata-sections -I$(RAYLIB)/src src/test_geometry.c src/puzzle.c src/generator.c build/rshapes-test.o -Wl,--gc-sections -lm -o build/test-game
+	$(CC) $(CFLAGS) -ffunction-sections -fdata-sections -I$(RAYLIB)/src src/test_geometry.c src/puzzle.c src/generator.c build/rshapes-test.o $(TEST_LDFLAGS) -lm -o build/test-game
 	./build/test-game
 
 .PHONY: test-generator

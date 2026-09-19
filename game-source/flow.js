@@ -7,7 +7,7 @@ window.triCancelGeneration = function () {
   generationId++;
   el("difficulties").removeAttribute("aria-busy");
   el("next-puzzle").disabled = false;
-  el("next-puzzle").textContent = "Next →";
+  el("next-puzzle").setAttribute("aria-label", "Next puzzle");
 };
 window.triMenuOpen = true;
 window.triShowHome = function (view = "main") {
@@ -87,7 +87,7 @@ window.triFlowState = function (next, previous) {
   el("strip-label").hidden = solved;
   el("completion").hidden = !solved || window.triMenuOpen;
   el("continue").hidden = true;
-  el("next-puzzle").textContent = "Next →";
+  el("next-puzzle").setAttribute("aria-label", "Next puzzle");
   const sameBoard =
     previous &&
     previous.level === next.level &&
@@ -120,7 +120,7 @@ async function startEndless(difficulty, number = 1, recent = []) {
   el("endless-note").textContent =
     "Creating an " + endlessDifficulties[difficulty].toLowerCase() + " puzzle…";
   el("next-puzzle").disabled = true;
-  el("next-puzzle").textContent = "Creating…";
+  el("next-puzzle").setAttribute("aria-label", "Creating puzzle…");
   try {
     for (let attempt = 0; attempt < 2000; attempt++) {
       if (attempt % 4 === 0)

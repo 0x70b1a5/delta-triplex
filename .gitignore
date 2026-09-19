@@ -47,3 +47,6 @@ next-env.d.ts
 
 /game-source/build/
 /game-source/web/
+
+# Local Emscripten and raylib build tools
+/.build/

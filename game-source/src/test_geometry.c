@@ -13,18 +13,16 @@ static void fill_solution(void){
  assert(won);
 }
 int main(void){
- int directions=0;
+ int accepted_seeds=0;
  for(unsigned seed=0;seed<256;seed++){
   const char *generated=game_generate(0,seed);
   if(!*generated)continue;
   char first[1024];strcpy(first,generated);
   assert(!strcmp(first,game_generate(0,seed)));
-  int direction=(seed^(seed>>16))&3;
-  char expected[32];snprintf(expected,sizeof expected,"\"orientation\":\"%c\"","SENW"[direction]);
-  assert(strstr(first,expected));directions|=1<<direction;
+  assert(!strstr(first,"\"orientation\""));accepted_seeds++;
  }
- assert(directions==15);
- boot();assert(tutorial==0&&board.n==2);
+ assert(accepted_seeds>0);
+ game_boot();assert(tutorial==0&&board.n==2);
  for(int demo=0;demo<3;demo++){
   assert(tutorial==demo&&board.n==demo+2);
   game_next();assert(tutorial==demo); // Cannot advance an unfinished lesson.

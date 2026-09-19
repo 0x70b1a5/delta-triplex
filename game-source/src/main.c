@@ -79,6 +79,10 @@ API void game_celebrate(void){if(motion){celebrating=true;celebration_start=-1;}
 API float game_celebration_angle(void){return celebration_angle;}
 API float game_celebration_scale(void){return celebration_scale;}
 static float light[MAX_TILES];
+static int solved_axis=2;
+API float game_light(int tile){return tile>=0&&tile<board.count?light[tile]:0;}
+API int game_celebrating(void){return celebrating;}
+API void game_effect_axis(int axis){if(axis>=0&&axis<3)solved_axis=axis;}
 API void game_clear_effects(void){memset(ripples,0,sizeof ripples);memset(light,0,sizeof light);solved_start=-1;shine=false;celebrating=false;celebration_angle=0;celebration_scale=1;}
 API void game_motion(int enabled){motion=enabled!=0;if(!motion)game_clear_effects();}
 API void game_shine(void){if(motion&&!won){shine=true;shine_start=-1;}}
@@ -117,11 +121,11 @@ API int game_effects(double now){
         if(solved_start<0)solved_start=now;
         shine=false;active=true;
         double step=(now-solved_start)/500.0;
-        int row=(int)step%board.n;
+        int row=board.n-1-(int)step%board.n;
         // Canonical rows run from the point to the base in every orientation.
         float pulse=.18f+.12f*cosf((step-floor(step))*PI);
         for(int t=0;t<board.count;t++)
-            if(board.tiles[t].i+board.tiles[t].j+board.tiles[t].o==row)
+            if(tile_line(&board,t,solved_axis)==row)
                 light[t]=fmaxf(light[t],pulse);
     }
     if(shine){
@@ -149,7 +153,7 @@ API int game_effects(double now){
 }
 
 static void sync_state(void){
-    char json[8192];int used=snprintf(json,sizeof json,
+    char json[24576];int used=snprintf(json,sizeof json,
         "{\"n\":%d,\"level\":%d,\"tutorial\":%d,\"won\":%s,\"undo\":%s,\"axis\":%d,\"row\":%d,\"hover\":[",
         board.n,custom?-1:level,custom?-1:tutorial,won?"true":"false",history_count?"true":"false",selected_axis,selected_row);
     for(int a=0;a<3;a++)used+=snprintf(json+used,sizeof json-used,"%s%d",a?",":"",hovered<0?-1:tile_line(&board,hovered,a));
@@ -165,7 +169,13 @@ static void sync_state(void){
         used+=snprintf(json+used,sizeof json-used,"]");
     }
     used+=snprintf(json+used,sizeof json-used,"],\"custom\":%s,\"editing\":%s,\"orientation\":%d,\"revision\":%d",custom?"true":"false",editing?"true":"false",orientation,custom_revision);
-    if(custom){
+    used+=snprintf(json+used,sizeof json-used,",\"cells\":[");
+    for(int t=0;t<board.count;t++){
+        Tile c=board.tiles[t];
+        used+=snprintf(json+used,sizeof json-used,"%s{\"i\":%d,\"j\":%d,\"o\":%d,\"active\":%s,\"state\":%d}",t?",":"",c.i,c.j,c.o,c.active?"true":"false",c.state);
+    }
+    used+=snprintf(json+used,sizeof json-used,"]");
+    {
         int solution[MAX_TILES]={0};
         for(int t=0;t<board.count;t++)solution[canonical_id(board.tiles[t])]=board.tiles[t].solution;
         used+=snprintf(json+used,sizeof json-used,",\"solution\":[");
@@ -186,10 +196,10 @@ static void persist(void){
     remember_board();
     char data[PUZZLE_COUNT*SAVE_TILES+2];int p=0;data[p++]='0'+level;
     for(int l=0;l<PUZZLE_COUNT;l++)for(int t=0;t<SAVE_TILES;t++)data[p++]='0'+saved[l][t];
-    data[p]=0;store_text("tri-logic-v1",data);
+    data[p]=0;store_text("tri-rotate-progress-v1",data);
     char intro[3*SAVE_TILES+2];p=0;intro[p++]=intro_done?'D':'0'+tutorial;
     for(int l=0;l<3;l++)for(int t=0;t<SAVE_TILES;t++)intro[p++]='0'+demo_saved[l][t];
-    intro[p]=0;store_text("tri-logic-intro-v1",intro);
+    intro[p]=0;store_text("tri-rotate-intro-v1",intro);
 }
 static void load_board(void){
     custom=false;editing=false;orientation=0;
@@ -200,14 +210,14 @@ static void load_board(void){
     history_count=0;selected_axis=0;selected_row=0;hovered=-1;stroke=false;refresh_editor_solution();
     sync_state();
 }
-static void boot(void){
+API void game_boot(void){
     char data[PUZZLE_COUNT*SAVE_TILES+2]={0};
-    if(read_text("tri-logic-v1",data,sizeof data)&&strlen(data)==PUZZLE_COUNT*SAVE_TILES+1){
+    if(read_text("tri-rotate-progress-v1",data,sizeof data)&&strlen(data)==PUZZLE_COUNT*SAVE_TILES+1){
         int l=data[0]-'0';if(l>=0&&l<PUZZLE_COUNT)level=l;
         int p=1;for(int a=0;a<PUZZLE_COUNT;a++)for(int t=0;t<SAVE_TILES;t++){int v=data[p++]-'0';saved[a][t]=v>=0&&v<=2?v:0;}
     }
     char intro[3*SAVE_TILES+2]={0};
-    if(read_text("tri-logic-intro-v1",intro,sizeof intro)&&strlen(intro)==3*SAVE_TILES+1){
+    if(read_text("tri-rotate-intro-v1",intro,sizeof intro)&&strlen(intro)==3*SAVE_TILES+1){
         intro_done=intro[0]=='D';int stage=intro[0]-'0';tutorial=intro_done?-1:(stage>=0&&stage<3?stage:0);
         int p=1;for(int a=0;a<3;a++)for(int t=0;t<SAVE_TILES;t++){int v=intro[p++]-'0';demo_saved[a][t]=v>=0&&v<=2?v:0;}
     }
@@ -251,6 +261,7 @@ static int central_cell(void){
     }
     return best;
 }
+API int game_celebration_cell(void){return central_cell();}
 static Camera2D celebration_camera(void){
     int t=central_cell();
     Vector2 pivot=t>=0?center(t):(Vector2){view_w*.5f,view_h*.5f};
@@ -388,7 +399,7 @@ API const char *game_generate(int difficulty,unsigned int seed){
     if(!puzzle_generate(difficulty,seed,&candidate,&rating))return "";
     int solution[MAX_TILES]={0};
     for(int t=0;t<candidate.count;t++)solution[canonical_id(candidate.tiles[t])]=candidate.tiles[t].solution;
-    int used=snprintf(json,sizeof json,"{\"format\":\"tri-logic\",\"version\":2,\"cellOrder\":\"north-row-major\",\"size\":%d,\"orientation\":\"%c\",\"rounds\":%d,\"solution\":[",candidate.n,"SENW"[(seed ^ (seed >> 16)) & 3],rating.rounds);
+    int used=snprintf(json,sizeof json,"{\"format\":\"tri-logic\",\"version\":2,\"cellOrder\":\"north-row-major\",\"size\":%d,\"rounds\":%d,\"solution\":[",candidate.n,rating.rounds);
     for(int t=0;t<candidate.count;t++)used+=snprintf(json+used,sizeof json-used,"%s%d",t?",":"",solution[t]);
     snprintf(json+used,sizeof json-used,"]}");return json;
 }
@@ -434,7 +445,7 @@ API void game_memory(void){
 }
 int main(void){
     SetConfigFlags(FLAG_MSAA_4X_HINT);InitWindow(view_w,view_h,"Delta Triplex");SetTargetFPS(0);
-    boot();
+    game_boot();
 #ifdef __EMSCRIPTEN__
     ready(); // No main loop. JavaScript requests a frame only when something changes.
 #else

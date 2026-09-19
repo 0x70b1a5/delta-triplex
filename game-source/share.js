@@ -1,24 +1,23 @@
 "use strict";
-// Version 1: version, side length, orientation, then MSB-first packed solution bits.
+// Version 2: version, side length, then MSB-first packed solution bits.
+// View rotation is session state, never puzzle data. Legacy v1 links still load.
 // Base64url has no padding. Solution order is the existing north-row-major order.
 window.TriShare = {
   encode(puzzle) {
-    const direction = ["S", "E", "N", "W"].indexOf(puzzle.orientation || "S");
     const n = puzzle.size;
     if (
       !Number.isInteger(n) ||
       n < 2 ||
       n > 10 ||
-      direction < 0 ||
       !Array.isArray(puzzle.solution) ||
       puzzle.solution.length !== n * n ||
       !puzzle.solution.every((v) => v === 0 || v === 1)
     )
       throw Error("Invalid puzzle.");
-    const bytes = new Uint8Array(3 + Math.ceil((n * n) / 8));
-    bytes.set([1, n, direction]);
+    const bytes = new Uint8Array(2 + Math.ceil((n * n) / 8));
+    bytes.set([2, n]);
     puzzle.solution.forEach((v, i) => {
-      bytes[3 + (i >> 3)] |= v << (7 - (i & 7));
+      bytes[2 + (i >> 3)] |= v << (7 - (i & 7));
     });
     return btoa(String.fromCharCode(...bytes))
       .replace(/\+/g, "-")
@@ -26,19 +25,20 @@ window.TriShare = {
       .replace(/=+$/g, "");
   },
   decode(code) {
-    if (!/^[A-Za-z0-9_-]{6,22}$/.test(code))
+    if (!/^[A-Za-z0-9_-]{4,22}$/.test(code))
       throw Error("Invalid puzzle link.");
     const bytes = Uint8Array.from(
       atob(code.replace(/-/g, "+").replace(/_/g, "/")),
       (c) => c.charCodeAt(0),
     );
-    const [version, n, direction] = bytes;
+    const [version, n] = bytes;
+    const offset = version === 1 ? 3 : 2;
     if (
-      version !== 1 ||
+      ![1, 2].includes(version) ||
       n < 2 ||
       n > 10 ||
-      direction > 3 ||
-      bytes.length !== 3 + Math.ceil((n * n) / 8)
+      (version === 1 && bytes[2] > 3) ||
+      bytes.length !== offset + Math.ceil((n * n) / 8)
     )
       throw Error("Unsupported puzzle link.");
     const puzzle = {
@@ -47,22 +47,20 @@ window.TriShare = {
       cellOrder: "north-row-major",
       name: "Shared puzzle",
       size: n,
-      orientation: ["S", "E", "N", "W"][direction],
       solution: Array.from(
         { length: n * n },
-        (_, i) => (bytes[3 + (i >> 3)] >> (7 - (i & 7))) & 1,
+        (_, i) => (bytes[offset + (i >> 3)] >> (7 - (i & 7))) & 1,
       ),
     };
-    if (this.encode(puzzle) !== code) throw Error("Invalid puzzle link.");
+    if (version === 2 && this.encode(puzzle) !== code) throw Error("Invalid puzzle link.");
     return puzzle;
   },
   // Replace this origin when the public release has an address.
-  base: "https://delta-triplex.example/",
-  seedPuzzle(seed, difficulty, orientation) {
+  base: "https://delta.theologi.ca/",
+  seedPuzzle(seed, difficulty) {
     if (
       !/^[0-9a-f]{1,8}$/i.test(seed) ||
-      !["easy", "medium", "hard", "impossible"].includes(difficulty) ||
-      (orientation !== undefined && !["S", "E", "N", "W"].includes(orientation))
+      !["easy", "medium", "hard", "impossible"].includes(difficulty)
     )
       throw Error("Invalid seed link.");
     const number = parseInt(seed, 16),
@@ -77,7 +75,6 @@ window.TriShare = {
     return {
       ...JSON.parse(json),
       name: "Shared " + difficulty + " puzzle",
-      ...(orientation ? { orientation } : {}),
       seed: number,
       difficulty: level,
     };
@@ -89,9 +86,7 @@ window.TriShare = {
         "#seed=" +
         (puzzle.seed >>> 0).toString(16) +
         "&difficulty=" +
-        ["easy", "medium", "hard", "impossible"][puzzle.difficulty] +
-        "&orientation=" +
-        puzzle.orientation
+        ["easy", "medium", "hard", "impossible"][puzzle.difficulty]
       );
     return this.base + "#p=" + this.encode(puzzle);
   },

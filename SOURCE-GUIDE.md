@@ -1,61 +1,33 @@
-# Delta Triplex source snapshot
+# Delta Triplex source guide
 
-Source revision: b5f436246a376865636f6e86079bdb56a1709e48
+The rotating nonogram design is now the main application. See [game-source/README.md](game-source/README.md) for controls, puzzle formats, effects, build instructions and test coverage.
 
-This archive contains the complete tracked project at that revision, including the latest colour-clear controls and removal of crosses on completion. Git history, installed dependencies, credentials and temporary build caches are not included.
+## Main files
 
-## Where to start
-
-- `game-source/src/main.c`: shared C game engine, rendering, input, animation, saves and WebAssembly API.
-- `game-source/src/puzzle.c` and `puzzle.h`: triangular board and clue rules.
-- `game-source/src/generator.c` and `generator.h`: seeded Endless generation and uniqueness certification by deduction.
-- `game-source/app.js`: shared browser interface and colour preferences.
-- `game-source/editor.js`: puzzle editor, imports and exports.
-- `game-source/flow.js`: main menu and Endless progression.
-- `game-source/share.js`: seed links and packed custom-puzzle links.
+- `game-source/rotate.js`: SVG board, responsive clue placement, rotation gestures, timing and result sharing.
+- `game-source/src/main.c`: C engine API, canonical cell snapshots, undo/saves, ripples, solved-row flashes and victory animation timing.
+- `game-source/src/puzzle.c` and `puzzle.h`: triangular board and run-length rules.
+- `game-source/src/generator.c` and `generator.h`: Endless generation and uniqueness certification by deduction.
+- `game-source/app.js`: browser bridge and color preferences.
+- `game-source/editor.js`: editor, imports and standalone exports.
+- `game-source/flow.js`: menus, progression, generation and completion.
+- `game-source/share.js`: versioned packed-puzzle and seed links.
 - `game-source/back.js`: browser Back handling.
-- `game-source/shell.html`: layout and styling.
-- `app/`: TypeScript/React Site wrapper.
-- `public/game.html`: current playable standalone build with embedded WebAssembly.
-- `game-source/README.md`: design decisions, formats, controls and detailed build notes.
+- `game-source/shell.html`: responsive document and shared footer layout.
+- `game-source/build_shell.py`: embeds JavaScript into the build shell.
+- `public/game.html`: current standalone application with embedded WebAssembly.
+- `app/`: React Site wrapper.
 
-The game and editor deliberately share one C renderer and one DOM clue matrix. Most game code is C and JavaScript; the outer Site wrapper is TypeScript.
+## Play and build
 
-## Play without rebuilding
+Open `public/game.html` directly, or serve the repository with `python3 -m http.server 8000` and open `/public/game.html`. No runtime downloads are required.
 
-Open `public/game.html` in a browser with WebGL, or serve the public directory:
+Run `./build.sh` to rebuild from source and produce `dist/static/index.html` for static deployment. It installs missing Emscripten/raylib tools locally and refreshes `public/game.html`. See [README.md](README.md) for prerequisites and tool overrides.
 
-```sh
-python3 -m http.server 8000 --directory public
-```
+Run `npm --prefix game-source test` after installing its dev dependency. Native checks are `make -C game-source test test-generator` and `make -C game-source test-game RAYLIB=/path/to/raylib` (macOS or GNU linker).
 
-Then open `http://localhost:8000/game.html`. This does not require the React wrapper or npm dependencies.
+The share origin is `https://delta.theologi.ca/`. Orientation is runtime view state and is omitted from new puzzle specs and seed links.
 
-## Rebuild the game
+## Local comparison archive
 
-Requires Python 3, Make, Emscripten 4.0.16 and raylib 5.5. Toolchains and raylib source are not bundled. Activate Emscripten and place raylib under `game-source/vendor/raylib`, then run from the archive root:
-
-```sh
-make -C game-source/vendor/raylib/src PLATFORM=PLATFORM_WEB
-make -C game-source web RAYLIB=vendor/raylib
-cp game-source/web/index.html public/game.html
-```
-
-`build_shell.py` embeds the JavaScript files and styles; Emscripten embeds the WebAssembly engine.
-
-## Checks
-
-```sh
-make -C game-source test-generator
-make -C game-source test-game RAYLIB=vendor/raylib
-npm --prefix game-source install
-npm --prefix game-source test
-```
-
-The native geometry target requires Linux/GNU linker tooling. DOM tests exercise the actual compiled WebAssembly but stub graphics rendering; real WebGL/mobile visual verification remains separate.
-
-## Site wrapper
-
-Root `package.json`, `pnpm-lock.yaml`, `scripts/` and the Site configuration are included unchanged. The wrapper requires the Node/pnpm versions declared in `package.json`. The existing `.openai/hosting.json` identifies the current private preview; it contains no authentication credentials.
-
-The public share origin is intentionally still `https://delta-triplex.example/` in `game-source/share.js`. Replace it when assigning a public address. Seed links are not guaranteed to remain stable after generator changes.
+The prior main source and playable HTML were preserved under `work/pre-rotation-main/` before promotion. `work/rotating-nonogram/compare.html` compares that archive with the current design. These are local ignored artifacts, not dependencies of the main application.

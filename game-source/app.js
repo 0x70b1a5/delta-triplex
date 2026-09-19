@@ -17,17 +17,7 @@ const motionPreference = window.matchMedia?.(
   "(prefers-reduced-motion: reduce)",
 );
 let motionEnabled = !motionPreference?.matches;
-function scheduleShine() {
-  (clearTimeout(shineTimer),
-    (shineTimer = 0),
-    appReady &&
-      !document.hidden &&
-      motionEnabled &&
-      !state?.won &&
-      (shineTimer = setTimeout(() => {
-        ((shineTimer = 0), call("shine"), requestFrame(), scheduleShine());
-      }, 4800)));
-}
+function scheduleShine() { clearTimeout(shineTimer); shineTimer = 0; }
 motionPreference?.addEventListener("change", (e) => {
   ((motionEnabled = !e.matches),
     call("motion", motionEnabled ? 1 : 0),
@@ -40,15 +30,15 @@ let activePointer = null,
 const lessons = [
   [
     "1 / 3 · Four cells",
-    "Fill the triangles to match the numbers. A number is a run of touching filled cells along a strip. Select C1: its 3 means fill all three highlighted cells. A 0 means leave that strip empty.",
+    "Numbers outside the triangle describe touching filled cells. Read each clue from outside toward the board. A 0 means leave that strip empty. Tap to fill, tap again to cross, and again to clear.",
   ],
   [
     "2 / 3 · Nine cells",
-    "Multiple numbers are separate runs, in the arrow’s direction. C1 reads 1 1 1: three filled cells with at least one empty cell between them. Crosses help you mark cells you know are empty.",
+    "Multiple numbers describe separate runs with an empty cell between them. One side has no clues: swipe, scroll, or twist with two fingers to reveal it. Every turn is 120°.",
   ],
   [
     "3 / 3 · Sixteen cells",
-    "Now combine A, B and C. Every triangle belongs to one strip in each direction. A highlighted clue matches your current runs; solve all the clues together. Crosses are useful but optional for finishing.",
+    "Every cell belongs to three strips. Turn to inspect all three sets of clues. Your active solving time and completed turns are recorded; share your result when you finish.",
   ],
 ];
 function toast(e) {
@@ -80,7 +70,7 @@ function applyPalette() {
 }
 const chosenColours = {};
 try {
-  const saved = JSON.parse(localStorage.getItem("delta-triplex-colours"));
+  const saved = JSON.parse(localStorage.getItem("delta-triplex-rotation-colours"));
   for (const key of ["bg", "cell"])
     if (/^#[0-9a-f]{6}$/i.test(saved?.[key])) chosenColours[key] = saved[key];
 } catch {}
@@ -90,7 +80,7 @@ function saveColours() {
       el("clear-colour-" + key).hidden = !chosenColours[key];
   try {
     localStorage.setItem(
-      "delta-triplex-colours",
+      "delta-triplex-rotation-colours",
       JSON.stringify(chosenColours),
     );
   } catch {}
@@ -200,65 +190,18 @@ for (const [e, t] of [
         );
     }));
 function fit() {
-  const e = stage.getBoundingClientRect(),
-    t = Math.min(window.devicePixelRatio || 1, 2),
-    n = Math.max(64, Math.round(e.width * t)),
-    r = Math.max(64, Math.round(e.height * t));
-  if (
-    ((renderWidth = n),
-    (renderHeight = r),
-    call("resize", n, r),
-    window.innerWidth >= 900 &&
-      window.innerWidth >= window.innerHeight &&
-      !state?.orientation)
-  ) {
-    let a = 1 / 0;
-    for (const o of ["clues", "lesson", "workshop", "corner"]) {
-      const i = el(o);
-      if (!i || i.hidden) continue;
-      const l = i.getBoundingClientRect(),
-        s = (l.top - e.top) * t,
-        c = (l.left - e.left) * t,
-        d = (l.right - e.left) * t;
-      if (s >= r || l.bottom <= e.top) continue;
-      const m = 14 * t;
-      (d < n / 2 &&
-        (a = Math.min(a, 2 * (n / 2 - d - m + (s - r / 2) / Math.sqrt(3)))),
-        c > n / 2 &&
-          (a = Math.min(a, 2 * (c - m - n / 2 + (s - r / 2) / Math.sqrt(3)))));
-    }
-    Number.isFinite(a) && call("limit", Math.max(1, a));
-  }
+  // The rules engine uses a stable coordinate system; SVG owns the responsive view.
+  renderWidth = 900; renderHeight = 760;
+  call("resize", renderWidth, renderHeight);
 }
-function requestFrame(e = !0) {
-  ((dirty = dirty || e),
-    !appReady ||
-      document.hidden ||
-      framePending ||
-      (framePending = requestAnimationFrame(() => {
-        if (((framePending = 0), document.hidden)) return;
-        const e = dirty;
-        (dirty && fit(), (dirty = !1));
-        const t = call("effects", performance.now());
-        (call("render"),
-          drawCount++,
-          e && positionStripLabel(),
-          t && !window.triMenuOpen && requestFrame(!1));
-      })));
-}
-function positionStripLabel() {
-  if (!state) return;
-  const e = stage.getBoundingClientRect(),
-    t = el("strip-label");
-  ((t.style.left = (call("label_x") * e.width) / renderWidth + "px"),
-    (t.style.top = (call("label_y") * e.height) / renderHeight + "px"));
-  const n = el(`clue-${state.axis}-${state.row}`).lastElementChild;
-  window.getComputedStyle &&
-    (t.style.fontSize = window.getComputedStyle(n).fontSize);
-  const label = t.getBoundingClientRect();
-  // Keep the full label visible even on high-DPI desktop canvases.
-  t.style.top = Math.max(parseFloat(t.style.top), label.height + 8 - e.top) + "px";
-  t.style.left = Math.max(8 - e.left, Math.min(parseFloat(t.style.left), window.innerWidth - e.left - label.width - 8)) + "px";
+function requestFrame() {
+  if (!appReady || document.hidden || framePending) return;
+  framePending = requestAnimationFrame(() => {
+    framePending = 0;
+    fit();
+    window.triDrawBoard?.();
+    drawCount++;
+  });
 }
 // Keep engine/save axes stable; display them in rotational A, B, C order.
 const displayAxes = [1, 2, 0];
@@ -354,23 +297,13 @@ function makeGrid(e) {
         (el("continue").textContent =
           2 === state.tutorial ? "Start puzzles" : "Next demo")));
     window.triBuildLevels?.(state.levels);
-    (!state.editing &&
-      state.won &&
-      t &&
-      !t.won &&
-      t.tutorial === state.tutorial &&
-      t.level === state.level &&
-      toast(
-        state.tutorial >= 0
-          ? "Solved. Continue when you’re ready."
-          : "Solved. Every strip agrees.",
-      ),
-      (el("app").dataset.orientation = ["S", "E", "N", "W"][
+    (      (el("app").dataset.orientation = ["S", "E", "N", "W"][
         state.orientation || 0
       ]),
       (el("app").dataset.custom = String(!!state.custom)),
       window.triCustomState?.(state),
       window.triFlowState?.(state, t),
+      window.triRotateState?.(state, t),
       requestFrame());
   }));
 function caret() {

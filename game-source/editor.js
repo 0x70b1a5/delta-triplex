@@ -61,7 +61,6 @@ function normalizePuzzle(value) {
     cellOrder: "north-row-major",
     name: String(value.name || "My puzzle").slice(0, 80),
     size: value.size,
-    orientation: value.orientation || "S",
     solution: value.solution.slice(),
     ...(Number.isInteger(value.seed) &&
     value.seed >= 0 &&
@@ -75,13 +74,12 @@ function normalizePuzzle(value) {
 }
 let draft;
 try {
-  draft = JSON.parse(localStorage.getItem("tri-logic-editor"));
+  draft = JSON.parse(localStorage.getItem("tri-rotate-editor-v1"));
 } catch {}
 if (!validPuzzle(draft))
   draft = {
     name: "My puzzle",
     size: 5,
-    orientation: "S",
     solution: Array(25).fill(0),
   };
 draft = normalizePuzzle(draft);
@@ -91,7 +89,7 @@ let currentPuzzle = null,
 const settings = document.createElement("section");
 settings.id = "editor-settings";
 settings.hidden = true;
-settings.innerHTML = `<h3>Puzzle settings</h3><label>Name <input id="editor-name" maxlength="80"></label><label>Size <select id="editor-size">${Array.from({ length: 9 }, (_, i) => `<option>${i + 2}</option>`).join("")}</select></label><label>Tip direction <select id="editor-orientation"><option value="N">North ↑</option><option value="E">East →</option><option value="S">South ↓ · base up</option><option value="W">West ←</option></select></label><p class="editor-note">Paint the solution on the board. Clues update automatically. Uniqueness is not checked.</p><div class="menu-actions"><button id="editor-export">Export playable HTML</button><button id="editor-json">Export puzzle JSON</button><button id="editor-share">Copy puzzle link</button></div><input id="share-output" aria-label="Puzzle link" readonly hidden>`;
+settings.innerHTML = `<h3>Puzzle settings</h3><label>Name <input id="editor-name" maxlength="80"></label><label>Size <select id="editor-size">${Array.from({ length: 9 }, (_, i) => `<option>${i + 2}</option>`).join("")}</select></label><p class="editor-note">Paint the solution on the board. Clues update automatically. Uniqueness is not checked.</p><div class="menu-actions"><button id="editor-export">Export playable HTML</button><button id="editor-json">Export puzzle JSON</button><button id="editor-share">Copy puzzle link</button></div><input id="share-output" aria-label="Puzzle link" readonly hidden>`;
 menu.insertBefore(settings, el("menu-tools").previousElementSibling);
 const workshop = document.createElement("section");
 workshop.id = "workshop";
@@ -102,7 +100,7 @@ el("bottom-controls").prepend(el("workshop-actions"));
 menu.append(el("controls-hint"));
 function saveDraft() {
   try {
-    localStorage.setItem("tri-logic-editor", JSON.stringify(draft));
+    localStorage.setItem("tri-rotate-editor-v1", JSON.stringify(draft));
   } catch {}
 }
 function loadCustom(puzzle, editing, ownsDraft, endlessRun = null) {
@@ -119,7 +117,7 @@ function loadCustom(puzzle, editing, ownsDraft, endlessRun = null) {
     ["number", "number", "string", "number"],
     [
       currentPuzzle.size,
-      directionCodes.indexOf(currentPuzzle.orientation),
+      0,
       currentPuzzle.solution.join(""),
       editing ? 1 : 0,
     ],
@@ -137,7 +135,6 @@ window.triCustomState = (next) => {
   }
   currentPuzzle.solution = next.solution.slice();
   currentPuzzle.size = next.n;
-  currentPuzzle.orientation = directionCodes[next.orientation];
   currentPuzzle.clues = next.clues.map((axis) =>
     axis.map((line) => line.runs.slice()),
   );
@@ -150,14 +147,12 @@ window.triCustomState = (next) => {
   el("workshop-title").textContent =
     (next.editing ? "Editing · " : "Trying · ") + currentPuzzle.name;
   el("workshop-help").textContent = next.editing
-    ? "Tap or drag to paint. Select any clue to highlight its strip."
-    : "Solve it using the same clues and controls as every level.";
+    ? "Tap to paint. Swipe, scroll, or twist to reveal another side."
+    : "Two sides visible. Turn to reveal the third.";
   el("editor-test").textContent = next.editing ? "Try" : "Edit";
   el("editor-name").value = currentPuzzle.name;
   el("editor-size").value = String(next.n);
-  el("editor-orientation").value = currentPuzzle.orientation;
   el("editor-size").disabled = !next.editing;
-  el("editor-orientation").disabled = !next.editing;
   el("reset").title = next.editing
     ? "Clear solution (R); undo restores it"
     : "Reset (R); undo restores it";
@@ -205,8 +200,6 @@ el("editor-size").onchange = () => {
     true,
   );
 };
-el("editor-orientation").onchange = () =>
-  call("orientation", directionCodes.indexOf(el("editor-orientation").value));
 function downloadPuzzle(text, extension, type) {
   const url = URL.createObjectURL(new Blob([text], { type })),
     link = document.createElement("a");
@@ -239,6 +232,13 @@ window.triInitializeCustom = () => {
   if (initializedCustom) return;
   initializedCustom = true;
   const params = new URLSearchParams(location.hash.slice(1));
+  if (params.has("level")) {
+    const index = Number(params.get("level"));
+    if (/^\d+$/.test(params.get("level")) && index < state.levels.length) {
+      window.triShowPlay(); call("level", index);
+    } else { window.triShowHome(); toast("Invalid level link."); }
+    return;
+  }
   if (params.has("seed")) {
     try {
       loadCustom(

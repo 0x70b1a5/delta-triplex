@@ -14,7 +14,7 @@ export default function Home() {
         <iframe
           src={source}
           title="Delta Triplex puzzle and level editor"
-          allow="fullscreen; clipboard-write"
+          allow="fullscreen; clipboard-write; web-share"
           allowFullScreen
         />
       )}
