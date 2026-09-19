@@ -58,8 +58,8 @@ static uint32_t random_word(uint32_t *state){
     uint32_t x=*state;x^=x<<13;x^=x>>17;x^=x<<5;return *state=x;
 }
 bool puzzle_generate(int difficulty,uint32_t seed,Board *out,Deduction *rating){
-    if(difficulty<0||difficulty>3)return false;
-    static const int sizes[]={4,6,8,10}, minimum_rounds[]={2,3,5,7};
+    if(difficulty<0||difficulty>4)return false;
+    static const int sizes[]={4,6,8,10,3}, minimum_rounds[]={2,3,5,7,1};
     int n=sizes[difficulty],filled=0;
     uint32_t rng=seed?seed:0x9e3779b9u;
     int density=43+random_word(&rng)%18;
@@ -70,5 +70,5 @@ bool puzzle_generate(int difficulty,uint32_t seed,Board *out,Deduction *rating){
     board_init(out,n,pattern);
     Deduction d=puzzle_deduce(out);
     if(rating)*rating=d;
-    return d.solved&&d.rounds>=minimum_rounds[difficulty]&&(difficulty<2||d.initial<=n*n/2);
+    return d.solved&&d.rounds>=minimum_rounds[difficulty]&&((difficulty!=2&&difficulty!=3)||d.initial<=n*n/2);
 }

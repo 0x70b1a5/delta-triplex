@@ -16,7 +16,7 @@ let pending = false,
 function uiDepth() {
   const playing = !el("home").hidden ? 0 : 1;
   const section = !el("home-back").hidden && !el("home").hidden;
-  const dialog = !el("puzzle-menu").hidden || !el("memory-panel").hidden;
+  const dialog = el("theme-welcome").open || !el("puzzle-menu").hidden || !el("memory-panel").hidden;
   return (playing || section ? 1 : 0) + (dialog ? 1 : 0);
 }
 function record(value) {
@@ -50,6 +50,7 @@ function handleHistoryPop(event) {
   applying = true;
   try {
     if (uiDepth() > depth) {
+      window.triCloseThemeWelcome?.();
       if (!el("puzzle-menu").hidden) toggleMenu(false);
       if (!el("memory-panel").hidden) memoryToggle(false);
       if (uiDepth() > depth) window.triShowHome();

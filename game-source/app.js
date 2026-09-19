@@ -11,7 +11,6 @@ let appReady = !1,
   renderWidth = 900,
   renderHeight = 760,
   toastTimer = 0,
-  palette = null,
   shineTimer = 0;
 const motionPreference = window.matchMedia?.(
   "(prefers-reduced-motion: reduce)",
@@ -52,143 +51,66 @@ function toast(e) {
 function call(e, ...t) {
   if (appReady) return Module["_game_" + e](...t);
 }
-function applyPalette() {
-  if (!palette) return;
-  const e = TriPalette.theme(palette);
-  for (const [t, n] of Object.entries(e))
-    document.documentElement.style.setProperty("--" + t, n);
-  ((document.documentElement.style.colorScheme =
-    "#ffffff" === e.ink ? "dark" : "light"),
-    (el("background-color").value = palette.bg),
-    (el("cell-color").value = palette.cell),
-    call(
-      "palette",
-      ...[e.bg, e.cell, e.empty, e.cross, e.a, e.b, e.c].map((e) =>
-        parseInt(e.slice(1), 16),
-      ),
-    ));
-}
+const themePreference = window.matchMedia?.("(prefers-color-scheme: dark)");
+let themeMode = "system", colorfulPalette = TriPalette.random();
 const chosenColours = {};
+try {
+  const saved = localStorage.getItem("delta-triplex-theme");
+  if (["system", "light", "dark", "colorful"].includes(saved)) themeMode = saved;
+} catch {}
 try {
   const saved = JSON.parse(localStorage.getItem("delta-triplex-rotation-colours"));
   for (const key of ["bg", "cell"])
     if (/^#[0-9a-f]{6}$/i.test(saved?.[key])) chosenColours[key] = saved[key];
 } catch {}
-function saveColours() {
-  for (const key of ["bg", "cell"])
-    if (el("clear-colour-" + key))
-      el("clear-colour-" + key).hidden = !chosenColours[key];
-  try {
-    localStorage.setItem(
-      "delta-triplex-rotation-colours",
-      JSON.stringify(chosenColours),
-    );
-  } catch {}
+function currentTheme(base = colorfulPalette) {
+  const mode = themeMode === "system" ? (themePreference?.matches ? "dark" : "light") : themeMode;
+  return TriPalette.theme(mode, chosenColours, base);
 }
-function randomColour(other) {
-  let best =
-    TriPalette.contrast(other, "#ffffff") >
-    TriPalette.contrast(other, "#000000")
-      ? "#ffffff"
-      : "#000000";
-  for (let attempt = 0; attempt < 80; attempt++) {
-    const colour = TriPalette.oklch(
-      0.12 + 0.83 * Math.random(),
-      0.03 + 0.17 * Math.random(),
-      360 * Math.random(),
-    );
-    if (TriPalette.contrast(other, colour) >= 6) return colour;
+function writeTheme(target, theme) {
+  for (const [name, value] of Object.entries(theme))
+    target.style.setProperty("--" + name, value);
+  target.style.setProperty("--home-cell-ink", TriPalette.ink(theme.cell));
+  target.style.setProperty("--home-empty-ink", theme.cross);
+}
+function applyPalette() {
+  const theme = currentTheme();
+  writeTheme(document.documentElement, theme);
+  document.documentElement.style.colorScheme = theme.ink === "#ffffff" ? "dark" : "light";
+  for (const [id, key] of [["background-color", "bg"], ["cell-color", "cell"]]) {
+    el(id).value = theme[key];
+    el("clear-colour-" + key).hidden = !chosenColours[key];
   }
-  return best;
+  el("theme-mode").value = themeMode;
+  call("flash_colorful", themeMode === "colorful" ? 1 : 0);
+  call("palette", ...[theme.bg, theme.cell, theme.empty, theme.cross, theme.a, theme.b, theme.c]
+    .map(value => parseInt(value.slice(1), 16)));
 }
-function nextPalette() {
-  const next = { ...TriPalette.random(), ...chosenColours };
-  if (chosenColours.bg && !chosenColours.cell)
-    next.cell = randomColour(next.bg);
-  if (chosenColours.cell && !chosenColours.bg)
-    next.bg = randomColour(next.cell);
-  return next;
+el("theme-mode").addEventListener("change", () => {
+  themeMode = el("theme-mode").value;
+  try { localStorage.setItem("delta-triplex-theme", themeMode); } catch {}
+  applyPalette(); window.triHomeChanged?.(); requestFrame();
+});
+themePreference?.addEventListener("change", () => {
+  if (themeMode === "system") { applyPalette(); window.triHomeChanged?.(); requestFrame(); }
+});
+function updateChosenColour(key, value) {
+  if (value) chosenColours[key] = value; else delete chosenColours[key];
+  try { localStorage.setItem("delta-triplex-rotation-colours", JSON.stringify(chosenColours)); } catch {}
+  applyPalette(); window.triHomeChanged?.(); requestFrame();
 }
-for (const [id, key] of [
-  ["background-color", "bg"],
-  ["cell-color", "cell"],
-]) {
-  let button = el("dice-" + key);
-  if (!button) {
-    const picker = el(id),
-      pair = document.createElement("span");
-    pair.className = "colour-controls";
-    picker.parentElement.append(pair);
-    pair.append(picker);
-    button = document.createElement("button");
-    button.id = "dice-" + key;
-    button.className = "colour-die";
-    button.textContent = "⚄";
-    button.setAttribute(
-      "aria-label",
-      "Randomize " + (key === "bg" ? "background" : "filled cell") + " colour",
-    );
-    button.title = button.getAttribute("aria-label");
-    pair.append(button);
-  }
-  let clear = el("clear-colour-" + key);
-  if (!clear) {
-    clear = document.createElement("button");
-    clear.id = "clear-colour-" + key;
-    clear.className = "colour-die";
-    clear.textContent = "×";
-    clear.setAttribute(
-      "aria-label",
-      "Clear chosen " +
-        (key === "bg" ? "background" : "filled cell") +
-        " colour",
-    );
-    clear.title =
-      "Use automatic " +
-      (key === "bg" ? "background" : "filled cell") +
-      " colour";
-    button.after(clear);
-  }
-  clear.hidden = !chosenColours[key];
-  clear.onclick = () => {
-    delete chosenColours[key];
-    saveColours();
-    if (palette) {
-      palette[key] = randomColour(palette[key === "bg" ? "cell" : "bg"]);
-      applyPalette();
-      requestFrame();
-    }
-    el(id).focus();
-  };
-  button.onclick = () => {
-    if (!palette) return;
-    palette[key] = randomColour(palette[key === "bg" ? "cell" : "bg"]);
-    chosenColours[key] = palette[key];
-    saveColours();
-    applyPalette();
-    requestFrame();
-  };
+for (const [id, key] of [["background-color", "bg"], ["cell-color", "cell"]]) {
+  el(id).addEventListener("input", () => updateChosenColour(key, el(id).value));
+  el(id).addEventListener("change", () => {
+    const theme = currentTheme();
+    if (TriPalette.contrast(theme.bg, theme.cell) < 6)
+      toast("Low contrast: choose a lighter cell or darker background (or vice versa).");
+  });
+  el("clear-colour-" + key).onclick = () => { updateChosenColour(key); el(id).focus(); };
+  el("dice-" + key).onclick = () => updateChosenColour(key,
+    TriPalette.randomColor(currentTheme()[key === "bg" ? "cell" : "bg"]));
 }
-for (const [e, t] of [
-  ["background-color", "bg"],
-  ["cell-color", "cell"],
-])
-  (el(e).addEventListener("input", () => {
-    if (palette) {
-      palette[t] = el(e).value;
-      chosenColours[t] = palette[t];
-      saveColours();
-      applyPalette();
-      requestFrame();
-    }
-  }),
-    el(e).addEventListener("change", () => {
-      palette &&
-        TriPalette.contrast(palette.bg, palette.cell) < 6 &&
-        toast(
-          "Low contrast: try a lighter cell or a darker background (or vice versa).",
-        );
-    }));
+applyPalette();
 function fit() {
   // The rules engine uses a stable coordinate system; SVG owns the responsive view.
   renderWidth = 900; renderHeight = 760;
@@ -253,12 +175,9 @@ function makeGrid(e) {
     (n !== gridKey &&
       ((gridKey = n),
       makeGrid(state.n),
-      (t &&
-        t.custom === state.custom &&
-        t.level === state.level &&
-        t.tutorial === state.tutorial &&
-        t.revision === state.revision) ||
-        (palette = nextPalette()),
+      (t && t.custom === state.custom && t.level === state.level &&
+        t.tutorial === state.tutorial && t.revision === state.revision) ||
+        (colorfulPalette = TriPalette.random()),
       scheduleShine()),
       applyPalette());
     for (let e = 0; e < 3; e++)
@@ -355,7 +274,7 @@ let sizeObserver;
   }),
   (el("caret").onclick = caret),
   document.addEventListener("keydown", (e) => {
-    if (window.triMenuOpen) return;
+    if (window.triMenuOpen || el("theme-welcome").open) return;
     "^" !== e.key
       ? e.ctrlKey ||
         e.metaKey ||

@@ -60,11 +60,11 @@ window.TriShare = {
   seedPuzzle(seed, difficulty) {
     if (
       !/^[0-9a-f]{1,8}$/i.test(seed) ||
-      !["easy", "medium", "hard", "impossible"].includes(difficulty)
+      !["easy", "medium", "hard", "impossible", "sprout"].includes(difficulty)
     )
       throw Error("Invalid seed link.");
     const number = parseInt(seed, 16),
-      level = ["easy", "medium", "hard", "impossible"].indexOf(difficulty);
+      level = ["easy", "medium", "hard", "impossible", "sprout"].indexOf(difficulty);
     const json = Module.ccall(
       "game_generate",
       "string",
@@ -86,7 +86,7 @@ window.TriShare = {
         "#seed=" +
         (puzzle.seed >>> 0).toString(16) +
         "&difficulty=" +
-        ["easy", "medium", "hard", "impossible"][puzzle.difficulty]
+        ["easy", "medium", "hard", "impossible", "sprout"][puzzle.difficulty]
       );
     return this.base + "#p=" + this.encode(puzzle);
   },

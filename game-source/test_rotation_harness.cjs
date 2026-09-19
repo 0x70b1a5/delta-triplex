@@ -19,12 +19,26 @@ function harness(html, url = "https://tri.test/", storage = {}, options = {}) {
     }),
     w = dom.window,
     d = w.document;
+  if (!options.firstGame) w.localStorage.setItem('delta-triplex-theme-welcome', '1');
+  w.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+  w.HTMLDialogElement.prototype.close = function () { this.open = false; };
   for (const [key, value] of Object.entries(storage))
     w.localStorage.setItem(key, value);
   const timers = new Map(),
     frames = new Map();
   let seq = 0;
-  w.matchMedia = () => ({ matches: options.reducedMotion ?? true, addEventListener() {} });
+  const media = new Map();
+  w.matchMedia = query => {
+    if (!media.has(query)) {
+      const listeners = [];
+      media.set(query, {
+        matches: query.includes('prefers-color-scheme') ? !!options.darkMode : options.reducedMotion ?? true,
+        addEventListener(type, listener) { listeners.push(listener); },
+        change(matches) { this.matches = matches; for (const listener of listeners) listener({ matches }); },
+      });
+    }
+    return media.get(query);
+  };
   w.ResizeObserver = class {
     observe() {}
   };

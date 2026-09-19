@@ -1,5 +1,5 @@
 "use strict";
-// Homepage colour motion is scoped to the menu; gameplay and saved colours stay put.
+// Menu flash waves use shared-edge distance; the base theme stays monochrome.
 (() => {
   const home = el("home");
   let hue = Math.random() * 360, elapsed = 0, previous = null, frame = 0;
@@ -131,28 +131,26 @@
       const step = elapsed * 2;
       const wave = Math.floor(step) % (2 * rows - 2);
       const glow = motionEnabled && !home.hidden ? .18 + .12 * Math.cos((step % 1) * Math.PI) : 0;
-      const empty = home.style.getPropertyValue("--empty");
-      const lit = "#" + [1, 3, 5].map(i => {
-        const channel = parseInt(empty.slice(i, i + 2), 16);
-        return Math.round(channel + (255 - channel) * glow).toString(16).padStart(2, "0");
-      }).join("");
-      const ink = TriPalette.contrast(lit, "#000000") >= TriPalette.contrast(lit, "#ffffff") ? "#000000" : "#ffffff";
+      const theme = home.style;
       for (const cell of scene.querySelectorAll("[data-row]")) {
         const active = +cell.dataset.wave === wave && glow > 0;
+        const banner = cell.classList.contains("home-banner");
         cell.style.setProperty("--row-glow", active ? glow : 0);
-        cell.style.setProperty("--row-ink", active ? ink : "var(--home-empty-ink)");
+        if (active) {
+          const fill = TriPalette.flash(theme.getPropertyValue(banner ? "--cell" : "--empty"), Math.floor(step), glow, themeMode);
+          cell.style.setProperty("--flash-fill", fill);
+          cell.style.setProperty("--row-ink", TriPalette.ink(fill));
+        } else {
+          cell.style.removeProperty("--flash-fill");
+          cell.style.removeProperty("--row-ink");
+        }
       }
     }
   }
   function paint() {
-    const colours = {
-      bg: TriPalette.oklch(.22, .04, hue),
-      cell: TriPalette.oklch(.91, .11, hue + 145),
-    };
-    const theme = TriPalette.theme(colours);
-    for (const [name, value] of Object.entries(theme)) home.style.setProperty("--" + name, value);
-    home.style.setProperty("--home-cell-ink", TriPalette.contrast(theme.cell, "#000000") >= TriPalette.contrast(theme.cell, "#ffffff") ? "#000000" : "#ffffff");
-    home.style.setProperty("--home-empty-ink", theme.cross);
+    writeTheme(home, currentTheme(themeMode === "colorful" ? {
+      bg: TriPalette.oklch(.22, .04, hue), cell: TriPalette.oklch(.91, .11, hue + 145),
+    } : undefined));
   }
   function tick(now) {
     frame = 0;
@@ -160,9 +158,10 @@
     if (previous !== null) {
       const dt = Math.min(100, Math.max(0, now - previous)) / 1000;
       elapsed += dt;
-      const speed = 2 + .65 * Math.sin(elapsed / 17) + .3 * Math.sin(elapsed / 7);
-      hue = (hue + speed * dt) % 360;
-      paint();
+      if (themeMode === "colorful") {
+        hue = (hue + (2 + .65 * Math.sin(elapsed / 17) + .3 * Math.sin(elapsed / 7)) * dt) % 360;
+        paint();
+      }
     }
     previous = now;
     flash(); drawZoom(now);
@@ -173,13 +172,12 @@
     frame = 0; previous = null;
     if (home.hidden || document.hidden || !motionEnabled) finishZoom();
     if (!home.hidden) { window.triHomeLayout(); startZoom(); }
-    flash();
+    paint(); flash();
     if (!home.hidden && !document.hidden && motionEnabled) frame = requestAnimationFrame(tick);
   };
   document.addEventListener("visibilitychange", window.triHomeChanged);
   motionPreference?.addEventListener("change", window.triHomeChanged);
   window.addEventListener("resize", () => { finishZoom(); window.triHomeLayout(); });
   document.fonts?.ready.then(() => scenes.forEach(fitLabels));
-  paint();
   window.triHomeChanged();
 })();

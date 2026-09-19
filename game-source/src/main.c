@@ -62,9 +62,9 @@ static void refresh_editor_solution(void){
 static int paint=0,view_w=900,view_h=760;
 static Vector2 last_pointer;
 static float half_limit=0;
-static Color BG={18,26,35,255},MINT={134,221,184,255},MUTED={148,165,172,255};
-static Color EMPTY={46,61,73,255};
-static Color ACCENT[3]={{139,197,239,255},{221,164,210,255},{242,195,115,255}};
+static Color BG={0,0,0,255},MINT={255,255,255,255},MUTED={255,255,255,255};
+static Color EMPTY={98,98,98,255};
+static Color ACCENT[3]={{255,255,255,255},{255,255,255,255},{255,255,255,255}};
 
 #define RIPPLE_COUNT 8
 typedef struct { bool active; double start; int distance[MAX_TILES],max_distance; } Ripple;
@@ -79,8 +79,15 @@ API void game_celebrate(void){if(motion){celebrating=true;celebration_start=-1;}
 API float game_celebration_angle(void){return celebration_angle;}
 API float game_celebration_scale(void){return celebration_scale;}
 static float light[MAX_TILES];
+static int flash_stage[MAX_TILES];
+static bool flash_colorful=false;
+API void game_flash_colorful(int enabled){flash_colorful=enabled!=0;}
 static int solved_axis=2;
 API float game_light(int tile){return tile>=0&&tile<board.count?light[tile]:0;}
+API int game_flash_stage(int tile){return tile>=0&&tile<board.count?flash_stage[tile]:0;}
+static void set_light(int tile,float pulse,int stage){
+    if(pulse>light[tile]){light[tile]=pulse;flash_stage[tile]=stage;}
+}
 API int game_celebrating(void){return celebrating;}
 API void game_effect_axis(int axis){if(axis>=0&&axis<3)solved_axis=axis;}
 API void game_clear_effects(void){memset(ripples,0,sizeof ripples);memset(light,0,sizeof light);solved_start=-1;shine=false;celebrating=false;celebration_angle=0;celebration_scale=1;}
@@ -112,7 +119,7 @@ API int game_effects(double now){
             float phase=(age-r->distance[t]*55)/260.0f;
             if(phase>=0&&phase<=1){
                 float envelope=fminf(1,phase/.12f)*(1-phase)*(1-phase);
-                float pulse=.48f*envelope/(1+.10f*r->distance[t]);light[t]=fmaxf(light[t],pulse);
+                float pulse=.48f*envelope/(1+.10f*r->distance[t]);set_light(t,pulse,r->distance[t]);
             }
         }
     }
@@ -121,12 +128,12 @@ API int game_effects(double now){
         if(solved_start<0)solved_start=now;
         shine=false;active=true;
         double step=(now-solved_start)/500.0;
-        int row=board.n-1-(int)step%board.n;
-        // Canonical rows run from the point to the base in every orientation.
+        int wave=(int)step%(2*board.n-1);
+        // Shared-edge distance from the visible tip, in every orientation.
         float pulse=.18f+.12f*cosf((step-floor(step))*PI);
         for(int t=0;t<board.count;t++)
-            if(tile_line(&board,t,solved_axis)==row)
-                light[t]=fmaxf(light[t],pulse);
+            if(2*(board.n-1-tile_line(&board,t,solved_axis))-board.tiles[t].o==wave)
+                set_light(t,pulse,(int)step);
     }
     if(shine){
         if(shine_start<0)shine_start=now;
@@ -136,7 +143,7 @@ API int game_effects(double now){
             active=true;Line *l=&board.lines[selected_axis][selected_row];
             for(int i=0;i<l->count;i++){
                 float phase=progress*(l->count+3)-i;
-                if(phase>0&&phase<3){float wave=sinf(phase*PI/3);light[l->tile[i]]=fmaxf(light[l->tile[i]],.14f*wave*wave);}
+                if(phase>0&&phase<3){float wave=sinf(phase*PI/3);set_light(l->tile[i],.14f*wave*wave,i);}
             }
         }
     }
@@ -427,8 +434,10 @@ API void game_render(void){
             Color target=board.tiles[t].state==1?BG:MINT;
             fill=(Color){(fill.r*4+target.r)/5,(fill.g*4+target.g)/5,(fill.b*4+target.b)/5,255};
         }
-        float glow=light[t];
-        fill=(Color){fill.r+(255-fill.r)*glow,fill.g+(255-fill.g)*glow,fill.b+(255-fill.b)*glow,255};
+        static const Color rainbow[]={{255,48,48,255},{255,136,0,255},{255,221,0,255},{32,192,80,255},{32,128,255,255},{100,60,255,255},{192,64,255,255}};
+        Color target=flash_colorful?WHITE:rainbow[flash_stage[t]%7];float glow=fminf(1,light[t]*(flash_colorful?1:3));
+        fill=(Color){fill.r+(target.r-fill.r)*glow,fill.g+(target.g-fill.g)*glow,fill.b+(target.b-fill.b)*glow,255};
+        if(board.tiles[t].state==2)fill.a=128;
         DrawTriangle(a,b,c,fill);
         if(board.tiles[t].state==2){float d=fminf(10,half_side()/board.n/6);DrawLineEx((Vector2){mid.x-d,mid.y-d},(Vector2){mid.x+d,mid.y+d},2,MUTED);DrawLineEx((Vector2){mid.x-d,mid.y+d},(Vector2){mid.x+d,mid.y-d},2,MUTED);}
     }

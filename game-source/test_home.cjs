@@ -1,12 +1,6 @@
 const assert = require('assert');
 const { harness, source } = require('./test_rotation_harness.cjs');
 const palette = require('./palette.js');
-for (let hue = 0; hue < 360; hue++) {
-  const theme = palette.theme({ bg: palette.oklch(.22, .04, hue), cell: palette.oklch(.91, .11, hue + 145) });
-  assert(palette.contrast(theme.bg, theme.cell) >= 9);
-  assert(palette.contrast(theme.bg, theme.empty) >= 3);
-  assert(palette.contrast(theme.empty, theme.cross) >= 4.5);
-}
 for (const reducedMotion of [false, true]) {
   const h = harness(source, 'https://tri.test/', {}, { reducedMotion });
   const home = h.d.getElementById('home');
@@ -15,8 +9,8 @@ for (const reducedMotion of [false, true]) {
   const gameColours = h.d.documentElement.style.cssText;
   for (let i = 0; i < 180; i++) h.frame(100);
   const after = home.style.getPropertyValue('--bg') + home.style.getPropertyValue('--cell');
-  assert.equal(before === after, reducedMotion, 'only motion-enabled homepage colours drift');
-  assert.equal(h.d.documentElement.style.cssText, gameColours, 'homepage drift does not change game colours');
+  assert.equal(before, after, 'homepage base colours remain monochrome');
+  assert.equal(h.d.documentElement.style.cssText, gameColours, 'homepage flashes do not change game colours');
   assert.equal(h.d.querySelectorAll('#home-main button').length, 5);
   assert.equal(h.d.querySelector('.home-credit').href, 'https://lovecrypt.itch.io/');
   h.click('select-level'); assert.equal(home.dataset.view, 'levels');
@@ -28,7 +22,7 @@ for (const reducedMotion of [false, true]) {
   assert.equal(home.style.cssText, frozen, 'hidden homepage stops animating');
   h.close();
 }
-console.log('PASS: homepage navigation, hue drift isolation/pause/reduced motion and full-hue contrast.');
+console.log('PASS: homepage navigation, monochrome base colours, pause and reduced motion.');
 
 // Layout rectangles stand in for browser measurement; animation and navigation
 // run through the same handlers and clock as the real game.
@@ -118,11 +112,18 @@ console.log('PASS: submenu zoom endpoints/midpoint/reverse, input guard, back ti
     [scene.querySelector('.home-banner')],
   ];
   assert.deepEqual(expected.map(cells => cells.length), [1, 1, 2, 2, 3, 1]);
-  for (let step = 0; step <= expected.length; step++) {
+  for (let step = 0; step <= expected.length * 2; step++) {
     const active = [...scene.querySelectorAll('[data-row]')]
       .filter(cell => +cell.style.getPropertyValue('--row-glow') > 0);
     assert.deepEqual(new Set(active), new Set(expected[step % expected.length]),
       `shared-edge wave ${step}, including wraparound`);
+    for (const cell of active) {
+      const base = h.d.documentElement.style.getPropertyValue(cell.classList.contains('home-banner') ? '--cell' : '--empty');
+      const glow = +cell.style.getPropertyValue('--row-glow');
+      const fill = cell.style.getPropertyValue('--flash-fill');
+      assert.equal(fill, palette.flash(base, step, glow), 'menu wave follows ROYGBIV, including violet across loops');
+      assert(palette.contrast(fill, cell.style.getPropertyValue('--row-ink')) >= 4.5);
+    }
     // Advance just past the next half-second boundary to avoid float rounding.
     for (let i = 0; i < 5; i++) h.frame(100);
     h.frame(1);

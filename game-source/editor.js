@@ -67,7 +67,7 @@ function normalizePuzzle(value) {
     value.seed <= 0xffffffff &&
     Number.isInteger(value.difficulty) &&
     value.difficulty >= 0 &&
-    value.difficulty <= 3
+    value.difficulty <= 4
       ? { seed: value.seed, difficulty: value.difficulty }
       : {}),
   };

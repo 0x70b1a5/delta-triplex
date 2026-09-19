@@ -118,12 +118,13 @@ int main(void){
   for(int t=0;t<board.count;t++)assert(board.tiles[t].state==0);
   fill_solution();assert(won);
   game_clear_effects();game_shine();assert(!shine);
-  for(int tick=0;tick<2*n;tick++){
+  for(int tick=0;tick<2*(2*n-1);tick++){
    for(int phase=0;phase<2;phase++){
     assert(game_effects(1000+tick*500+phase*499));
     for(int t=0;t<board.count;t++){
-     bool lit=board.tiles[t].i+board.tiles[t].j+board.tiles[t].o==tick%n;
+     bool lit=2*(board.tiles[t].i+board.tiles[t].j)+board.tiles[t].o==tick%(2*n-1);
      assert(lit ? light[t]>.05f : light[t]==0);
+     if(lit)assert(game_flash_stage(t)==tick);
     }
    }
   }

@@ -247,10 +247,7 @@
     const victory = !!call("celebrating");
     geometry = layout(Math.max(160, rect.width), Math.max(160, rect.height), eased);
     const style = document.documentElement.style;
-    const colours = ["--empty", "--cell"].map(key => {
-      const hex = style.getPropertyValue(key).trim();
-      return [1, 3, 5].map(start => parseInt(hex.slice(start, start + 2), 16));
-    });
+    const colours = ["--empty", "--cell"].map(key => style.getPropertyValue(key).trim());
     svg.setAttribute("viewBox", `0 0 ${geometry.width} ${geometry.height}`);
     // Match raylib's celebration camera: rotate/zoom the already laid-out
     // board about its central active cell. Ordinary turns alone use edge fitting.
@@ -267,11 +264,12 @@
       const inset = Math.max(.8, 1 - 2 / (geometry.scale / state.n));
       const drawn = points.map(p => p.map((v, a) => mid[a] + (v - mid[a]) * inset));
       const glow = call("light", index);
-      const fill = glow > 0 ? `rgb(${colours[cell.state === 1 ? 1 : 0].map(c => Math.round(c + (255 - c) * glow)).join(",")})`
+      const flashStage = call("flash_stage", index);
+      const fill = glow > 0 ? TriPalette.flash(colours[cell.state === 1 ? 1 : 0], flashStage, glow, themeMode)
         : cell.state === 1 ? "var(--cell)" : "var(--empty)";
-      const polygon = node("polygon", { points: drawn.map(p => p.join(",")).join(" "), fill, "data-glow": glow, "data-cell": index, "aria-label": `Cell ${index + 1}: ${["empty", "filled", "crossed"][cell.state]}` });
+      const polygon = node("polygon", { points: drawn.map(p => p.join(",")).join(" "), fill, "fill-opacity": cell.state === 2 ? .5 : 1, "data-glow": glow, "data-flash-stage": flashStage, "data-cell": index, "aria-label": `Cell ${index + 1}: ${["empty", "filled", "crossed"][cell.state]}` });
       fragment.append(polygon);
-      if (cell.state === 2) fragment.append(node("text", { x: mid[0], y: mid[1], "text-anchor": "middle", "dominant-baseline": "central", "font-size": Math.max(9, Math.min(20, geometry.scale / state.n / 2)) }, "×"));
+      if (cell.state === 2) fragment.append(node("text", { x: mid[0], y: mid[1], "text-anchor": "middle", "dominant-baseline": "central", "font-size": Math.max(9, Math.min(20, geometry.scale / state.n / 2)), fill: TriPalette.ink(TriPalette.mix(style.getPropertyValue("--bg"), glow > 0 ? fill : colours[0], .5)) }, "×"));
     });
     if (!state.won || state.editing) for (const clue of geometry.clues) {
       const edge = geometry.toScreen(clue.edge), center = geometry.toScreen(clue.center);

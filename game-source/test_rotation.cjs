@@ -99,11 +99,11 @@ const { harness, source } = require("./test_rotation_harness.cjs");
   assert.equal(linked.state.level, 2); linked.close();
   h.click("undo"); assert(!h.state.won); assert.equal(axes().size, 2);
   h.click("reset"); assert.equal(w.TriRotation.stats.turns, 0); assert.equal(w.TriRotation.stats.elapsed, 0);
-  for (let difficulty = 0; difficulty < 4; difficulty++) {
+  for (let difficulty = 0; difficulty < 5; difficulty++) {
     h.click("return-home"); h.click("endless-mode");
-    d.querySelectorAll("#difficulties button")[difficulty].click();
+    d.querySelector(`#difficulties button[data-difficulty="${difficulty}"]`).click();
     await h.settle(() => h.state.custom && w.triEndlessRun?.difficulty === difficulty);
-    assert.equal(h.state.n, 4 + 2 * difficulty);
+    assert.equal(h.state.n, [4, 6, 8, 10, 3][difficulty]);
     h.click("editor-json"); const puzzle = JSON.parse(await h.download());
     assert(!("orientation" in puzzle), "export omits orientation");
     const url = w.TriShare.url(puzzle); assert(!url.includes("orientation"));
@@ -145,5 +145,5 @@ const { harness, source } = require("./test_rotation_harness.cjs");
     h.resize(900, 760);
   }
   h.close();
-  console.log("PASS: real WASM rules, anchored view, all clue sides, tap/swipe/twist/cancel/wheel, rotation counts, timing/pause/freeze/undo/reset, brag fallback, level links, four Endless difficulties, orientation-free exports and seed links.");
+  console.log("PASS: real WASM rules, anchored view, all clue sides, tap/swipe/twist/cancel/wheel, rotation counts, timing/pause/freeze/undo/reset, brag fallback, level links, five Endless difficulties, orientation-free exports and seed links.");
 })().catch(error => { console.error(error); process.exit(1); });

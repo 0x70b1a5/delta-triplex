@@ -27,13 +27,13 @@ int main(void){
             assert(matches==1);
         }
     }
-    for(int d=0;d<4;d++){
+    for(int d=0;d<5;d++){
         Board b,again;Deduction rating;int accepted=0;
         for(unsigned int s=1;s<4000&&accepted<100;s++){
             unsigned int seed=s*2654435761u;
             if(!puzzle_generate(d,seed,&b,&rating))continue;
-            assert(b.n==4+2*d);assert(rating.solved);
-            assert((rating.rounds>=(int[]){2,3,5,7}[d]));
+            assert((b.n==(int[]){4,6,8,10,3}[d]));assert(rating.solved);
+            assert((rating.rounds>=(int[]){2,3,5,7,1}[d]));
             assert(puzzle_generate(d,seed,&again,NULL));
             assert(!memcmp(&b,&again,sizeof b));
             for(int t=0;t<b.count;t++)b.tiles[t].state=b.tiles[t].solution;

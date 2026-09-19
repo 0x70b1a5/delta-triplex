@@ -1,6 +1,6 @@
 "use strict";
 // Navigation observes the same engine state for stock, imported and trial puzzles.
-const endlessDifficulties = ["Easy", "Medium", "Hard", "Impossible"];
+const endlessDifficulties = ["Easy", "Medium", "Hard", "Impossible", "Sprout"];
 let generationId = 0;
 window.triEndlessRun = null;
 window.triCancelGeneration = function () {
@@ -11,6 +11,7 @@ window.triCancelGeneration = function () {
 };
 window.triMenuOpen = true;
 window.triShowHome = function (view = "main") {
+  window.triCloseThemeWelcome?.();
   window.triHomePrepare?.(view);
   window.triCancelGeneration();
   window.triEndlessRun = null;
@@ -37,6 +38,7 @@ window.triShowPlay = function () {
   window.triHomeChanged?.();
   el("app").inert = false;
   toggleMenu(false);
+  window.triMaybeChooseTheme?.();
   requestFrame();
   window.triSyncHistory?.();
 };
@@ -122,7 +124,7 @@ async function startEndless(difficulty, number = 1, recent = []) {
   const job = generationId;
   el("difficulties").setAttribute("aria-busy", "true");
   el("endless-note").textContent =
-    "Creating an " + endlessDifficulties[difficulty].toLowerCase() + " puzzle…";
+    "Creating a " + endlessDifficulties[difficulty].toLowerCase() + " puzzle…";
   el("next-puzzle").disabled = true;
   el("next-puzzle").setAttribute("aria-label", "Creating puzzle…");
   try {
@@ -160,14 +162,15 @@ async function startEndless(difficulty, number = 1, recent = []) {
     if (job === generationId) window.triCancelGeneration();
   }
 }
-[...el("difficulties").children].forEach((button, difficulty) => {
-  button.dataset.difficulty = String(difficulty);
+[...el("difficulties").children].forEach(button => {
+  const difficulty = Number(button.dataset.difficulty);
   const detail = document.createElement("small");
   detail.textContent = [
     "16 cells · A gentle start",
     "36 cells · More to untangle",
     "64 cells · Longer deductions",
     "100 cells · The deepest challenge",
+    "9 cells · A tiny beginning",
   ][difficulty];
   button.title = detail.textContent;
   detail.textContent = detail.textContent.split(" · ")[0];

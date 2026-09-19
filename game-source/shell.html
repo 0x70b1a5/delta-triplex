@@ -11,16 +11,16 @@
     <style>
       :root {
         color-scheme: dark;
-        --surface: #21303d;
-        --hover: #354958;
-        --border: #354552;
-        --bg: #121a23;
-        --ink: #e7ece4;
-        --muted: #94a5ac;
-        --mint: #86ddb8;
-        --a: #8bc5ef;
-        --b: #dda4d2;
-        --c: #f2c373;
+        --surface: #171717;
+        --hover: #303030;
+        --border: #777777;
+        --bg: #000000;
+        --ink: #ffffff;
+        --muted: #b0b0b0;
+        --mint: #ffffff;
+        --a: #ffffff;
+        --b: #ffffff;
+        --c: #ffffff;
       }
       * {
         box-sizing: border-box;
@@ -662,7 +662,7 @@
         padding: 6px 9px;
       }
       #editor-settings input,
-      #editor-settings select {
+      #editor-settings select, #theme-mode {
         font: inherit;
         color: var(--ink);
         background: var(--surface);
@@ -948,7 +948,7 @@
       #rotate-board { display: block; width: 100%; height: 100%; touch-action: none; user-select: none; outline: none; }
       #app:not([data-solved="true"]) #rotate-board[data-keyboard-focus="true"]:focus { outline: 1px solid var(--muted); outline-offset: -4px; }
       #rotate-board polygon { cursor: pointer; }
-      #rotate-board text { fill: var(--ink); font-family: system-ui, sans-serif; font-variant-numeric: tabular-nums; pointer-events: none; }
+      #rotate-board text { font-family: system-ui, sans-serif; font-variant-numeric: tabular-nums; pointer-events: none; }
       #rotate-board text[data-axis] { fill: var(--cell); }
       #session-bar { position: fixed; top: 14px; left: 24px; right: 20px; display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--muted); font-size: 12px; }
       #session-clock { font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -1031,7 +1031,7 @@
       }
       .home-banner {
         position: absolute; inset: 0 0 auto; height: calc(100% / var(--rows));
-        background: var(--cell); color: var(--home-cell-ink);
+        background: var(--flash-fill, var(--cell)); color: var(--row-ink, var(--home-cell-ink));
         clip-path: polygon(.2% .5%, 99.8% .5%, calc(100% - var(--tip) - .2%) 99.5%, calc(var(--tip) + .2%) 99.5%);
         display: grid; place-items: center;
       }
@@ -1039,7 +1039,7 @@
       #home .home-cell {
         display: block; position: absolute; left: var(--x); top: var(--y);
         width: calc(100% / var(--rows)); height: calc(100% / var(--rows)); margin: 0; padding: 0; border: 0; border-radius: 0;
-        background: var(--empty); color: var(--row-ink, var(--home-empty-ink));
+        background: var(--flash-fill, var(--empty)); color: var(--row-ink, var(--home-empty-ink));
         clip-path: polygon(1% .5%, 99% .5%, 50% 99%);
         font: 400 var(--label-size, clamp(9px, 1.35vw, 22px))/1.4 Michroma, system-ui, sans-serif;
         text-align: center; text-decoration: none; -webkit-tap-highlight-color: transparent;
@@ -1052,7 +1052,6 @@
       #home .home-credit > span, #home .home-back > span { top: 24%; }
       #home .home-credit > span { font-size: 75%; }
       #home .home-credit small { margin: 0 0 .2em; }
-      #home .home-cell::after, .home-banner::after { content: ""; position: absolute; inset: 0; background: white; opacity: var(--row-glow, 0); pointer-events: none; }
       #home button.home-cell:active, #home a.home-cell:active,
       #home button.home-cell:focus-visible, #home a.home-cell:focus-visible { background: var(--cell); color: var(--home-cell-ink); outline: 0; }
       @media (hover: hover) {
@@ -1073,6 +1072,28 @@
       @media (max-height: 450px) {
         .home-triangle { --top: 8px; }
         .home-banner h1, .home-banner h2 { font-size: clamp(27px, 9dvh, 45px); }
+      }
+      #theme-welcome { width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); box-sizing: border-box; padding: 24px; border: 1px solid var(--border); border-radius: 18px; background: var(--bg); color: var(--ink); overflow: auto; box-shadow: 0 16px 64px #0006; }
+      #theme-welcome::backdrop { background: #0009; }
+      #theme-welcome h2 { margin: 0; font-size: 23px; font-weight: 650; }
+      #theme-welcome p { margin: 8px 0 18px; color: var(--muted); font-size: 14px; }
+      .theme-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0; margin: 0; border: 0; }
+      .theme-options label { position: relative; display: grid; padding: 7px 7px 10px; border: 2px solid var(--border); border-radius: 10px; cursor: pointer; background: var(--surface); }
+      .theme-options label:has(input:checked) { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+      .theme-options label:has(input:focus-visible) { outline: 2px solid var(--ink); outline-offset: 3px; }
+      .theme-options input { position: absolute; right: 12px; bottom: 24px; width: 16px; height: 16px; margin: 0; accent-color: var(--ink); }
+      .theme-preview { display: block; overflow: hidden; border-radius: 5px; margin-bottom: 8px; }
+      .theme-preview svg { display: block; width: 100%; height: 84px; }
+      .theme-options strong, .theme-options small { margin: 0 24px 0 5px; }
+      .theme-options strong { font-size: 14px; }
+      .theme-options small { margin-top: 3px; font-size: 11px; color: var(--muted); }
+      #theme-welcome .theme-welcome-note { font-size: 12px; margin: 18px 0 12px; }
+      #theme-welcome-start { width: 100%; min-height: 44px; background: var(--ink); color: var(--bg); font-weight: 650; }
+      .theme-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+      @media (max-width: 360px), (max-height: 560px) {
+        #theme-welcome { padding: 16px; }
+        #theme-welcome h2 { font-size: 20px; }
+        .theme-preview svg { height: 60px; }
       }
     </style>
   </head>
@@ -1162,23 +1183,28 @@
         <button id="editor-open">Level editor</button>
       </div>
       <h3>Appearance</h3>
-      <label
-        >Background
-        <input
-          aria-label="Background colour"
-          id="background-color"
-          title="Background colour"
-          type="color"
-          value="#121a23" /></label
-      ><label
-        >Filled cells
-        <input
-          aria-label="Filled cell colour"
-          id="cell-color"
-          title="Filled cell colour"
-          type="color"
-          value="#86ddb8"
-      /></label>
+      <label for="theme-mode">Theme
+        <select id="theme-mode">
+          <option value="system">System</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+          <option value="colorful">Colorful</option>
+        </select>
+      </label>
+      <label for="background-color">Background
+        <span class="colour-controls">
+          <input id="background-color" type="color" aria-label="Background colour">
+          <button id="dice-bg" class="colour-die" aria-label="Randomize background colour" title="Randomize colour">⚄</button>
+          <button id="clear-colour-bg" class="colour-die" aria-label="Clear chosen background colour" title="Use theme colour" hidden>×</button>
+        </span>
+      </label>
+      <label for="cell-color">Filled cells
+        <span class="colour-controls">
+          <input id="cell-color" type="color" aria-label="Filled cells colour">
+          <button id="dice-cell" class="colour-die" aria-label="Randomize filled cells colour" title="Randomize colour">⚄</button>
+          <button id="clear-colour-cell" class="colour-die" aria-label="Clear chosen filled cells colour" title="Use theme colour" hidden>×</button>
+        </span>
+      </label>
       <h3>Tools</h3>
       <div id="menu-tools"></div>
     </aside>
@@ -1203,8 +1229,7 @@
         <section id="home-endless" class="home-triangle" hidden>
           <header class="home-banner"><h2>Endless Mode</h2></header>
           <div class="home-actions" id="difficulties">
-            <button>Easy</button><button>Medium</button><button>Hard</button
-            ><button>Impossible</button>
+            <button data-difficulty="4">Sprout</button><button data-difficulty="0">Easy</button><button data-difficulty="1">Medium</button><button data-difficulty="2">Hard</button><button data-difficulty="3">Impossible</button>
           </div>
           <p id="endless-note" role="status">
             Every puzzle has one solution. Choose your challenge.
@@ -1266,11 +1291,27 @@
         ><button id="memory-close">Hide</button>
       </div>
     </aside>
+    <dialog id="theme-welcome" aria-labelledby="theme-welcome-title" aria-describedby="theme-welcome-help">
+      <form method="dialog">
+        <h2 id="theme-welcome-title">Make yourself at home</h2>
+        <p id="theme-welcome-help">Choose a look for your first puzzle.</p>
+        <fieldset class="theme-options">
+          <legend class="theme-sr-only">Theme</legend>
+          <label><input type="radio" name="welcome-theme" value="light"><span class="theme-preview"></span><strong>Light</strong><small>Bright &amp; simple</small></label>
+          <label><input type="radio" name="welcome-theme" value="dark"><span class="theme-preview"></span><strong>Dark</strong><small>Easy on the eyes</small></label>
+          <label><input type="radio" name="welcome-theme" value="system"><span class="theme-preview"></span><strong>System</strong><small>Follow your device</small></label>
+          <label><input type="radio" name="welcome-theme" value="colorful"><span class="theme-preview"></span><strong>Colorful</strong><small>A little more play</small></label>
+        </fieldset>
+        <p class="theme-welcome-note">Change this anytime in Menu → Appearance.</p>
+        <button id="theme-welcome-start" type="submit">Start playing</button>
+      </form>
+    </dialog>
     <script src="palette.js"></script>
     <script src="share.js"></script>
     <script src="app.js"></script>
     {{{ SCRIPT }}}
     <script src="editor.js"></script>
+    <script src="theme-welcome.js"></script>
     <script src="flow.js"></script>
     <script src="back.js"></script>
     <script src="rotate.js"></script>
