@@ -1,4 +1,8 @@
 const assert = require('assert'), P = require('./palette.js');
+assert.equal(P.rotateHue('#ff0000', 120), '#00ff00');
+assert.equal(P.rotateHue('#ff0000', -120), '#0000ff');
+assert.equal(P.rotateHue('#18304c', 360), '#18304c');
+assert.equal(P.rotateHue('#888888', 73), '#888888');
 const { harness, source } = require('./test_rotation_harness.cjs');
 for (const mode of ['light', 'dark']) {
   const theme = P.theme(mode);

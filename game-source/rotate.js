@@ -82,7 +82,7 @@
   toggleMenu = function (open) { clock(); baseMenu(open); clock(); };
   const baseHome = window.triShowHome;
   window.triShowHome = function (...args) {
-    clock(); saveAttempt(true); cancelGesture(); baseHome(...args); clock();
+    clock(); saveAttempt(true); cancelGesture(); baseHome(...args); applyPalette(); clock();
     copyPanel.hidden = true;
   };
   const basePlay = window.triShowPlay;
@@ -145,10 +145,6 @@
     if (text !== undefined) item.textContent = text;
     return item;
   }
-  function bounds(points) {
-    return { minX: Math.min(...points.map(p => p[0])), maxX: Math.max(...points.map(p => p[0])),
-      minY: Math.min(...points.map(p => p[1])), maxY: Math.max(...points.map(p => p[1])) };
-  }
   function clueRows(angle, desktop) {
     // Start-end directions of the canonical strips, through their end-cell centroids.
     const directions = [[.5, -SQRT3 / 2], [-.5, -SQRT3 / 2], [-1, 0]];
@@ -188,11 +184,11 @@
       max: [right ? 0 : width, top ? font : 0],
     };
   }
-  function pose(width, height, angle, desktop, font, withClues, balanced = false) {
+  function pose(width, height, angle, desktop, font, withClues, solved = false) {
     const outer = [vertex(0, 0, state.n), vertex(state.n, 0, state.n), vertex(0, state.n, state.n)].map(p => rotatePoint(p, angle));
-    const box = bounds(outer);
-    const origin = balanced ? [(box.minX + box.maxX) / 2, (box.minY + box.maxY) / 2] : desktop ? [(box.minX + box.maxX) / 2, box.minY] : [box.minX, (box.minY + box.maxY) / 2];
-    const offset = balanced ? [width / 2, height / 2] : desktop ? [width / 2, EDGE] : [EDGE, height / 2];
+    const origin = solved ? [0, 1].map(axis =>
+      (Math.min(...outer.map(p => p[axis])) + Math.max(...outer.map(p => p[axis]))) / 2) : [0, 0];
+    const offset = [width / 2, height / 2];
     const clues = withClues ? clueRows(angle, desktop) : [];
     const constraints = outer.map(p => ({ p, extra: [0, 0], min: [0, 0], max: [0, 0] }));
     for (const clue of clues) {
@@ -204,10 +200,10 @@
     }
     // Each vertex and number imposes an exact linear bound on the scale. This
     // uses the available space instead of reserving a large blanket clue margin.
-    let scale = Infinity;
+    let scale = solved ? Infinity : (Math.min(width, height) / 2 - EDGE) / (2 * SQRT3 / 3);
     for (const item of constraints) for (let axis = 0; axis < 2; axis++) {
       const a = item.p[axis] - origin[axis], b = offset[axis] + item.extra[axis];
-      const padding = balanced ? EDGE : 12;
+      const padding = EDGE;
       const low = padding - item.min[axis], high = (axis ? height : width) - padding - item.max[axis];
       if (a > 1e-7) scale = Math.min(scale, (high - b) / a);
       else if (a < -1e-7) scale = Math.min(scale, (low - b) / a);
@@ -222,7 +218,7 @@
     if (progress === 1) { visualTurn = animation.to; animation = null; }
     return eased;
   }
-  function layout(width, height, eased) {
+  function layout(width, height) {
     const desktop = window.innerWidth >= 900;
     const base = desktop ? 0 : -90;
     const angle = base + visualTurn + preview;
@@ -231,26 +227,28 @@
     const solved = state.won && !state.editing;
     const resting = pose(width, height, base + view * 120, desktop, font, !solved, solved);
     const moving = animation !== null || preview !== 0;
-    const current = moving ? pose(width, height, angle, desktop, font, false) : resting;
-    const desiredScale = animation ? animation.fromScale + (resting.scale - animation.fromScale) * eased : resting.scale;
-    const scale = Math.min(desiredScale, current.scale);
+    const current = resting;
+    const scale = Math.min(...[0, 120, 240].map(turn =>
+      pose(width, height, base + turn, desktop, font, !solved, solved).scale));
     const toScreen = p => rotatePoint(p, angle).map((v, a) => current.offset[a] + (v - current.origin[a]) * scale);
     return { width, height, desktop, angle, scale, font, toScreen, clues: moving ? [] : resting.clues,
-      moving, outer: current.outer.map(p => p.map((v, a) => current.offset[a] + (v - current.origin[a]) * scale)) };
+      moving, outer: [vertex(0, 0, state.n), vertex(state.n, 0, state.n), vertex(0, state.n, state.n)].map(toScreen) };
   }
+  window.triPuzzleHue = () => window.triMenuOpen || state?.editing ? 0 : visualTurn + preview;
   window.triDrawBoard = () => {
     if (!state?.cells) return;
     const rect = stage.getBoundingClientRect();
-    const eased = advanceAnimation();
+    advanceAnimation();
+    applyPalette();
     call("effect_axis", [2, 1, 0][view]);
     const effects = call("effects", performance.now());
     const victory = !!call("celebrating");
-    geometry = layout(Math.max(160, rect.width), Math.max(160, rect.height), eased);
+    geometry = layout(Math.max(160, rect.width), Math.max(160, rect.height));
     const style = document.documentElement.style;
     const colours = ["--empty", "--cell"].map(key => style.getPropertyValue(key).trim());
     svg.setAttribute("viewBox", `0 0 ${geometry.width} ${geometry.height}`);
     // Match raylib's celebration camera: rotate/zoom the already laid-out
-    // board about its central active cell. Ordinary turns alone use edge fitting.
+    // board about its central active cell. Ordinary turns use the triangle centroid.
     const fragment = node("g", { "data-board-layer": "" });
     if (victory) {
       const cell = state.cells[call("celebration_cell")];
@@ -303,7 +301,7 @@
     if (!state.editing) turns += Math.abs(steps);
     preview = 0;
     if (motionEnabled && Math.abs(to - from) > .01) {
-      animation = { from, to, start: performance.now(), fromScale: geometry?.scale ?? 1,
+      animation = { from, to, start: performance.now(),
         duration: Math.max(160, Math.min(650, TURN_MS * Math.abs(to - from) / 120)) };
       visualTurn = from;
     } else { visualTurn = to; animation = null; }

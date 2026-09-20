@@ -13,6 +13,19 @@ const TriPalette = (() => {
   const ink = color => contrast(color, '#ffffff') >= contrast(color, '#000000') ? '#ffffff' : '#000000';
   const rainbow = ['#ff3030', '#ff8800', '#ffdd00', '#20c050', '#2080ff', '#643cff', '#c040ff'];
   const mix = (base, target, amount) => hex(rgb(base).map((v, i) => v + (rgb(target)[i] - v) * amount));
+  // Rotate RGB hue while retaining saturation/lightness, including neutral colors.
+  function rotateHue(color, degrees) {
+    const channels = rgb(color).map(v => v / 255);
+    const high = Math.max(...channels), low = Math.min(...channels), chroma = high - low;
+    if (!chroma) return color;
+    const [r, g, b] = channels;
+    const sector = high === r ? (g - b) / chroma : high === g ? (b - r) / chroma + 2 : (r - g) / chroma + 4;
+    const h = ((sector + degrees / 60) % 6 + 6) % 6;
+    const x = chroma * (1 - Math.abs(h % 2 - 1));
+    const rotated = h < 1 ? [chroma, x, 0] : h < 2 ? [x, chroma, 0]
+      : h < 3 ? [0, chroma, x] : h < 4 ? [0, x, chroma] : h < 5 ? [x, 0, chroma] : [chroma, 0, x];
+    return hex(rotated.map(v => (v + low) * 255));
+  }
   function flash(base, stage, glow, mode) {
     const colorful = mode === 'colorful';
     return mix(base, colorful ? '#ffffff' : rainbow[stage % rainbow.length],
@@ -81,6 +94,6 @@ const TriPalette = (() => {
       hover: dark ? '#303030' : '#dddddd', border: dark ? '#777777' : '#888888',
       mint: cell, a: cell, b: cell, c: cell };
   }
-  return { theme, contrast, ink, rainbow, flash, mix, random, randomColor, oklch };
+  return { rotateHue, theme, contrast, ink, rainbow, flash, mix, random, randomColor, oklch };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = TriPalette;

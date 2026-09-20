@@ -12,8 +12,7 @@ function pointer(type, target, x, y) {
 }
 function checkFrame() {
   const g = w.TriRotation.geometry;
-  assert(Math.abs(Math.min(...g.outer.map(p => p[g.desktop ? 1 : 0])) - 24) < 1e-6, "fixed edge clearance throughout animation");
-  if (g.desktop) assert(Math.abs((Math.min(...g.outer.map(p => p[0])) + Math.max(...g.outer.map(p => p[0]))) / 2 - g.width / 2) < 1e-6, "desktop board stays centered");
+  for (const axis of [0, 1]) assert(Math.abs(g.outer.reduce((sum, p) => sum + p[axis], 0) / 3 - (axis ? g.height : g.width) / 2) < 1e-6, "triangle centroid stays at the stage center");
   for (const [x, y] of g.outer) assert(x >= 11.99 && y >= 11.99 && x <= g.width - 11.99 && y <= g.height - 11.99, "every animated vertex fits");
   if (g.moving) assert.equal(svg.querySelectorAll("text[data-axis]").length, 0, "clues wait until the board settles");
 }
@@ -43,7 +42,7 @@ for (const [width, height] of [[1440, 760], [900, 550], [390, 480], [320, 360], 
   assert(Math.abs(w.TriRotation.geometry.angle - initialAngle - 120) < 1e-6);
   assert.equal(w.TriRotation.stats.turns, initialTurns + 1);
   assert(svg.querySelectorAll("text[data-axis]").length > 0);
-  if (width === 1440 || width === 390) assert(smallest < initialScale - 1, "board shrinks to fit the turn");
+  assert(Math.abs(smallest - initialScale) < 1e-6, "rotation keeps its scale");
   // Drag follows the finger. The remaining angle animates rather than jumping.
   const beforeSwipe = w.TriRotation.geometry.angle, beforeTurns = w.TriRotation.stats.turns;
   pointer("pointerdown", svg, 200, 200);
@@ -66,5 +65,33 @@ for (const [width, height] of [[1440, 760], [900, 550], [390, 480], [320, 360], 
   assert.equal(w.TriRotation.stats.turns, turns);
   assert(Math.abs(w.TriRotation.geometry.angle - settled) < 1e-6);
 }
+// Hue follows the exact visual angle, reverses on snap-back, and never rewrites preferences.
+const palette = require("./palette.js");
+for (const [id, value] of [["background-color", "#18304c"], ["cell-color", "#edbd91"]]) {
+  d.getElementById(id).value = value;
+  d.getElementById(id).dispatchEvent(new w.Event("input"));
+}
+h.frame();
+const saved = w.localStorage.getItem("delta-triplex-rotation-colours");
+const baseAngle = w.TriRotation.geometry.desktop ? 0 : -90;
+function checkHue() {
+  const angle = w.TriRotation.geometry.angle - baseAngle;
+  for (const [key, value] of [["bg", "#18304c"], ["cell", "#edbd91"]])
+    assert.equal(d.documentElement.style.getPropertyValue("--" + key), palette.rotateHue(value, angle));
+  assert.equal(w.localStorage.getItem("delta-triplex-rotation-colours"), saved);
+}
+const initialColors = ["bg", "cell"].map(key => d.documentElement.style.getPropertyValue("--" + key));
+for (let turn = 0; turn < 3; turn++) {
+  h.click("turn-right");
+  for (let tick = 0; tick < 28; tick++) { h.frame(16); checkHue(); }
+}
+assert.deepEqual(["bg", "cell"].map(key => d.documentElement.style.getPropertyValue("--" + key)), initialColors);
+pointer("pointerdown", svg, 200, 200);
+pointer("pointermove", svg, 220, 200);
+checkHue();
+assert.notEqual(d.documentElement.style.getPropertyValue("--bg"), initialColors[0]);
+pointer("pointerup", svg, 220, 200);
+for (let tick = 0; tick < 28; tick++) { h.frame(16); checkHue(); }
+assert.deepEqual(["bg", "cell"].map(key => d.documentElement.style.getPropertyValue("--" + key)), initialColors);
 h.close();
-console.log("PASS: horizontal desktop base, centered/maximized layout, smooth turns and gesture settling, shrink-to-fit, fixed edge clearance on every frame, input suppression, and subthreshold snap-back.");
+console.log("PASS: horizontal desktop base, centered/maximized layout, smooth turns and gesture settling, fixed scale and centroid on every frame, input suppression, and subthreshold snap-back.");

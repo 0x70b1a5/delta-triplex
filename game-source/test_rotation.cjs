@@ -24,8 +24,7 @@ const { harness, source } = require("./test_rotation_harness.cjs");
   const axes = () => new Set([...board.querySelectorAll("text[data-axis]")].map(e => Number(e.dataset.axis)));
   function assertAnchor() {
     const g = w.TriRotation.geometry;
-    assert(Math.abs(Math.min(...g.outer.map(p => p[g.desktop ? 1 : 0])) - 24) < 1e-6);
-    if (g.desktop) assert(Math.abs((Math.min(...g.outer.map(p => p[0])) + Math.max(...g.outer.map(p => p[0]))) / 2 - g.width / 2) < 1e-6);
+    for (const axis of [0, 1]) assert(Math.abs(g.outer.reduce((sum, p) => sum + p[axis], 0) / 3 - (axis ? g.height : g.width) / 2) < 1e-6);
   }
   const observed = new Set();
   for (let i = 0; i < 3; i++) {
@@ -145,5 +144,5 @@ const { harness, source } = require("./test_rotation_harness.cjs");
     h.resize(900, 760);
   }
   h.close();
-  console.log("PASS: real WASM rules, anchored view, all clue sides, tap/swipe/twist/cancel/wheel, rotation counts, timing/pause/freeze/undo/reset, brag fallback, level links, five Endless difficulties, orientation-free exports and seed links.");
+  console.log("PASS: real WASM rules, centered view, all clue sides, tap/swipe/twist/cancel/wheel, rotation counts, timing/pause/freeze/undo/reset, brag fallback, level links, five Endless difficulties, orientation-free exports and seed links.");
 })().catch(error => { console.error(error); process.exit(1); });

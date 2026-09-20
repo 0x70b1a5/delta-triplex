@@ -74,11 +74,14 @@ function writeTheme(target, theme) {
   target.style.setProperty("--home-empty-ink", theme.cross);
 }
 function applyPalette() {
-  const theme = currentTheme();
+  const base = currentTheme();
+  const angle = ((window.triPuzzleHue?.() ?? 0) % 360 + 360) % 360;
+  const rotated = { bg: TriPalette.rotateHue(base.bg, angle), cell: TriPalette.rotateHue(base.cell, angle) };
+  const theme = rotated.bg === base.bg && rotated.cell === base.cell ? base : TriPalette.theme(themeMode, rotated);
   writeTheme(document.documentElement, theme);
   document.documentElement.style.colorScheme = theme.ink === "#ffffff" ? "dark" : "light";
   for (const [id, key] of [["background-color", "bg"], ["cell-color", "cell"]]) {
-    el(id).value = theme[key];
+    el(id).value = base[key];
     el("clear-colour-" + key).hidden = !chosenColours[key];
   }
   el("theme-mode").value = themeMode;
