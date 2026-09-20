@@ -6,7 +6,7 @@
       content="width=device-width,initial-scale=1,viewport-fit=cover"
       name="viewport"
     />
-    <title>Delta Triplex</title>
+    <title>{{copy:app.name}}</title>
     <link rel="icon" type="image/svg+xml" href="../public/favicon.svg" />
     <style>
       :root {
@@ -995,6 +995,7 @@
       #share-result svg { flex-shrink: 0; }
       .mobile-share-suffix { display: none; }
       @media (min-width: 900px) {
+        #app #stage { bottom: 88px !important; }
         #app[data-solved="true"] #stage { inset: 52px 0 !important; }
       }
       @media (min-width: 900px) and (max-height: 550px) and (orientation: landscape) {
@@ -1005,6 +1006,7 @@
       @media (max-width: 899px) {
         #solve-result { display: none; }
         .mobile-share-suffix { display: inline; }
+        .desktop-share-label { display: none; }
         #completion { font-size: 13px; gap: 6px; }
       }
       @media (max-width: 700px) {
@@ -1101,7 +1103,7 @@
     <main data-tutorial="true" id="app">
       <div id="stage">
         <canvas
-          aria-label="Internal rules canvas"
+          aria-label="{{copy:ui.internal-rules-canvas}}"
           height="760"
           id="canvas"
           tabindex="0"
@@ -1109,37 +1111,36 @@
         ></canvas>
         <div id="strip-label" aria-hidden="true"></div>
       </div>
-      <section aria-label="Puzzle clues and controls" id="side">
-        <nav aria-label="Puzzles" id="navigation">
+      <section aria-label="{{copy:ui.puzzle-clues-and-controls}}" id="side">
+        <nav aria-label="{{copy:ui.puzzles}}" id="navigation">
           <div id="levels" hidden></div>
           <button
             id="caret"
-            aria-label="Hidden utilities toggle: press three times"
+            aria-label="{{copy:ui.hidden-utilities-toggle-press-three-times}}"
             title="^^^"
           >
             ⌃
           </button>
         </nav>
-        <div id="clues" aria-label="Clues in three directions"></div>
-        <section aria-label="Introduction" id="lesson">
+        <div id="clues" aria-label="{{copy:ui.clues-in-three-directions}}"></div>
+        <section aria-label="{{copy:ui.introduction}}" id="lesson">
           <h1 id="lesson-title"></h1>
           <p id="lesson-text"></p>
           <div class="lesson-actions">
-            <button id="continue" hidden>Continue</button
-            ><button id="skip">Skip introduction</button>
+            <button id="continue" hidden>{{copy:ui.continue}}</button
+            ><button id="skip">{{copy:ui.skip-introduction}}</button>
           </div>
         </section>
         <div id="corner">
           <div id="controls-hint">
             <span class="desktop-hint"
-              >click: fill · drag: paint<br />rclick: cross</span
+              >{{copy:ui.click-fill-drag-paint}}<br />{{copy:ui.rclick-cross}}</span
             ><span class="mobile-hint"
-              >tap: fill · drag: paint<br />tap a filled one to cross, tap a
-              cross to clear</span
+              >{{copy:ui.tap-fill-drag-paint}}<br />{{copy:controls.tapCycle}}</span
             >
           </div>
           <div class="icons" id="bottom-controls">
-            <button id="undo" aria-label="Undo" title="Undo (Z)" class="icon">
+            <button id="undo" aria-label="{{copy:ui.undo}}" title="{{copy:ui.undo-z}}" class="icon">
               <svg aria-hidden="true" viewBox="0 0 24 24">
                 <path
                   d="M8 5 3 10l5 5M3 10h11a6 6 0 0 1 0 12"
@@ -1148,8 +1149,8 @@
               </svg></button
             ><button
               id="reset"
-              aria-label="Reset puzzle"
-              title="Reset (R); undo restores it"
+              aria-label="{{copy:ui.reset-puzzle}}"
+              title="{{copy:ui.reset-r-undo-restores-it}}"
               class="icon"
             >
               <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -1158,10 +1159,10 @@
             ><button
               id="menu-toggle"
               class="icon"
-              aria-label="Open puzzle menu"
+              aria-label="{{copy:ui.open-puzzle-menu}}"
               aria-expanded="false"
               aria-controls="puzzle-menu"
-              title="Menu"
+              title="{{copy:ui.menu}}"
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M4 6h16M4 12h16M4 18h16" />
@@ -1171,72 +1172,72 @@
         </div>
       </section>
     </main>
-    <aside id="puzzle-menu" aria-label="Puzzle menu" hidden>
+    <aside id="puzzle-menu" aria-label="{{copy:ui.puzzle-menu}}" hidden>
       <div class="menu-heading">
-        <h2>Delta Triplex</h2>
-        <button id="menu-close" aria-label="Close menu">×</button>
+        <h2>{{copy:app.name}}</h2>
+        <button id="menu-close" aria-label="{{copy:ui.close-menu}}">×</button>
       </div>
-      <button id="return-home">Main menu</button>
+      <button id="return-home">{{copy:ui.main-menu}}</button>
 
-      <h3>Create</h3>
+      <h3>{{copy:ui.create}}</h3>
       <div class="menu-actions">
-        <button id="editor-open">Level editor</button>
+        <button id="editor-open">{{copy:ui.level-editor}}</button>
       </div>
-      <h3>Appearance</h3>
-      <label for="theme-mode">Theme
+      <h3>{{copy:ui.appearance}}</h3>
+      <label for="theme-mode">{{copy:theme.label}}
         <select id="theme-mode">
-          <option value="system">System</option>
-          <option value="light">Light</option>
-          <option value="dark">Dark</option>
-          <option value="colorful">Colorful</option>
+          <option value="system">{{copy:theme.system.label}}</option>
+          <option value="light">{{copy:theme.light.label}}</option>
+          <option value="dark">{{copy:theme.dark.label}}</option>
+          <option value="colorful">{{copy:theme.colorful.label}}</option>
         </select>
       </label>
-      <label for="background-color">Background
+      <label for="background-color">{{copy:ui.background}}
         <span class="colour-controls">
-          <input id="background-color" type="color" aria-label="Background colour">
-          <button id="dice-bg" class="colour-die" aria-label="Randomize background colour" title="Randomize colour">⚄</button>
-          <button id="clear-colour-bg" class="colour-die" aria-label="Clear chosen background colour" title="Use theme colour" hidden>×</button>
+          <input id="background-color" type="color" aria-label="{{copy:ui.background-colour}}">
+          <button id="dice-bg" class="colour-die" aria-label="{{copy:ui.randomize-background-colour}}" title="{{copy:ui.randomize-colour}}">⚄</button>
+          <button id="clear-colour-bg" class="colour-die" aria-label="{{copy:ui.clear-chosen-background-colour}}" title="{{copy:ui.use-theme-colour}}" hidden>×</button>
         </span>
       </label>
-      <label for="cell-color">Filled cells
+      <label for="cell-color">{{copy:ui.filled-cells}}
         <span class="colour-controls">
-          <input id="cell-color" type="color" aria-label="Filled cells colour">
-          <button id="dice-cell" class="colour-die" aria-label="Randomize filled cells colour" title="Randomize colour">⚄</button>
-          <button id="clear-colour-cell" class="colour-die" aria-label="Clear chosen filled cells colour" title="Use theme colour" hidden>×</button>
+          <input id="cell-color" type="color" aria-label="{{copy:ui.filled-cells-colour}}">
+          <button id="dice-cell" class="colour-die" aria-label="{{copy:ui.randomize-filled-cells-colour}}" title="{{copy:ui.randomize-colour}}">⚄</button>
+          <button id="clear-colour-cell" class="colour-die" aria-label="{{copy:ui.clear-chosen-filled-cells-colour}}" title="{{copy:ui.use-theme-colour}}" hidden>×</button>
         </span>
       </label>
-      <h3>Tools</h3>
+      <h3>{{copy:ui.tools}}</h3>
       <div id="menu-tools"></div>
     </aside>
-    <section id="home" aria-label="Main menu" data-view="main">
+    <section id="home" aria-label="{{copy:ui.main-menu}}" data-view="main">
       <div class="home-card">
         <div id="home-main" class="home-actions home-triangle">
-          <header class="home-banner"><h1>DELTA TRIPLEX</h1></header>
-          <button id="new-game" class="home-cell" style="--x:12.5%;--y:25%"><span>New<br>Game</span></button>
-          <button id="select-level" class="home-cell" style="--x:37.5%;--y:25%"><span>Level<br>Select</span></button>
-          <button id="endless-mode" class="home-cell" style="--x:62.5%;--y:25%"><span>Endless<br>Mode</span></button>
-          <button id="create-puzzle" class="home-cell" style="--x:25%;--y:50%"><span>Create<br>Puzzle</span></button>
-          <button id="load-puzzle" class="home-cell" style="--x:50%;--y:50%"><span>Load<br>Puzzle</span></button>
+          <header class="home-banner"><h1>{{copy:home.brand}}</h1></header>
+          <button id="new-game" class="home-cell" style="--x:12.5%;--y:25%"><span>{{copy:home.newGame}}</span></button>
+          <button id="select-level" class="home-cell" style="--x:37.5%;--y:25%"><span>{{copy:home.levelSelect}}</span></button>
+          <button id="endless-mode" class="home-cell" style="--x:62.5%;--y:25%"><span>{{copy:home.endlessMode}}</span></button>
+          <button id="create-puzzle" class="home-cell" style="--x:25%;--y:50%"><span>{{copy:home.createPuzzle}}</span></button>
+          <button id="load-puzzle" class="home-cell" style="--x:50%;--y:50%"><span>{{copy:home.loadPuzzle}}</span></button>
           <i class="home-cell home-filler" style="--x:25%;--y:25%" aria-hidden="true"></i>
           <i class="home-cell home-filler" style="--x:50%;--y:25%" aria-hidden="true"></i>
           <i class="home-cell home-filler" style="--x:37.5%;--y:50%" aria-hidden="true"></i>
-          <a class="home-cell home-credit" style="--x:37.5%;--y:75%" href="https://lovecrypt.itch.io/" target="_blank" rel="noopener noreferrer"><span><small>by</small> lovecrypt</span></a>
+          <a class="home-cell home-credit" style="--x:37.5%;--y:75%" href="https://lovecrypt.itch.io/" target="_blank" rel="noopener noreferrer"><span><small>{{copy:ui.by}}</small> {{copy:ui.lovecrypt}}</span></a>
         </div>
         <section id="home-levels" class="home-triangle" hidden>
-          <header class="home-banner"><h2>Level Select</h2></header>
+          <header class="home-banner"><h2>{{copy:ui.level-select}}</h2></header>
           <div id="level-grid"></div>
         </section>
         <section id="home-endless" class="home-triangle" hidden>
-          <header class="home-banner"><h2>Endless Mode</h2></header>
+          <header class="home-banner"><h2>{{copy:ui.endless-mode}}</h2></header>
           <div class="home-actions" id="difficulties">
-            <button data-difficulty="4">Sprout</button><button data-difficulty="0">Easy</button><button data-difficulty="1">Medium</button><button data-difficulty="2">Hard</button><button data-difficulty="3">Impossible</button>
+            <button data-difficulty="4">{{copy:ui.sprout}}</button><button data-difficulty="0">{{copy:ui.easy}}</button><button data-difficulty="1">{{copy:ui.medium}}</button><button data-difficulty="2">{{copy:ui.hard}}</button><button data-difficulty="3">{{copy:ui.impossible}}</button>
           </div>
           <p id="endless-note" role="status">
-            Every puzzle has one solution. Choose your challenge.
+            {{copy:endless.intro}}
           </p>
         </section>
         <p id="load-error" role="alert" hidden></p>
-        <button id="home-back" hidden>Back</button>
+        <button id="home-back" hidden>{{copy:ui.back}}</button>
       </div>
     </section>
     <input
@@ -1246,66 +1247,65 @@
       hidden
     />
     <div id="completion" hidden role="status">
-      <span id="solve-result">Solved<span id="solve-details"></span></span>
-      <button id="share-result" class="icon share-button" aria-label="Share solution" title="Share solution"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V3m-4 4 4-4 4 4M5 11v9h14v-9" /></svg><span>Share<span class="mobile-share-suffix"> solution</span></span></button>
-      <button id="next-puzzle" class="icon" aria-label="Next puzzle" title="Next puzzle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" /></svg></button>
+      <span id="solve-result"><span id="solve-details">{{copy:ui.solved}}</span></span>
+      <button id="share-result" class="icon share-button" aria-label="{{copy:ui.share-solution}}" title="{{copy:ui.share-solution}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V3m-4 4 4-4 4 4M5 11v9h14v-9" /></svg><span class="desktop-share-label">{{copy:ui.share}}</span><span class="mobile-share-suffix">{{copy:ui.share-solution}}</span></button>
+      <button id="next-puzzle" class="icon" aria-label="{{copy:ui.next-puzzle}}" title="{{copy:ui.next-puzzle}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" /></svg></button>
     </div>
     <div id="toast" hidden role="status"></div>
-    <div id="status" role="status">Loading…</div>
+    <div id="status" role="status">{{copy:ui.loading}}</div>
     <div id="error" hidden></div>
     <div id="utilities" hidden>
-      <button id="memory">Memory</button
-      ><button id="fullscreen">Fullscreen</button
-      ><button id="replay">Introduction</button>
+      <button id="memory">{{copy:ui.memory}}</button
+      ><button id="fullscreen">{{copy:ui.fullscreen}}</button
+      ><button id="replay">{{copy:ui.introduction}}</button>
     </div>
-    <aside aria-label="Memory diagnostics" hidden id="memory-panel">
-      <h2>Memory during play</h2>
+    <aside aria-label="{{copy:ui.memory-diagnostics}}" hidden id="memory-panel">
+      <h2>{{copy:ui.memory-during-play}}</h2>
       <dl>
-        <dt>Wasm capacity</dt>
+        <dt>{{copy:ui.wasm-capacity}}</dt>
         <dd id="mem-capacity">—</dd>
-        <dt>C heap allocated</dt>
+        <dt>{{copy:ui.c-heap-allocated}}</dt>
         <dd id="mem-allocated">—</dd>
-        <dt>C heap free blocks</dt>
+        <dt>{{copy:ui.c-heap-free-blocks}}</dt>
         <dd id="mem-free">—</dd>
-        <dt>Peak allocated (sampled)</dt>
+        <dt>{{copy:ui.peak-allocated-sampled}}</dt>
         <dd id="mem-peak">—</dd>
-        <dt>Change since opening</dt>
+        <dt>{{copy:ui.change-since-opening}}</dt>
         <dd id="mem-delta">—</dd>
-        <dt>Board + undo + saves + effects</dt>
+        <dt>{{copy:ui.board-undo-saves-effects}}</dt>
         <dd id="mem-static">—</dd>
-        <dt>Samples retained</dt>
+        <dt>{{copy:ui.samples-retained}}</dt>
         <dd id="mem-count">0</dd>
-        <dt>Frames drawn</dt>
+        <dt>{{copy:ui.frames-drawn}}</dt>
         <dd id="mem-frames">0</dd>
       </dl>
       <p>
-        Samples once per second while recording; retains 600. Hide to play. Wasm
-        capacity is buffer size, not physical RAM. Allocations and static data
-        are within capacity; do not add the rows. JavaScript, browser and GPU
-        memory are excluded. Sampling does not redraw the board.
+        {{copy:memory.help}}
       </p>
       <div class="actions">
-        <button id="memory-export" disabled>Export CSV</button
-        ><button id="memory-reset">Restart</button
-        ><button id="memory-pause">Pause</button
-        ><button id="memory-close">Hide</button>
+        <button id="memory-export" disabled>{{copy:ui.export-csv}}</button
+        ><button id="memory-reset">{{copy:ui.restart}}</button
+        ><button id="memory-pause">{{copy:ui.pause}}</button
+        ><button id="memory-close">{{copy:ui.hide}}</button>
       </div>
     </aside>
     <dialog id="theme-welcome" aria-labelledby="theme-welcome-title" aria-describedby="theme-welcome-help">
       <form method="dialog">
-        <h2 id="theme-welcome-title">Make yourself at home</h2>
-        <p id="theme-welcome-help">Choose a look for your first puzzle.</p>
+        <h2 id="theme-welcome-title">{{copy:theme.welcome.title}}</h2>
+        <p id="theme-welcome-help">{{copy:theme.welcome.help}}</p>
         <fieldset class="theme-options">
-          <legend class="theme-sr-only">Theme</legend>
-          <label><input type="radio" name="welcome-theme" value="light"><span class="theme-preview"></span><strong>Light</strong><small>Bright &amp; simple</small></label>
-          <label><input type="radio" name="welcome-theme" value="dark"><span class="theme-preview"></span><strong>Dark</strong><small>Easy on the eyes</small></label>
-          <label><input type="radio" name="welcome-theme" value="system"><span class="theme-preview"></span><strong>System</strong><small>Follow your device</small></label>
-          <label><input type="radio" name="welcome-theme" value="colorful"><span class="theme-preview"></span><strong>Colorful</strong><small>A little more play</small></label>
+          <legend class="theme-sr-only">{{copy:theme.label}}</legend>
+          <label><input type="radio" name="welcome-theme" value="light"><span class="theme-preview"></span><strong>{{copy:theme.light.label}}</strong><small>{{copy:theme.light.description}}</small></label>
+          <label><input type="radio" name="welcome-theme" value="dark"><span class="theme-preview"></span><strong>{{copy:theme.dark.label}}</strong><small>{{copy:theme.dark.description}}</small></label>
+          <label><input type="radio" name="welcome-theme" value="system"><span class="theme-preview"></span><strong>{{copy:theme.system.label}}</strong><small>{{copy:theme.system.description}}</small></label>
+          <label><input type="radio" name="welcome-theme" value="colorful"><span class="theme-preview"></span><strong>{{copy:theme.colorful.label}}</strong><small>{{copy:theme.colorful.description}}</small></label>
         </fieldset>
-        <p class="theme-welcome-note">Change this anytime in Menu → Appearance.</p>
-        <button id="theme-welcome-start" type="submit">Start playing</button>
+        <p class="theme-welcome-note">{{copy:theme.welcome.note}}</p>
+        <button id="theme-welcome-start" type="submit">{{copy:theme.welcome.start}}</button>
       </form>
     </dialog>
+    <script id="copy-catalog" type="application/json">{{COPY_CATALOG}}</script>
+    <script src="copy.js"></script>
     <script src="palette.js"></script>
     <script src="share.js"></script>
     <script src="app.js"></script>

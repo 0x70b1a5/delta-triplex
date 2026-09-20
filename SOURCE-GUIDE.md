@@ -4,6 +4,9 @@ The rotating nonogram design is now the main application. See [game-source/READM
 
 ## Main files
 
+- `game-source/locales/en.json`: central English copy catalog; see `game-source/locales/README.md` for editing and translations.
+- `game-source/copy.js`: named interpolation, plural rules and safe HTML insertion.
+
 - `game-source/home.js`: triangle menu layout, submenu zoom transitions, row flashes, isolated hue animation and reduced-motion handling.
 - `game-source/rotate.js`: SVG board, responsive clue placement, rotation gestures, timing and result sharing.
 - `game-source/src/main.c`: C engine API, canonical cell snapshots, undo/saves, ripples, solved-row flashes and victory animation timing.

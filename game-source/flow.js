@@ -1,13 +1,13 @@
 "use strict";
 // Navigation observes the same engine state for stock, imported and trial puzzles.
-const endlessDifficulties = ["Easy", "Medium", "Hard", "Impossible", "Sprout"];
+const endlessDifficulties = [TriCopy.t("ui.easy"), TriCopy.t("ui.medium"), TriCopy.t("ui.hard"), TriCopy.t("ui.impossible"), TriCopy.t("ui.sprout")];
 let generationId = 0;
 window.triEndlessRun = null;
 window.triCancelGeneration = function () {
   generationId++;
   el("difficulties").removeAttribute("aria-busy");
   el("next-puzzle").disabled = false;
-  el("next-puzzle").setAttribute("aria-label", "Next puzzle");
+  el("next-puzzle").setAttribute("aria-label", TriCopy.t("ui.next-puzzle"));
 };
 window.triMenuOpen = true;
 window.triShowHome = function (view = "main") {
@@ -61,7 +61,7 @@ window.triBuildLevels = function (names) {
       tile.id = "level-" + index;
       tile.textContent = String(index + 1).padStart(2, "0");
       const label = document.createElement("small");
-      label.textContent = name;
+      label.textContent = TriCopy.has(name) ? TriCopy.t(name) : name;
       tile.append(label);
       tile.onclick = () => openLevel(index);
       el("level-grid").append(tile);
@@ -81,9 +81,9 @@ window.triFlowState = function (next, previous) {
   if (next.custom && window.triEndlessRun) {
     const run = window.triEndlessRun;
     el("workshop-title").textContent =
-      endlessDifficulties[run.difficulty] + " · Puzzle " + run.number;
+      TriCopy.t("endless.title", { difficulty: endlessDifficulties[run.difficulty], number: run.number });
     el("workshop-help").textContent =
-      "Endless Mode · " + next.n * next.n + " cells";
+      TriCopy.t("endless.help", { count: next.n * next.n });
   }
   const solved = !!next.won && !next.editing;
   // Visibility preserves layout, so the puzzle does not jump as the clues vanish.
@@ -93,7 +93,7 @@ window.triFlowState = function (next, previous) {
   el("strip-label").hidden = solved;
   el("completion").hidden = !solved || window.triMenuOpen;
   el("continue").hidden = true;
-  el("next-puzzle").setAttribute("aria-label", "Next puzzle");
+  el("next-puzzle").setAttribute("aria-label", TriCopy.t("ui.next-puzzle"));
   const sameBoard =
     previous &&
     previous.level === next.level &&
@@ -104,7 +104,7 @@ window.triFlowState = function (next, previous) {
   if (!solved) call("clear_celebration");
 };
 el("new-game").onclick = () => {
-  if (!appReady) return toast("The game is still loading.");
+  if (!appReady) return toast(TriCopy.t("errors.loading"));
   window.triShowPlay();
   call("new");
 };
@@ -119,14 +119,14 @@ el("load-puzzle").onclick = () => {
 };
 // Each attempt is bounded, and yielding between batches keeps navigation responsive.
 async function startEndless(difficulty, number = 1, recent = []) {
-  if (!appReady) return toast("The game is still loading.");
+  if (!appReady) return toast(TriCopy.t("errors.loading"));
   window.triCancelGeneration();
   const job = generationId;
   el("difficulties").setAttribute("aria-busy", "true");
   el("endless-note").textContent =
-    "Creating a " + endlessDifficulties[difficulty].toLowerCase() + " puzzle…";
+    TriCopy.t("endless.creating", { difficulty: TriCopy.t("difficulty." + difficulty + ".sentence") });
   el("next-puzzle").disabled = true;
-  el("next-puzzle").setAttribute("aria-label", "Creating puzzle…");
+  el("next-puzzle").setAttribute("aria-label", TriCopy.t("flow.creating-puzzle"));
   try {
     for (let attempt = 0; attempt < 2000; attempt++) {
       if (attempt % 4 === 0)
@@ -145,7 +145,7 @@ async function startEndless(difficulty, number = 1, recent = []) {
       if (recent.includes(signature)) continue;
       puzzle.seed = seed;
       puzzle.difficulty = difficulty;
-      puzzle.name = "Endless " + endlessDifficulties[difficulty] + " " + number;
+      puzzle.name = TriCopy.t("endless.name", { difficulty: endlessDifficulties[difficulty], number });
       loadCustom(puzzle, false, false, {
         difficulty,
         number,
@@ -153,7 +153,7 @@ async function startEndless(difficulty, number = 1, recent = []) {
       });
       return;
     }
-    throw Error("Please try again; this puzzle took too long to create.");
+    throw Error(TriCopy.t("errors.generationTimeout"));
   } catch (error) {
     if (job !== generationId) return;
     el("endless-note").textContent = error.message;
@@ -165,15 +165,8 @@ async function startEndless(difficulty, number = 1, recent = []) {
 [...el("difficulties").children].forEach(button => {
   const difficulty = Number(button.dataset.difficulty);
   const detail = document.createElement("small");
-  detail.textContent = [
-    "16 cells · A gentle start",
-    "36 cells · More to untangle",
-    "64 cells · Longer deductions",
-    "100 cells · The deepest challenge",
-    "9 cells · A tiny beginning",
-  ][difficulty];
-  button.title = detail.textContent;
-  detail.textContent = detail.textContent.split(" · ")[0];
+  button.title = TriCopy.t("difficulty." + difficulty + ".description");
+  detail.textContent = TriCopy.t("difficulty.cells", { count: [16, 36, 64, 100, 9][difficulty] });
   button.append(detail);
   button.onclick = () => startEndless(difficulty);
 });
@@ -181,9 +174,9 @@ el("puzzle-file").onchange = async () => {
   const file = el("puzzle-file").files?.[0];
   if (!file) return;
   try {
-    if (!appReady) throw Error("The game is still loading. Please try again.");
+    if (!appReady) throw Error(TriCopy.t("errors.loadingRetry"));
     if (file.size > 65536)
-      throw Error("Please choose a puzzle JSON file smaller than 64 KB.");
+      throw Error(TriCopy.t("errors.fileSize"));
     const puzzle = JSON.parse(await file.text());
     if (
       !validPuzzle(puzzle) ||
@@ -192,13 +185,13 @@ el("puzzle-file").onchange = async () => {
       (puzzle.cellOrder && puzzle.cellOrder !== "north-row-major")
     )
       throw Error(
-        "This file is not a supported puzzle. Choose an exported puzzle JSON file.",
+        TriCopy.t("errors.fileUnsupported"),
       );
     loadCustom(puzzle, false, false);
   } catch (error) {
     el("load-error").textContent =
       error instanceof SyntaxError
-        ? "This file is not valid JSON. Choose an exported puzzle JSON file."
+        ? TriCopy.t("errors.fileJson")
         : error.message;
     el("load-error").hidden = false;
   }

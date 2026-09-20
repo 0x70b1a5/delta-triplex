@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import copy from "../game-source/locales/en.json";
 
 export const metadata: Metadata = {
-  title: "Delta Triplex",
-  description: "A triangular nonogram. Solve puzzles in three directions or create your own.",
+  title: copy["app.name"],
+  description: copy["site.description"],
   other: {
     "codex-preview": "development",
   },

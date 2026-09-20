@@ -32,10 +32,11 @@ def solve(n,pattern):
 
 def main():
     rng=random.Random(6042); puzzles=[]
-    for n,name in [(4,'First light'),(5,'Cut glass'),(6,'Prism'),(6,'Missing pieces')]:
+    for index,n in enumerate([4,5,6,6]):
+        name = f'levels.{index}'
         cs=cells(n)
         for attempt in range(2000):
-            pattern=''.join('.' if name=='Missing pieces' and i in (1,2) and j==1 else str(int(rng.random()<0.53)) for i,j,o in cs)
+            pattern=''.join('.' if index==3 and i in (1,2) and j==1 else str(int(rng.random()<0.53)) for i,j,o in cs)
             if solve(n,pattern):break
         else:raise RuntimeError('Could not generate a logical puzzle')
         puzzles.append((n,name,pattern))

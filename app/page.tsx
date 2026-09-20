@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import copy from "../game-source/locales/en.json";
 export default function Home() {
   const [source, setSource] = useState<string | null>(null);
   useEffect(() => {
@@ -13,7 +14,7 @@ export default function Home() {
       {source && (
         <iframe
           src={source}
-          title="Delta Triplex puzzle and level editor"
+          title={copy["site.frameTitle"]}
           allow="fullscreen; clipboard-write; web-share"
           allowFullScreen
         />

@@ -24,7 +24,7 @@ const { harness, source } = require("./test_rotation_harness.cjs");
   const axes = () => new Set([...board.querySelectorAll("text[data-axis]")].map(e => Number(e.dataset.axis)));
   function assertAnchor() {
     const g = w.TriRotation.geometry;
-    for (const axis of [0, 1]) assert(Math.abs(g.outer.reduce((sum, p) => sum + p[axis], 0) / 3 - (axis ? g.height : g.width) / 2) < 1e-6);
+    for (const axis of [0, 1]) assert(Math.abs(g.outer.reduce((sum, p) => sum + p[axis], 0) / 3 - g.center[axis]) < 1e-6);
   }
   const observed = new Set();
   for (let i = 0; i < 3; i++) {

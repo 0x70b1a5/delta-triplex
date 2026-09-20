@@ -10,7 +10,7 @@
   svg.id = "rotate-board";
   svg.setAttribute("tabindex", "0");
   svg.setAttribute("role", "group");
-  svg.setAttribute("aria-label", "Triangle puzzle. Tap cells to fill, cross, or clear. Swipe or use arrow keys to turn 120 degrees.");
+  svg.setAttribute("aria-label", TriCopy.t("rotation.boardLabel"));
   stage.append(svg);
   // Programmatic focus after a tap can retain :focus-visible in some browsers.
   // Track the input method explicitly so only keyboard use outlines the board.
@@ -21,11 +21,11 @@
   }, true);
   const bar = document.createElement("div");
   bar.id = "session-bar";
-  bar.innerHTML = '<span>Delta Triplex</span><span id="session-clock">00:00 / 0 rotations</span>';
+  bar.innerHTML = `<span>${TriCopy.html("app.name")}</span><span id="session-clock">${TriCopy.html("rotation.clock", { time: "00:00", count: 0 })}</span>`;
   el("app").append(bar);
   const controls = document.createElement("div");
   controls.id = "turn-controls";
-  for (const [id, label] of [["turn-left", "Rotate counterclockwise"], ["turn-right", "Rotate clockwise"]]) {
+  for (const [id, label] of [["turn-left", TriCopy.t("rotate.rotate-counterclockwise")], ["turn-right", TriCopy.t("rotate.rotate-clockwise")]]) {
     const button = document.createElement("button");
     button.id = id; button.className = "icon";
     button.setAttribute("aria-label", label); button.title = label;
@@ -37,7 +37,7 @@
   const copyPanel = document.createElement("div");
   copyPanel.id = "result-copy";
   copyPanel.hidden = true;
-  copyPanel.innerHTML = '<label for="result-text">Copy your result and puzzle link</label><textarea id="result-text" readonly></textarea><button id="result-close">Close</button>';
+  copyPanel.innerHTML = `<label for="result-text">${TriCopy.html("rotate.copy-your-result-and-puzzle-link")}</label><textarea id="result-text" readonly></textarea><button id="result-close">${TriCopy.html("rotate.close")}</button>`;
   document.body.append(copyPanel);
   el("result-close").onclick = () => { copyPanel.hidden = true; el("share-result").focus(); };
 
@@ -53,7 +53,7 @@
     try { localStorage.setItem("tri-rotate-attempts-v1", JSON.stringify(attempts)); } catch {}
     lastSaved = performance.now();
   }
-  let wheelAmount = 0, wheelLast = -Infinity, wheelCommit = -Infinity;
+  let wheelAmount = 0, wheelLast = -Infinity, wheelCooldownUntil = -Infinity;
   const pointers = new Map();
   let gesture = null;
   function formatTime(ms) {
@@ -68,8 +68,8 @@
     if (running) elapsed += Math.max(0, now - lastTick);
     lastTick = now;
     running = !!(mayPlay() && !state.won && !state.editing);
-    el("session-clock").textContent = `${formatTime(finished?.elapsed ?? elapsed)} / ${finished?.turns ?? turns} rotations`;
-    if (state?.editing) el("session-clock").textContent = "Editing";
+    el("session-clock").textContent = TriCopy.t("rotation.clock", { time: formatTime(finished?.elapsed ?? elapsed), count: finished?.turns ?? turns });
+    if (state?.editing) el("session-clock").textContent = TriCopy.t("rotate.editing");
     saveAttempt();
   }
   const baseCall = call;
@@ -122,8 +122,8 @@
     el("app").dataset.solved = String(next.won && !next.editing);
     el("share-result").disabled = !!finished?.unknown;
     el("solve-details").textContent = finished?.unknown
-      ? " · previous session"
-      : `: ${formatTime(finished?.elapsed ?? elapsed)} / ${finished?.turns ?? turns} rotations`;
+      ? TriCopy.t("rotation.previousSession")
+      : TriCopy.t("rotation.resultDetails", { time: formatTime(finished?.elapsed ?? elapsed), count: finished?.turns ?? turns });
     clock();
   };
 
@@ -186,7 +186,7 @@
   }
   function pose(width, height, angle, desktop, font, withClues, solved = false) {
     const outer = [vertex(0, 0, state.n), vertex(state.n, 0, state.n), vertex(0, state.n, state.n)].map(p => rotatePoint(p, angle));
-    const origin = solved ? [0, 1].map(axis =>
+    const origin = solved || desktop ? [0, 1].map(axis =>
       (Math.min(...outer.map(p => p[axis])) + Math.max(...outer.map(p => p[axis]))) / 2) : [0, 0];
     const offset = [width / 2, height / 2];
     const clues = withClues ? clueRows(angle, desktop) : [];
@@ -200,7 +200,7 @@
     }
     // Each vertex and number imposes an exact linear bound on the scale. This
     // uses the available space instead of reserving a large blanket clue margin.
-    let scale = solved ? Infinity : (Math.min(width, height) / 2 - EDGE) / (2 * SQRT3 / 3);
+    let scale = solved || desktop ? Infinity : (Math.min(width, height) / 2 - EDGE) / (2 * SQRT3 / 3);
     for (const item of constraints) for (let axis = 0; axis < 2; axis++) {
       const a = item.p[axis] - origin[axis], b = offset[axis] + item.extra[axis];
       const padding = EDGE;
@@ -210,12 +210,18 @@
     }
     return { outer, origin, offset, clues, scale: Math.max(1, scale) };
   }
+  function finishAnimation() {
+    if (!animation) return;
+    visualTurn = animation.to;
+    if (animation.scroll) wheelCooldownUntil = performance.now() + TURN_MS;
+    animation = null;
+  }
   function advanceAnimation() {
     if (!animation) return 1;
     const progress = motionEnabled ? Math.min(1, Math.max(0, (performance.now() - animation.start) / animation.duration)) : 1;
     const eased = progress * progress * (3 - 2 * progress);
     visualTurn = animation.from + (animation.to - animation.from) * eased;
-    if (progress === 1) { visualTurn = animation.to; animation = null; }
+    if (progress === 1) finishAnimation();
     return eased;
   }
   function layout(width, height) {
@@ -227,12 +233,22 @@
     const solved = state.won && !state.editing;
     const resting = pose(width, height, base + view * 120, desktop, font, !solved, solved);
     const moving = animation !== null || preview !== 0;
-    const current = resting;
-    const scale = Math.min(...[0, 120, 240].map(turn =>
+    const restingScale = Math.min(...[0, 120, 240].map(turn =>
       pose(width, height, base + turn, desktop, font, !solved, solved).scale));
-    const toScreen = p => rotatePoint(p, angle).map((v, a) => current.offset[a] + (v - current.origin[a]) * scale);
-    return { width, height, desktop, angle, scale, font, toScreen, clues: moving ? [] : resting.clues,
-      moving, outer: [vertex(0, 0, state.n), vertex(state.n, 0, state.n), vertex(0, state.n, state.n)].map(toScreen) };
+    // Position the settled layout once. Scaling a turn must not move its pivot.
+    const center = resting.offset.map((v, axis) => v - resting.origin[axis] * restingScale);
+    const vertices = [vertex(0, 0, state.n), vertex(state.n, 0, state.n), vertex(0, state.n, state.n)];
+    let scale = restingScale;
+    if (moving && desktop) for (const point of vertices.map(p => rotatePoint(p, angle))) {
+      for (const axis of [0, 1]) {
+        const v = point[axis];
+        if (v > 1e-7) scale = Math.min(scale, ((axis ? height : width) - EDGE - center[axis]) / v);
+        else if (v < -1e-7) scale = Math.min(scale, (EDGE - center[axis]) / v);
+      }
+    }
+    const toScreen = p => rotatePoint(p, angle).map((v, axis) => center[axis] + v * scale);
+    return { width, height, desktop, angle, scale, center, font, toScreen, clues: moving ? [] : resting.clues,
+      moving, outer: vertices.map(toScreen) };
   }
   window.triPuzzleHue = () => window.triMenuOpen || state?.editing ? 0 : visualTurn + preview;
   window.triDrawBoard = () => {
@@ -265,7 +281,7 @@
       const flashStage = call("flash_stage", index);
       const fill = glow > 0 ? TriPalette.flash(colours[cell.state === 1 ? 1 : 0], flashStage, glow, themeMode)
         : cell.state === 1 ? "var(--cell)" : "var(--empty)";
-      const polygon = node("polygon", { points: drawn.map(p => p.join(",")).join(" "), fill, "fill-opacity": cell.state === 2 ? .5 : 1, "data-glow": glow, "data-flash-stage": flashStage, "data-cell": index, "aria-label": `Cell ${index + 1}: ${["empty", "filled", "crossed"][cell.state]}` });
+      const polygon = node("polygon", { points: drawn.map(p => p.join(",")).join(" "), fill, "fill-opacity": cell.state === 2 ? .5 : 1, "data-glow": glow, "data-flash-stage": flashStage, "data-cell": index, "aria-label": TriCopy.t("cell.label", { number: index + 1, state: TriCopy.t(["cell.empty", "cell.filled", "cell.crossed"][cell.state]) }) });
       fragment.append(polygon);
       if (cell.state === 2) fragment.append(node("text", { x: mid[0], y: mid[1], "text-anchor": "middle", "dominant-baseline": "central", "font-size": Math.max(9, Math.min(20, geometry.scale / state.n / 2)), fill: TriPalette.ink(TriPalette.mix(style.getPropertyValue("--bg"), glow > 0 ? fill : colours[0], .5)) }, "×"));
     });
@@ -290,8 +306,9 @@
     if (animation || (effects && !window.triMenuOpen)) requestFrame();
   };
 
-  function turn(delta) {
+  function turn(delta, scroll = false) {
     if (!mayPlay() || state.won || animation) return;
+    wheelAmount = 0; wheelLast = -Infinity;
     clock();
     advanceAnimation();
     const steps = Math.trunc(delta);
@@ -301,10 +318,13 @@
     if (!state.editing) turns += Math.abs(steps);
     preview = 0;
     if (motionEnabled && Math.abs(to - from) > .01) {
-      animation = { from, to, start: performance.now(),
+      animation = { from, to, scroll, start: performance.now(),
         duration: Math.max(160, Math.min(650, TURN_MS * Math.abs(to - from) / 120)) };
       visualTurn = from;
-    } else { visualTurn = to; animation = null; }
+    } else {
+      visualTurn = to; animation = null;
+      if (scroll) wheelCooldownUntil = performance.now() + TURN_MS;
+    }
     clock(); saveAttempt(true); requestFrame();
   }
   el("turn-left").onclick = () => turn(-1);
@@ -316,19 +336,24 @@
     if (!mayPlay() || state.won) return;
     e.preventDefault();
     const now = performance.now();
-    if (now - wheelCommit < 350) return;
+    // Discard momentum during the turn and for one full turn duration after
+    // it finishes. Ignored deltas never contribute to the next gesture.
+    if (animation || now < wheelCooldownUntil) {
+      wheelAmount = 0; wheelLast = -Infinity;
+      return;
+    }
     if (now - wheelLast > 180) wheelAmount = 0;
     wheelLast = now;
     const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
     wheelAmount += delta * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1);
-    if (Math.abs(wheelAmount) >= 45) { turn(Math.sign(wheelAmount)); wheelAmount = 0; wheelCommit = now; }
+    if (Math.abs(wheelAmount) >= 45) { turn(Math.sign(wheelAmount), true); }
   }, { passive: false });
   const pointerPosition = e => [e.clientX, e.clientY];
   function pairAngle() {
     const [a, b] = [...pointers.values()];
     return Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI;
   }
-  function cancelGesture() { pointers.clear(); gesture = null; preview = 0; if (animation) visualTurn = animation.to; animation = null; requestFrame(); }
+  function cancelGesture() { pointers.clear(); gesture = null; preview = 0; finishAnimation(); requestFrame(); }
   function enginePoint(index) {
     const c = state.cells[index], n = state.n;
     const half = Math.min((900 - 96) / 2, (760 - 144) / SQRT3);
@@ -384,10 +409,10 @@
   svg.addEventListener("lostpointercapture", e => release(e, true));
 
   function brag() {
-    const text = `Delta Triplex — Solved: ${formatTime(finished.elapsed)} / ${finished.turns} rotations`;
+    const text = TriCopy.t("share.result", { time: formatTime(finished.elapsed), count: finished.turns });
     const url = state.custom ? TriShare.url(currentPuzzle)
       : (state.tutorial >= 0 ? TriShare.url({ size: state.n, solution: state.solution }) : `${TriShare.base}#level=${state.level}`);
-    return { title: "Delta Triplex", text, url };
+    return { title: TriCopy.t("app.name"), text, url };
   }
   el("share-result").onclick = async () => {
     if (!state?.won || !finished || finished.unknown) return;
@@ -397,7 +422,7 @@
       catch (error) { if (error.name === "AbortError") return; }
     }
     const text = `${data.text}\n${data.url}`;
-    try { await navigator.clipboard.writeText(text); toast("Result and puzzle link copied."); }
+    try { await navigator.clipboard.writeText(text); toast(TriCopy.t("rotate.result-and-puzzle-link-copied")); }
     catch { copyPanel.hidden = false; el("result-text").value = text; el("result-text").focus(); el("result-text").select(); }
   };
   // Read-only hooks for deterministic prototype regression tests.

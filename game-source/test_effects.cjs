@@ -58,7 +58,8 @@ assert.equal(svg.querySelector('[data-cell="0"]').getAttribute('fill-opacity'), 
 
 assert(d.getElementById('bottom-controls').contains(d.getElementById('completion')));
 assert(d.getElementById('share-result').querySelector('svg'));
-assert.equal(d.getElementById('share-result').textContent.trim(), 'Share solution');
+assert.equal(d.querySelector('#share-result .desktop-share-label').textContent, 'Share');
+assert.equal(d.querySelector('#share-result .mobile-share-suffix').textContent, 'Share solution');
 assert(d.getElementById('next-puzzle').querySelector('svg'));
 assert.equal(d.getElementById('next-puzzle').textContent.trim(), '');
 for (let view = 0; view < 3; view++) {

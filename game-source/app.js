@@ -28,16 +28,16 @@ let activePointer = null,
   lastCaret = 0;
 const lessons = [
   [
-    "1 / 3 · Four cells",
-    "Numbers outside the triangle describe touching filled cells. Read each clue from outside toward the board. A 0 means leave that strip empty. Tap to fill, tap again to cross, and again to clear.",
+    TriCopy.t("tutorial.0.title"),
+    TriCopy.t("tutorial.0.body"),
   ],
   [
-    "2 / 3 · Nine cells",
-    "Multiple numbers describe separate runs with an empty cell between them. One side has no clues: swipe, scroll, or twist with two fingers to reveal it. Every turn is 120°.",
+    TriCopy.t("tutorial.1.title"),
+    TriCopy.t("tutorial.1.body"),
   ],
   [
-    "3 / 3 · Sixteen cells",
-    "Every cell belongs to three strips. Turn to inspect all three sets of clues. Your active solving time and completed turns are recorded; share your result when you finish.",
+    TriCopy.t("tutorial.2.title"),
+    TriCopy.t("tutorial.2.body"),
   ],
 ];
 function toast(e) {
@@ -107,7 +107,7 @@ for (const [id, key] of [["background-color", "bg"], ["cell-color", "cell"]]) {
   el(id).addEventListener("change", () => {
     const theme = currentTheme();
     if (TriPalette.contrast(theme.bg, theme.cell) < 6)
-      toast("Low contrast: choose a lighter cell or darker background (or vice versa).");
+      toast(TriCopy.t("theme.lowContrast"));
   });
   el("clear-colour-" + key).onclick = () => { updateChosenColour(key); el(id).focus(); };
   el("dice-" + key).onclick = () => updateChosenColour(key,
@@ -198,7 +198,7 @@ function makeGrid(e) {
           ),
           n.setAttribute(
             "aria-label",
-            `${axisLabels[e]}${t + 1}: ${a}${r.match ? ", runs match" : ""}`,
+            TriCopy.t(r.match ? "clues.labelMatched" : "clues.label", { strip: axisLabels[e] + (t + 1), runs: a }),
           ));
       }
     const r = state.clues[state.axis][state.row];
@@ -217,7 +217,7 @@ function makeGrid(e) {
         (el("lesson-text").textContent = lessons[state.tutorial][1]),
         (el("continue").hidden = !state.won),
         (el("continue").textContent =
-          2 === state.tutorial ? "Start puzzles" : "Next demo")));
+          2 === state.tutorial ? TriCopy.t("app.start-puzzles") : TriCopy.t("app.next-demo"))));
     window.triBuildLevels?.(state.levels);
     (      (el("app").dataset.orientation = ["S", "E", "N", "W"][
         state.orientation || 0
@@ -263,13 +263,13 @@ function endPointer(e, t = !1) {
 }
 let sizeObserver;
 ((el("undo").onclick = () => {
-  (call("undo"), toast("Undone."));
+  (call("undo"), toast(TriCopy.t("app.undone")));
 }),
   (el("reset").onclick = () => {
-    (call("reset"), toast("Board cleared. Undo restores it."));
+    (call("reset"), toast(TriCopy.t("app.board-cleared-undo-restores-it")));
   }),
   (el("skip").onclick = () => {
-    (call("skip"), toast("Introduction skipped."));
+    (call("skip"), toast(TriCopy.t("app.introduction-skipped")));
   }),
   (el("continue").onclick = () => call("next")),
   (el("replay").onclick = () => {
@@ -288,7 +288,7 @@ let sizeObserver;
         "r" === e.key.toLowerCase() &&
           (e.preventDefault(),
           call("reset"),
-          toast("Board cleared. Undo restores it.")),
+          toast(TriCopy.t("app.board-cleared-undo-restores-it"))),
         "Escape" === e.key &&
           ((el("utilities").hidden = !0), memoryToggle(false)))
       : e.repeat || caret();
@@ -374,7 +374,7 @@ let sizeObserver;
         ? await document.exitFullscreen()
         : await document.documentElement.requestFullscreen();
     } catch (e) {
-      toast("Fullscreen is unavailable in this viewer.");
+      toast(TriCopy.t("app.fullscreen-is-unavailable-in-this-viewer"));
     }
   }),
   document.fullscreenEnabled || (el("fullscreen").hidden = !0),
@@ -398,7 +398,7 @@ function memoryToggle(e) {
     e &&
       !window.triMemoryEnabled &&
       ((window.triMemoryEnabled = !0),
-      (el("memory-pause").textContent = "Pause"),
+      (el("memory-pause").textContent = TriCopy.t("ui.pause")),
       startMemoryTimer()));
 }
 function memoryRestart() {
@@ -423,7 +423,7 @@ function memoryRestart() {
     static: e.game_static,
   };
   for (const [e, n] of Object.entries(t))
-    el("mem-" + e).textContent = (n / 1048576).toFixed(3) + " MiB";
+    el("mem-" + e).textContent = (n / 1048576).toFixed(3) + TriCopy.t("app.mib");
   ((el("mem-count").textContent = String(memorySamples.length)),
     (el("mem-frames").textContent = String(drawCount)),
     (el("memory-export").disabled = !1));
@@ -434,8 +434,8 @@ function memoryRestart() {
   (el("memory-pause").onclick = () => {
     ((window.triMemoryEnabled = !window.triMemoryEnabled),
       (el("memory-pause").textContent = window.triMemoryEnabled
-        ? "Pause"
-        : "Resume"),
+        ? TriCopy.t("ui.pause")
+        : TriCopy.t("app.resume")),
       window.triMemoryEnabled ? startMemoryTimer() : stopMemoryTimer());
   }),
   (el("memory-export").onclick = () => {
@@ -468,7 +468,7 @@ var Module = {
   onAbort: (e) => {
     ((el("status").hidden = !0),
       (el("error").hidden = !1),
-      (el("error").textContent = "The game could not start. " + e));
+      (el("error").textContent = TriCopy.t("errors.start", { error: e })));
   },
 };
 
@@ -476,6 +476,6 @@ canvas.addEventListener("webglcontextcreationerror", (event) => {
   el("status").hidden = true;
   el("error").hidden = false;
   el("error").textContent =
-    "This browser could not start WebGL, which Delta Triplex needs to draw the puzzle. Try a browser with graphics acceleration enabled.";
+    TriCopy.t("errors.webgl");
   console.error("WebGL startup:", event.statusMessage);
 });
