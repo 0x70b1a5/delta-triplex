@@ -614,6 +614,36 @@
         display: grid;
         gap: 8px;
       }
+      #puzzle-menu #editor-settings .menu-actions,
+      #puzzle-menu #utilities {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+      }
+      #puzzle-menu #editor-settings .menu-actions button,
+      #puzzle-menu #utilities button {
+        min-width: 0;
+        min-height: 40px;
+        padding: 8px 4px;
+        font-size: 12px;
+        overflow-wrap: anywhere;
+      }
+      #puzzle-menu .sound-controls label {
+        display: grid;
+        grid-template-columns: 52px minmax(0, 1fr) 42px;
+        gap: 8px;
+      }
+      .sound-controls input[type="range"] {
+        width: 100%;
+        min-width: 0;
+        margin: 0;
+        accent-color: var(--ink);
+      }
+      .sound-controls output {
+        text-align: right;
+        font-size: 12px;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
       #puzzle-menu label {
         display: flex;
         align-items: center;
@@ -940,7 +970,7 @@
       }
       /* Rotating board and responsive controls. */
       #app { display: block !important; padding: 0 !important; }
-      #app #stage { position: absolute !important; inset: 52px 0 150px !important; margin: 0 !important; }
+      #app #stage { position: absolute !important; inset: 52px 0 88px !important; margin: 0 !important; }
       #canvas, #clues, #strip-label { display: none !important; }
       #app #side { display: contents !important; }
       #app { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
@@ -967,7 +997,7 @@
         #app[data-tutorial="true"] #stage { right: 0 !important; bottom: 340px !important; }
         #app[data-tutorial="true"] #lesson { left: 24px; right: auto; }
         #session-bar { font-size: 11px; }
-        #app #stage { bottom: 180px !important; }
+        #app[data-custom="true"] #stage { bottom: 180px !important; }
         #app #workshop { bottom: 114px; max-width: calc(100vw - 48px); min-height: 0; font-size: 11px; }
         #app #corner { bottom: 14px; right: 16px; }
         #turn-controls { gap: 4px; }
@@ -1206,6 +1236,12 @@
           <button id="clear-colour-cell" class="colour-die" aria-label="{{copy:ui.clear-chosen-filled-cells-colour}}" title="{{copy:ui.use-theme-colour}}" hidden>×</button>
         </span>
       </label>
+      <section class="sound-controls" aria-labelledby="sound-title">
+        <h3 id="sound-title">{{copy:sound.title}}</h3>
+        <label for="sound-master"><span>{{copy:sound.master}}</span><input id="sound-master" type="range" min="0" max="100" step="1" value="100"><output id="sound-master-value" for="sound-master">100%</output></label>
+        <label for="sound-music"><span>{{copy:sound.music}}</span><input id="sound-music" type="range" min="0" max="100" step="1" value="100"><output id="sound-music-value" for="sound-music">100%</output></label>
+        <label for="sound-sfx"><span>{{copy:sound.sfx}}</span><input id="sound-sfx" type="range" min="0" max="100" step="1" value="100"><output id="sound-sfx-value" for="sound-sfx">100%</output></label>
+      </section>
       <h3>{{copy:ui.tools}}</h3>
       <div id="menu-tools"></div>
     </aside>

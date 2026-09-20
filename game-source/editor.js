@@ -89,12 +89,12 @@ let currentPuzzle = null,
 const settings = document.createElement("section");
 settings.id = "editor-settings";
 settings.hidden = true;
-settings.innerHTML = `<h3>${TriCopy.html("editor.puzzle-settings")}</h3><label>${TriCopy.html("editor.name")} <input id="editor-name" maxlength="80"></label><label>${TriCopy.html("editor.size")} <select id="editor-size">${Array.from({ length: 9 }, (_, i) => `<option>${i + 2}</option>`).join("")}</select></label><p class="editor-note">${TriCopy.html("editor.settingsHelp")}</p><div class="menu-actions"><button id="editor-export">${TriCopy.html("editor.export-playable-html")}</button><button id="editor-json">${TriCopy.html("editor.export-puzzle-json")}</button><button id="editor-share">${TriCopy.html("editor.copy-puzzle-link")}</button></div><input id="share-output" aria-label="${TriCopy.html("editor.puzzle-link")}" readonly hidden>`;
+settings.innerHTML = `<h3>${TriCopy.html("editor.puzzle-settings")}</h3><label>${TriCopy.html("editor.name")} <input id="editor-name" maxlength="80"></label><label>${TriCopy.html("editor.size")} <select id="editor-size">${Array.from({ length: 9 }, (_, i) => `<option>${i + 2}</option>`).join("")}</select></label><p class="editor-note">${TriCopy.html("editor.settingsHelp")}</p><h3>${TriCopy.html("editor.exportHeading")}</h3><div class="menu-actions"><button id="editor-export">${TriCopy.html("editor.export-playable-html")}</button><button id="editor-json">${TriCopy.html("editor.export-puzzle-json")}</button><button id="editor-share">${TriCopy.html("editor.copy-puzzle-link")}</button></div><input id="share-output" aria-label="${TriCopy.html("editor.puzzle-link")}" readonly hidden>`;
 menu.insertBefore(settings, el("menu-tools").previousElementSibling);
 const workshop = document.createElement("section");
 workshop.id = "workshop";
 workshop.hidden = true;
-workshop.innerHTML = `<div id="workshop-title"></div><p id="workshop-help"></p><div class="lesson-actions" id="workshop-actions"><button id="editor-test">${TriCopy.html("editor.try")}</button><button id="editor-configure" title="${TriCopy.html("editor.settings-export")}">${TriCopy.html("editor.settings")}</button><button id="editor-close">${TriCopy.html("editor.done")}</button></div>`;
+workshop.innerHTML = `<div id="workshop-title"></div><p id="workshop-help"></p><div class="lesson-actions" id="workshop-actions"><button id="editor-test">${TriCopy.html("editor.try")}</button></div>`;
 el("side").insertBefore(workshop, el("corner"));
 el("bottom-controls").prepend(el("workshop-actions"));
 menu.append(el("controls-hint"));
@@ -165,15 +165,6 @@ el("editor-test").onclick = () => {
   if (!state?.custom) return;
   if (!state.editing) authorSession = true;
   call("editing", state.editing ? 0 : 1);
-};
-el("editor-close").onclick = () => {
-  call("leave_custom");
-  window.triShowHome?.();
-  toggleMenu(false);
-};
-el("editor-configure").onclick = () => {
-  toggleMenu(true);
-  settings.scrollIntoView?.({ block: "nearest" });
 };
 el("editor-name").oninput = () => {
   if (!currentPuzzle) return;

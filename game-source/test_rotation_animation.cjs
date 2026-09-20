@@ -48,8 +48,7 @@ for (const [width, height] of [[1440, 760], [900, 550], [390, 480], [320, 360], 
   assert(Math.abs(w.TriRotation.geometry.angle - initialAngle - 120) < 1e-6);
   assert.equal(w.TriRotation.stats.turns, initialTurns + 1);
   assert(svg.querySelectorAll("text[data-axis]").length > 0);
-  if (g.desktop) assert(smallest < initialScale, "desktop temporarily shrinks to fit the turn");
-  else assert(Math.abs(smallest - initialScale) < 1e-6, "mobile rotation keeps its scale");
+  assert(smallest <= initialScale, "turns shrink only when necessary to stay inside the viewport");
   assert(Math.abs(w.TriRotation.geometry.scale - initialScale) < 1e-6, "settling restores the full size");
   // Drag follows the finger. The remaining angle animates rather than jumping.
   const beforeSwipe = w.TriRotation.geometry.angle, beforeTurns = w.TriRotation.stats.turns;

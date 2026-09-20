@@ -118,9 +118,11 @@ const { harness, source } = require("./test_rotation_harness.cjs");
     standalone.close();
     // All sizes have only two clue axes; every number remains inside the drawing area.
     h.flush(); assert.equal(axes().size, 2);
-    for (const [width, height] of [[900, 760], [390, 480], [320, 360], [800, 240]]) {
+    for (const [width, height] of [[1440, 760], [900, 760], [390, 760], [412, 900], [390, 480], [320, 360], [800, 240]]) {
       h.resize(width, height);
+      const composition = [];
       for (let turn = 0; turn < 3; turn++) {
+        composition.push(...w.TriRotation.geometry.outer);
         assert.equal(axes().size, 2);
         assertAnchor();
         for (const label of board.querySelectorAll("text[data-axis]")) {
@@ -136,10 +138,19 @@ const { harness, source } = require("./test_rotation_harness.cjs");
           assert.equal(label.getAttribute("dominant-baseline"), top ? "text-before-edge" : "text-after-edge");
           const font = Number(label.getAttribute("font-size")), textWidth = font * .72 * label.textContent.length;
           const left = x - (right ? textWidth : 0), bottom = y + (top ? font : 0);
+          composition.push([left, bottom - font], [left + textWidth, bottom]);
           assert(left >= 11.99 && left + textWidth <= width - 11.99 && bottom - font >= 11.99 && bottom <= height - 11.99, `anchored clue inside ${width}×${height} viewport`);
         }
         h.click("turn-right");
       }
+      const spans = [0, 1].map(axis => {
+        const low = Math.min(...composition.map(p => p[axis]));
+        const high = Math.max(...composition.map(p => p[axis]));
+        assert(Math.abs((low + high) / 2 - (axis ? height : width) / 2) < 1e-6, "triangle and all hints are centered together");
+        return high - low;
+      });
+      assert(Math.abs(spans[0] - (width - 48)) < 1e-6 || Math.abs(spans[1] - (height - 48)) < 1e-6,
+        "at least one dimension is fully used; enlarging would clip the triangle or a hint");
     }
     h.resize(900, 760);
   }

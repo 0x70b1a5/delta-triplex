@@ -114,6 +114,28 @@ for (const [id, key] of [["background-color", "bg"], ["cell-color", "cell"]]) {
     TriPalette.randomColor(currentTheme()[key === "bg" ? "cell" : "bg"]));
 }
 applyPalette();
+// Store volume preferences for the future audio system; no audio is started here.
+const soundLevels = { master: 100, music: 100, sfx: 100 };
+try {
+  const saved = JSON.parse(localStorage.getItem("delta-triplex-sound"));
+  for (const key of Object.keys(soundLevels))
+    if (Number.isFinite(saved?.[key])) soundLevels[key] = Math.round(Math.max(0, Math.min(100, saved[key])));
+} catch {}
+const volumeFormat = new Intl.NumberFormat(TriCopy.locale, { style: "percent" });
+for (const key of Object.keys(soundLevels)) {
+  const slider = el("sound-" + key), output = el("sound-" + key + "-value");
+  const updateVolume = () => {
+    output.value = volumeFormat.format(soundLevels[key] / 100);
+    slider.setAttribute("aria-valuetext", output.value);
+  };
+  slider.value = soundLevels[key];
+  updateVolume();
+  slider.addEventListener("input", () => {
+    soundLevels[key] = Number(slider.value);
+    updateVolume();
+    try { localStorage.setItem("delta-triplex-sound", JSON.stringify(soundLevels)); } catch {}
+  });
+}
 function fit() {
   // The rules engine uses a stable coordinate system; SVG owns the responsive view.
   renderWidth = 900; renderHeight = 760;

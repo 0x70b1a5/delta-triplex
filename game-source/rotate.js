@@ -184,11 +184,8 @@
       max: [right ? 0 : width, top ? font : 0],
     };
   }
-  function pose(width, height, angle, desktop, font, withClues, solved = false) {
+  function pose(angle, desktop, font, withClues) {
     const outer = [vertex(0, 0, state.n), vertex(state.n, 0, state.n), vertex(0, state.n, state.n)].map(p => rotatePoint(p, angle));
-    const origin = solved || desktop ? [0, 1].map(axis =>
-      (Math.min(...outer.map(p => p[axis])) + Math.max(...outer.map(p => p[axis]))) / 2) : [0, 0];
-    const offset = [width / 2, height / 2];
     const clues = withClues ? clueRows(angle, desktop) : [];
     const constraints = outer.map(p => ({ p, extra: [0, 0], min: [0, 0], max: [0, 0] }));
     for (const clue of clues) {
@@ -198,17 +195,34 @@
         ...clueAnchor(desktop, direction, font, value),
       }));
     }
-    // Each vertex and number imposes an exact linear bound on the scale. This
-    // uses the available space instead of reserving a large blanket clue margin.
-    let scale = solved || desktop ? Infinity : (Math.min(width, height) / 2 - EDGE) / (2 * SQRT3 / 3);
-    for (const item of constraints) for (let axis = 0; axis < 2; axis++) {
-      const a = item.p[axis] - origin[axis], b = offset[axis] + item.extra[axis];
-      const padding = EDGE;
-      const low = padding - item.min[axis], high = (axis ? height : width) - padding - item.max[axis];
-      if (a > 1e-7) scale = Math.min(scale, (high - b) / a);
-      else if (a < -1e-7) scale = Math.min(scale, (low - b) / a);
+    return { clues, constraints };
+  }
+  let layoutCache = null;
+  function fitBoard(width, height, base, desktop, font, solved) {
+    const key = JSON.stringify([width, height, base, font, solved, state.n, state.clues.map(axis => axis.map(row => row.runs))]);
+    if (layoutCache?.key === key) return layoutCache;
+    const poses = [0, 120, 240].map(turn => pose(base + turn, desktop, font, !solved));
+    const constraints = poses.flatMap(p => p.constraints);
+    // Fit the whole composition, allowing translation as well as scale. Every
+    // pair of bounds limits scale independently of where the pivot is placed.
+    // Include all resting orientations so turning cannot shift the pivot.
+    let scale = Infinity;
+    for (const axis of [0, 1]) {
+      const available = (axis ? height : width) - 2 * EDGE;
+      for (const high of constraints) for (const low of constraints) {
+        const distance = high.p[axis] - low.p[axis];
+        if (distance > 1e-7) scale = Math.min(scale,
+          (available - high.extra[axis] - high.max[axis] + low.extra[axis] + low.min[axis]) / distance);
+      }
     }
-    return { outer, origin, offset, clues, scale: Math.max(1, scale) };
+    scale = Math.max(1, scale);
+    const center = [0, 1].map(axis => {
+      const low = Math.min(...constraints.map(c => c.p[axis] * scale + c.extra[axis] + c.min[axis]));
+      const high = Math.max(...constraints.map(c => c.p[axis] * scale + c.extra[axis] + c.max[axis]));
+      return ((axis ? height : width) - low - high) / 2;
+    });
+    layoutCache = { key, poses, scale, center };
+    return layoutCache;
   }
   function finishAnimation() {
     if (!animation) return;
@@ -231,15 +245,13 @@
     const maxRuns = Math.max(1, ...state.clues.flat().map(line => line.runs.length));
     const font = Math.max(8, Math.min(20, width / (state.n * 2.5), (height - 80) / (2.8 * maxRuns)));
     const solved = state.won && !state.editing;
-    const resting = pose(width, height, base + view * 120, desktop, font, !solved, solved);
+    const fitted = fitBoard(width, height, base, desktop, font, solved);
+    const resting = fitted.poses[view];
     const moving = animation !== null || preview !== 0;
-    const restingScale = Math.min(...[0, 120, 240].map(turn =>
-      pose(width, height, base + turn, desktop, font, !solved, solved).scale));
-    // Position the settled layout once. Scaling a turn must not move its pivot.
-    const center = resting.offset.map((v, axis) => v - resting.origin[axis] * restingScale);
+    const restingScale = fitted.scale, center = fitted.center;
     const vertices = [vertex(0, 0, state.n), vertex(state.n, 0, state.n), vertex(0, state.n, state.n)];
     let scale = restingScale;
-    if (moving && desktop) for (const point of vertices.map(p => rotatePoint(p, angle))) {
+    if (moving) for (const point of vertices.map(p => rotatePoint(p, angle))) {
       for (const axis of [0, 1]) {
         const v = point[axis];
         if (v > 1e-7) scale = Math.min(scale, ((axis ? height : width) - EDGE - center[axis]) / v);
