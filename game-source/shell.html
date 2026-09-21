@@ -1155,12 +1155,13 @@
       }
       #tutorial-intro { position: fixed; inset: 0; z-index: 30; overflow: auto; background: var(--bg); color: var(--ink); padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom)); box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 12px; }
       #tutorial-intro[hidden] { display: none; }
+      .intro-copy, #intro-controls, .intro-navigation { flex-shrink: 0; }
       .intro-copy { width: min(640px, 100%); text-align: center; }
       .intro-copy h1 { font-size: clamp(20px, 3vw, 30px); margin: 8px 0 14px; }
       .intro-copy p { line-height: 1.6; margin: 8px 0; }
       #intro-progress { font-size: 12px; opacity: .65; }
       #intro-nonogram { color: var(--ink); font-size: inherit; text-underline-offset: 3px; }
-      #intro-board { display: block; width: min(100%, 650px); flex: 1 0 210px; min-height: 210px; max-height: 52dvh; overflow: visible; }
+      #intro-board { display: block; width: min(100%, 900px); flex: 1 0 210px; min-height: 210px; overflow: visible; }
       .intro-cell { fill: var(--empty); stroke: var(--bg); stroke-width: 3; stroke-linejoin: round; }
       .intro-cell.filled { fill: var(--cell); }
       .intro-cell.emphasis { stroke: var(--ink); stroke-width: 2; }

@@ -293,12 +293,11 @@
       el("next-puzzle").style.setProperty("--next-ink", TriPalette.ink(nextFill));
     }
     svg.setAttribute("viewBox", `0 0 ${geometry.width} ${geometry.height}`);
-    // Match raylib's celebration camera: rotate/zoom the already laid-out
-    // board about its central active cell. Ordinary turns use the triangle centroid.
+    // Both ordinary turns and the celebration use the triangle centroid.
+    // A nearby cell centre is off-center whenever the side length is divisible by three.
     const fragment = node("g", { "data-board-layer": "" });
     if (victory) {
-      const cell = state.cells[call("celebration_cell")];
-      const pivot = cell ? geometry.toScreen(mean(corners(cell, state.n))) : [geometry.width / 2, geometry.height / 2];
+      const pivot = geometry.center;
       fragment.setAttribute("transform", `translate(${pivot.join(" ")}) rotate(${call("celebration_angle")}) scale(${call("celebration_scale")}) translate(${-pivot[0]} ${-pivot[1]})`);
       fragment.dataset.pivot = pivot.join(",");
     }

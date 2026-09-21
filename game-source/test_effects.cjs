@@ -136,3 +136,38 @@ for (let view = 0; view < 3; view++) {
 h.close();
 }
 console.log('PASS: completion footer/icons, visible fill ripples, finite victory spin/scale, rotated point-to-base ROYGBIV edge waves, frozen solve stats, fixed victory pivot and reduced motion.');
+
+// All three playable lessons must spin around their geometric centre, including
+// the nine-cell lesson whose centroid falls between cell centres.
+for (const width of [390, 1000]) {
+  const h = harness(source, 'https://tri.test/', {}, { reducedMotion:false });
+  const {w,d}=h;
+  h.resize(width,760); h.click('how-to-play');
+  for(let i=0;i<4;i++) h.click('intro-next');
+  const board=d.getElementById('rotate-board'); board.setPointerCapture=()=>{};
+  for(let lesson=0;lesson<3;lesson++) {
+    assert.equal(h.state.tutorial,lesson);
+    for(let index=0;index<h.state.cells.length;index++) {
+      const c=h.state.cells[index], row=c.i+c.j+c.o;
+      if(!h.state.solution[row*row+2*c.i+c.o])continue;
+      const target=board.querySelector(`[data-cell="${index}"]`);
+      for(const type of ['pointerdown','pointerup']) {
+        const event=new w.Event(type,{bubbles:true,cancelable:true});
+        Object.assign(event,{pointerId:1,pointerType:'touch',button:0,clientX:200,clientY:200});
+        (type === 'pointerdown' ? target : board).dispatchEvent(event);h.frame();
+      }
+    }
+    assert(h.state.won);
+    for(const elapsed of [0,100,150]) {
+      h.frame(elapsed);
+      const pivot=board.querySelector('[data-board-layer]').dataset.pivot.split(',').map(Number);
+      for(const axis of [0,1]) {
+        const centroid=w.TriRotation.geometry.outer.reduce((sum,p)=>sum+p[axis],0)/3;
+        assert(Math.abs(pivot[axis]-centroid)<1e-6, `lesson ${lesson+1} celebration uses the triangle centroid`);
+      }
+    }
+    h.frame(300);h.click('next-puzzle');
+  }
+  h.close();
+}
+console.log('PASS: centered completion spins for all three playable tutorials on desktop and mobile.');

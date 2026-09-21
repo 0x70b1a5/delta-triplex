@@ -142,19 +142,13 @@ int main(void){
  game_down(winning_point.x,winning_point.y,1);game_up();assert(won);
  for(int t=0;t<board.count;t++)assert(board.tiles[t].state!=2);
  game_undo();assert(!won&&board.tiles[1].state==2&&board.tiles[0].state==0);
- // The rotation and scale pivot is an actual cell centre, stable in all views.
+ // The rotation and scale pivot is the triangle centroid in every size/view.
  for(int n=2;n<=10;n++){
   memset(asymmetric,'0',n*n);asymmetric[n*n]=0;
-  int chosen=-1;
   for(int direction=0;direction<4;direction++){
    assert(game_custom(n,direction,asymmetric,1));
-   int t=central_cell();assert(t>=0&&board.tiles[t].active);
-   if(chosen<0)chosen=canonical_id(board.tiles[t]);
-   assert(chosen==canonical_id(board.tiles[t]));
-   if(n==3)assert(board.tiles[t].i==0&&board.tiles[t].j==0&&board.tiles[t].o==1);
-   if(n==4)assert(board.tiles[t].i==1&&board.tiles[t].j==1&&board.tiles[t].o==0);
-   if(n==5)assert(board.tiles[t].i==1&&board.tiles[t].j==1&&board.tiles[t].o==1);
-   Vector2 pivot=center(t);
+   Vector2 a=vertex(0,0),b=vertex(n,0),c=vertex(0,n);
+   Vector2 pivot={(a.x+b.x+c.x)/3,(a.y+b.y+c.y)/3};
    for(int phase=0;phase<=10;phase++){
     celebration_angle=36*phase;celebration_scale=1+.1f*sinf(PI*phase/10);
     Camera2D camera=celebration_camera();

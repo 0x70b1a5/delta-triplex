@@ -254,24 +254,10 @@ static void corners(int t,Vector2 *a,Vector2 *b,Vector2 *c){
     else{*a=vertex(x.i+1,x.j);*b=vertex(x.i,x.j+1);*c=vertex(x.i+1,x.j+1);}
 }
 static Vector2 center(int t){Vector2 a,b,c;corners(t,&a,&b,&c);return (Vector2){(a.x+b.x+c.x)/3,(a.y+b.y+c.y)/3};}
-// Choose the active cell nearest the triangle centroid in integer barycentric
-// coordinates. Prefer the centreline on ties, then the tipward canonical cell.
-// This selects the middle inverted cell for the nine-cell introduction.
-static int central_cell(void){
-    int best=-1,best_distance=0,best_axis=0;
-    for(int t=0;t<board.count;t++)if(board.tiles[t].active){
-        Tile cell=board.tiles[t];
-        int a=3*cell.i+1+cell.o-board.n,b=3*cell.j+1+cell.o-board.n,c=-a-b;
-        int distance=a*a+b*b+c*c;
-        int axis=abs(cell.i-cell.j);
-        if(best<0||distance<best_distance||(distance==best_distance&&(axis<best_axis||(axis==best_axis&&canonical_id(cell)<canonical_id(board.tiles[best]))))){best=t;best_distance=distance;best_axis=axis;}
-    }
-    return best;
-}
-API int game_celebration_cell(void){return central_cell();}
+// Use the geometric centroid even when no cell centre lies on it.
 static Camera2D celebration_camera(void){
-    int t=central_cell();
-    Vector2 pivot=t>=0?center(t):(Vector2){view_w*.5f,view_h*.5f};
+    Vector2 a=vertex(0,0),b=vertex(board.n,0),c=vertex(0,board.n);
+    Vector2 pivot={(a.x+b.x+c.x)/3,(a.y+b.y+c.y)/3};
     return (Camera2D){.offset=pivot,.target=pivot,.rotation=celebration_angle,.zoom=celebration_scale};
 }
 // Gap is the perpendicular distance between two neighbouring rendered cells.
