@@ -124,6 +124,12 @@ console.log('PASS: submenu zoom endpoints/midpoint/reverse, input guard, back ti
       assert.equal(fill, palette.flash(base, step, glow), 'menu wave follows ROYGBIV, including violet across loops');
       assert(palette.contrast(fill, cell.style.getPropertyValue('--row-ink')) >= 4.5);
     }
+    for (const cell of h.d.querySelectorAll('#home-endless .home-up')) {
+      const glow = +cell.style.getPropertyValue('--row-glow');
+      if (glow > 0) assert.equal(cell.style.getPropertyValue('--flash-fill'),
+        palette.flash(h.d.getElementById('home').style.getPropertyValue('--home-dim'), step, glow),
+        'Endless upward cells flash from the same double-dim base');
+    }
     // Advance just past the next half-second boundary to avoid float rounding.
     for (let i = 0; i < 5; i++) h.frame(100);
     h.frame(1);

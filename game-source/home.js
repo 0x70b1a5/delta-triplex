@@ -4,7 +4,7 @@
   const home = el("home");
   let hue = Math.random() * 360, elapsed = 0, previous = null, frame = 0;
   let pending = null, zoom = null;
-  const scenes = ["main", "endless"].map(name => el("home-" + name));
+  const scenes = [...home.querySelectorAll(".home-triangle")];
   const trigger = { endless: "endless-mode" };
   function cell(node, x, y, row) {
     node.classList.add("home-cell");
@@ -142,7 +142,7 @@
         const banner = cell.classList.contains("home-banner");
         cell.style.setProperty("--row-glow", active ? glow : 0);
         if (active) {
-          const fill = TriPalette.flash(theme.getPropertyValue(banner ? "--cell" : scene.id === "home-main" && cell.classList.contains("home-up") ? "--home-dim" : "--empty"), Math.floor(step), glow, themeMode);
+          const fill = TriPalette.flash(theme.getPropertyValue(banner ? "--cell" : cell.classList.contains("home-up") ? "--home-dim" : "--empty"), Math.floor(step), glow, themeMode);
           cell.style.setProperty("--flash-fill", fill);
           cell.style.setProperty("--row-ink", TriPalette.ink(fill));
         } else {

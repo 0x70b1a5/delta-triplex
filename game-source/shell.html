@@ -813,24 +813,12 @@
         gap: 10px;
         margin: 28px 0;
       }
-      .home-actions button,
-      #level-grid button {
+      .home-actions button {
         padding: 16px;
         text-align: left;
       }
       .home-actions button:first-child {
         border: 1px solid var(--mint);
-      }
-      #level-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 12px;
-        margin: 24px 0;
-      }
-      #level-grid small {
-        display: block;
-        color: var(--muted);
-        margin-top: 8px;
       }
       #completion {
         position: fixed;
@@ -1089,7 +1077,7 @@
       @media (hover: hover) {
         #home button.home-cell:hover, #home a.home-cell:hover { background: var(--cell); color: var(--home-cell-ink); }
       }
-      #home #level-grid, #home #difficulties { display: contents; }
+      #home #difficulties { display: contents; }
       #home #load-error, #home #endless-note { position: fixed; top: 0; left: 10%; width: 80%; z-index: 3; margin: 0; background: var(--bg); font-size: 11px; text-align: center; }
       #home #endless-note { pointer-events: none; }
       #home #endless-note:empty { display: none; }
@@ -1105,7 +1093,7 @@
         .home-triangle { --top: 8px; }
         .home-banner h1, .home-banner h2 { font-size: clamp(27px, 9dvh, 45px); }
       }
-      #home-main .home-up { background: var(--flash-fill, var(--home-dim)); color: var(--row-ink, var(--home-dim-ink)); }
+      #home .home-triangle .home-up { background: var(--flash-fill, var(--home-dim)); color: var(--row-ink, var(--home-dim-ink)); }
       #home .home-up > span { top: 66%; }
       #home-calendar { box-sizing: border-box; height: 100dvh; padding: 20px 16px max(12px, env(safe-area-inset-bottom)); overflow: auto; text-align: center; }
       .calendar-heading h2 { font: 700 clamp(18px, 4vw, 32px) Michroma, sans-serif; margin: 0 0 12px; }
