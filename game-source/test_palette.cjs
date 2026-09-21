@@ -40,7 +40,7 @@ for (const darkMode of [false, true]) {
     assert.equal(h.w.localStorage.getItem('delta-triplex-theme'), mode);
     system.change(mode !== 'dark');
     assert.equal(root.style.colorScheme, mode, 'explicit choice overrides OS');
-    h.click('new-game'); h.frame();
+    h.startPuzzle(); h.frame();
     assert.equal(root.style.getPropertyValue('--cell'), mode === 'dark' ? '#ffffff' : '#000000');
     const restored = harness(source, 'https://tri.test/', {'delta-triplex-theme': mode}, {darkMode: mode !== 'dark'});
     assert.equal(restored.d.documentElement.style.colorScheme, mode, 'theme survives reload');
@@ -101,7 +101,7 @@ for (const mode of ['system', 'light', 'dark', 'colorful']) {
   for (const node of home.querySelectorAll('[data-row]')) {
     const glow = +node.style.getPropertyValue('--row-glow');
     if (glow > 0 && mode === 'colorful') {
-      const base = home.style.getPropertyValue(node.classList.contains('home-banner') ? '--cell' : '--empty');
+      const base = home.style.getPropertyValue(node.classList.contains('home-banner') ? '--cell' : node.closest('#home-main') && node.classList.contains('home-up') ? '--home-dim' : '--empty');
       assert.equal(node.style.getPropertyValue('--flash-fill'), P.mix(base, '#ffffff', glow), 'colorful menu flashes white');
     }
   }

@@ -1,0 +1,54 @@
+const assert = require('assert');
+const { harness, source } = require('./test_rotation_harness.cjs');
+(async () => {
+  const h = harness(source), { w, d } = h;
+  const share = w.TriShare;
+  const all = new Set();
+  for (let difficulty = 0; difficulty < 5; difficulty++) for (const seed of [0, 1, 0x7fffffff, 0x80000000, 0xffffffff]) {
+    const code = share.seedCode(seed, difficulty);
+    assert(!all.has(code)); all.add(code);
+    assert.deepEqual(share.parseSeedCode(code), { seed, difficulty });
+    assert.deepEqual(share.parseSeedCode('  ' + code.toLowerCase().replace('-', ' ') + ' '), { seed, difficulty });
+  }
+  assert.deepEqual(share.parseSeedCode('OOO-OOOL'), { seed: 1, difficulty: 0 });
+  for (const code of ['', '1234', '12345678', 'M00-0000', 'ZZZ-ZZZZ', '000-000U', '<script>']) assert.throws(() => share.parseSeedCode(code));
+  assert.equal(share.seedCode(0, 5), ''); assert.equal(share.seedCode(0, -1), '');
+  h.click('endless-mode');
+  d.querySelector('[data-difficulty="4"]').click();
+  await h.settle(() => h.state.custom && w.triEndlessRun?.difficulty === 4);
+  const original = JSON.stringify(h.state.solution);
+  const code = d.getElementById('session-seed').textContent.replace(/^Code /, '');
+  let copied;
+  Object.defineProperty(w.navigator, 'clipboard', { configurable: true, value: { writeText: async text => { copied = text; } } });
+  h.click('session-seed'); await Promise.resolve();
+  assert.equal(copied, code, 'clicking the timer code copies the entire puzzle identity');
+  const puzzle = share.seedPuzzle(code), url = share.url(puzzle);
+  assert(url.endsWith('#seed=' + code)); assert(!url.includes('difficulty'));
+  for (const text of [code.toLowerCase(), url, '#seed=' + code]) assert.equal(JSON.stringify(share.fromText(text).solution), original);
+  // Modal input pauses play; cancellation and validation preserve the board.
+  Object.defineProperty(w.navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw Error('unavailable'); } } });
+  h.click('session-seed'); await new Promise(resolve => setImmediate(resolve));
+  const dialog = d.getElementById('load-dialog'), input = d.getElementById('puzzle-code');
+  assert(dialog.open); assert.equal(input.value, code);
+  const elapsed = w.TriRotation.stats.elapsed;
+  h.advance(1000); assert.equal(w.TriRotation.stats.elapsed, elapsed);
+  dialog.dispatchEvent(new w.Event('cancel', { cancelable: true }));
+  assert(!dialog.open); assert(!d.getElementById('app').inert);
+  h.click('return-home'); h.click('load-puzzle');
+  input.value = 'not valid';
+  d.getElementById('load-code-form').dispatchEvent(new w.Event('submit', { cancelable: true }));
+  assert(dialog.open); assert(!d.getElementById('load-code-error').hidden);
+  assert.equal(JSON.stringify(h.state.solution), original);
+  input.value = code.toLowerCase();
+  d.getElementById('load-code-form').dispatchEvent(new w.Event('submit', { cancelable: true })); h.frame();
+  assert(!dialog.open); assert(d.getElementById('home').hidden);
+  assert.equal(JSON.stringify(h.state.solution), original);
+  assert.equal(h.state.n, 3);
+  assert.equal(d.getElementById('session-seed').textContent, 'Code ' + code);
+  const imported = { size: 2, solution: [1, 0, 1, 0] };
+  assert.deepEqual(share.fromText(share.url(imported)).solution, imported.solution, 'packed custom links still open');
+  h.click('return-home'); h.click('load-puzzle'); h.click('load-json-file');
+  assert(!dialog.open, 'JSON import remains available alongside code input');
+  h.close();
+  console.log('PASS: complete puzzle codes, all difficulty/seed boundaries, readable input, copy/paste, modal pause, validation and JSON route.');
+})().catch(error => { console.error(error); process.exitCode = 1; });

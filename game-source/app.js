@@ -240,7 +240,6 @@ function makeGrid(e) {
         (el("continue").hidden = !state.won),
         (el("continue").textContent =
           2 === state.tutorial ? TriCopy.t("app.start-puzzles") : TriCopy.t("app.next-demo"))));
-    window.triBuildLevels?.(state.levels);
     (      (el("app").dataset.orientation = ["S", "E", "N", "W"][
         state.orientation || 0
       ]),

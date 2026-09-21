@@ -11,6 +11,8 @@ window.triCancelGeneration = function () {
 };
 window.triMenuOpen = true;
 window.triShowHome = function (view = "main") {
+  window.triCloseIntro?.();
+  window.triClosePuzzleLoader?.();
   window.triCloseThemeWelcome?.();
   window.triHomePrepare?.(view);
   window.triCancelGeneration();
@@ -24,15 +26,16 @@ window.triShowHome = function (view = "main") {
   el("app").inert = true;
   el("completion").hidden = true;
   toggleMenu(false);
-  for (const name of ["main", "levels", "endless"])
+  for (const name of ["main", "calendar", "endless"])
     el("home-" + name).hidden = name !== view;
   el("home-back").hidden = view === "main";
   el("load-error").hidden = true;
   window.triHomeChanged?.();
-  el(view === "main" ? "new-game" : "home-back").focus();
+  el(view === "main" ? "today-puzzle" : "home-back").focus();
   window.triSyncHistory?.();
 };
 window.triShowPlay = function () {
+  window.triCloseIntro?.();
   window.triMenuOpen = false;
   el("home").hidden = true;
   window.triHomeChanged?.();
@@ -41,39 +44,6 @@ window.triShowPlay = function () {
   window.triMaybeChooseTheme?.();
   requestFrame();
   window.triSyncHistory?.();
-};
-function openLevel(index) {
-  window.triCancelGeneration();
-  window.triEndlessRun = null;
-  window.triShowPlay();
-  call("level", index);
-}
-let levelListKey = "";
-window.triBuildLevels = function (names) {
-  if (!names) return;
-  const key = JSON.stringify(names);
-  if (key !== levelListKey) {
-    levelListKey = key;
-
-    el("level-grid").replaceChildren();
-    names.forEach((name, index) => {
-      const tile = document.createElement("button");
-      tile.id = "level-" + index;
-      tile.textContent = String(index + 1).padStart(2, "0");
-      const label = document.createElement("small");
-      label.textContent = TriCopy.has(name) ? TriCopy.t(name) : name;
-      tile.append(label);
-      tile.onclick = () => openLevel(index);
-      el("level-grid").append(tile);
-    });
-    window.triHomeLayout?.();
-  }
-  names.forEach((_, i) =>
-    el("level-" + i).setAttribute(
-      "aria-pressed",
-      String(!state.custom && state.tutorial < 0 && state.level === i),
-    ),
-  );
 };
 window.triFlowState = function (next, previous) {
   if (!next.custom) window.triEndlessRun = null;
@@ -103,17 +73,54 @@ window.triFlowState = function (next, previous) {
   if (solved && sameBoard && !previous.won) call("celebrate");
   if (!solved) call("clear_celebration");
 };
-el("new-game").onclick = () => {
+el("today-puzzle").onclick = () => window.triOpenCalendar(true);
+el("past-puzzles").onclick = () => window.triOpenCalendar(false);
+el("how-to-play").onclick = () => {
   if (!appReady) return toast(TriCopy.t("errors.loading"));
+  call("replay");
   window.triShowPlay();
-  call("new");
 };
-el("select-level").onclick = () => window.triShowHome("levels");
+el("skip").onclick = () => window.triShowHome();
 el("endless-mode").onclick = () => window.triShowHome("endless");
 el("home-back").onclick = () => window.triShowHome();
 el("return-home").onclick = () => window.triShowHome();
 el("create-puzzle").onclick = () => el("editor-open").click();
-el("load-puzzle").onclick = () => {
+const loadDialog = el("load-dialog");
+window.triOpenPuzzleLoader = (code = "") => {
+  el("puzzle-code").value = code;
+  el("load-code-error").hidden = true;
+  el("app").inert = true;
+  if (!loadDialog.open) loadDialog.showModal();
+  call("sync");
+  el("puzzle-code").focus();
+  window.triSyncHistory?.();
+};
+window.triClosePuzzleLoader = () => {
+  if (!loadDialog.open) return;
+  loadDialog.close();
+  el("app").inert = !!window.triMenuOpen || el("theme-welcome").open;
+  call("sync");
+  (window.triMenuOpen ? el("load-puzzle") : el("rotate-board"))?.focus({ preventScroll: true });
+  window.triSyncHistory?.();
+};
+el("load-puzzle").onclick = () => window.triOpenPuzzleLoader();
+el("load-cancel").onclick = window.triClosePuzzleLoader;
+loadDialog.addEventListener("cancel", event => { event.preventDefault(); window.triClosePuzzleLoader(); });
+el("load-code-form").addEventListener("submit", event => {
+  event.preventDefault();
+  try {
+    if (!appReady) throw Error(TriCopy.t("errors.loading"));
+    const puzzle = TriShare.fromText(el("puzzle-code").value);
+    window.triClosePuzzleLoader();
+    loadCustom(puzzle, false, false);
+  } catch (error) {
+    el("load-code-error").textContent = error.message;
+    el("load-code-error").hidden = false;
+    el("puzzle-code").focus();
+  }
+});
+el("load-json-file").onclick = () => {
+  window.triClosePuzzleLoader();
   el("puzzle-file").value = "";
   el("puzzle-file").click();
 };
@@ -205,9 +212,8 @@ el("next-puzzle").onclick = () => {
       startEndless(run.difficulty, run.number + 1, run.recent);
     } else if (authorSession) call("editing", 1);
     else window.triShowHome();
-  } else if (state.tutorial >= 0) call("next");
-  else if (state.level + 1 < state.levels.length) openLevel(state.level + 1);
+  } else if (state.tutorial >= 0 && state.tutorial < 2) call("next");
   else window.triShowHome();
 };
-window.triBuildLevels(state?.levels);
+el("continue").onclick = () => el("next-puzzle").click();
 if (appReady) window.triInitializeCustom();

@@ -21,7 +21,7 @@
   }, true);
   const bar = document.createElement("div");
   bar.id = "session-bar";
-  bar.innerHTML = `<span>${TriCopy.html("app.name")}</span><span id="session-clock">${TriCopy.html("rotation.clock", { time: "00:00", count: 0 })}</span>`;
+  bar.innerHTML = `<span>${TriCopy.html("app.name")}</span><span id="session-details"><button id="session-seed" type="button" hidden></button><span id="session-clock">${TriCopy.html("rotation.clock", { time: "00:00", count: 0 })}</span>`;
   el("app").append(bar);
   const controls = document.createElement("div");
   controls.id = "turn-controls";
@@ -60,6 +60,12 @@
     const seconds = Math.floor(Math.max(0, ms) / 1000);
     return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
   }
+  el("session-seed").onclick = async () => {
+    const code = TriShare.seedCode(currentPuzzle?.seed, currentPuzzle?.difficulty);
+    if (!code) return;
+    try { await navigator.clipboard.writeText(code); toast(TriCopy.t("share.codeCopied")); }
+    catch { window.triOpenPuzzleLoader(code); el("puzzle-code").select(); toast(TriCopy.t("share.copyCodeFallback")); }
+  };
   function mayPlay() {
     return appReady && state && !window.triMenuOpen && !el("app").inert && el("puzzle-menu").hidden && !document.hidden;
   }
@@ -70,6 +76,13 @@
     running = !!(mayPlay() && !state.won && !state.editing);
     el("session-clock").textContent = TriCopy.t("rotation.clock", { time: formatTime(finished?.elapsed ?? elapsed), count: finished?.turns ?? turns });
     if (state?.editing) el("session-clock").textContent = TriCopy.t("rotate.editing");
+    const seed = state?.custom && !state.editing ? currentPuzzle?.seed : undefined;
+    const seedCode = TriShare.seedCode(seed, currentPuzzle?.difficulty);
+    el("session-seed").hidden = !seedCode;
+    el("session-seed").textContent = seedCode ? TriCopy.t("rotation.seed", { seed: seedCode }) : "";
+    el("session-seed").title = seedCode ? TriCopy.t("rotation.seedDetails", {
+      difficulty: endlessDifficulties[currentPuzzle.difficulty], hex: seed.toString(16).toUpperCase().padStart(8, "0"), decimal: seed,
+    }) : "";
     saveAttempt();
   }
   const baseCall = call;
@@ -274,6 +287,11 @@
     geometry = layout(Math.max(160, rect.width), Math.max(160, rect.height));
     const style = document.documentElement.style;
     const colours = ["--empty", "--cell"].map(key => style.getPropertyValue(key).trim());
+    if (state.won && !state.editing) {
+      const nextFill = TriPalette.oklch(.7, .16, motionEnabled ? performance.now() / 24 % 360 : 145);
+      el("next-puzzle").style.setProperty("--next-fill", nextFill);
+      el("next-puzzle").style.setProperty("--next-ink", TriPalette.ink(nextFill));
+    }
     svg.setAttribute("viewBox", `0 0 ${geometry.width} ${geometry.height}`);
     // Match raylib's celebration camera: rotate/zoom the already laid-out
     // board about its central active cell. Ordinary turns use the triangle centroid.

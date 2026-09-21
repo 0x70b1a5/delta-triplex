@@ -31,7 +31,7 @@ assert.equal(russian.t('count', { count: 5 }), 'many');
   original.close();
   const h = harness(shell.replace('{{{ SCRIPT }}}', () => engine), 'https://tri.test/', {}, { firstGame: true });
   assert.equal(h.d.documentElement.lang, 'fr');
-  h.click('new-game');
+  h.startPuzzle();
   assert.equal(h.d.getElementById('theme-welcome-title').textContent, translated['theme.welcome.title']);
   assert.equal(h.d.getElementById('theme-welcome-title').children.length, 0, 'catalog markup remains literal text');
   assert.equal(h.d.querySelector('#theme-mode option[value="light"]').textContent, 'Clair');

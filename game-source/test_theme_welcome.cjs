@@ -4,7 +4,7 @@ for (const mode of ['light', 'dark', 'system', 'colorful']) {
   const h = harness(source, 'https://tri.test/', {}, {firstGame: true});
   const dialog = h.d.getElementById('theme-welcome');
   assert(!dialog.open, 'menu does not prompt before starting');
-  h.click('new-game');
+  h.startPuzzle();
   assert(dialog.open);
   assert.equal(dialog.querySelector('input:checked').value, 'system');
   assert.equal(dialog.querySelectorAll('svg').length, 4);
@@ -19,7 +19,7 @@ for (const mode of ['light', 'dark', 'system', 'colorful']) {
   h.frame();
   assert(!dialog.open); assert(!h.d.getElementById('app').inert);
   assert.equal(h.w.localStorage.getItem('delta-triplex-theme-welcome'), '1');
-  h.click('return-home'); h.click('new-game');
+  h.click('return-home'); h.startPuzzle();
   assert(!dialog.open, 'only once per browser');
   const restored = harness(source, 'https://tri.test/#level=1', {
     'delta-triplex-theme': mode, 'delta-triplex-theme-welcome': '1',

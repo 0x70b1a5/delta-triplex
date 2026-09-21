@@ -4,8 +4,8 @@
   const home = el("home");
   let hue = Math.random() * 360, elapsed = 0, previous = null, frame = 0;
   let pending = null, zoom = null;
-  const scenes = ["main", "levels", "endless"].map(name => el("home-" + name));
-  const trigger = { levels: "select-level", endless: "endless-mode" };
+  const scenes = ["main", "endless"].map(name => el("home-" + name));
+  const trigger = { endless: "endless-mode" };
   function cell(node, x, y, row) {
     node.classList.add("home-cell");
     node.style.setProperty("--x", x * 100 + "%");
@@ -36,7 +36,7 @@
   }
   window.triHomeLayout = () => {
     for (const scene of scenes) {
-      const buttons = [...scene.querySelectorAll("button:not(#home-back)")];
+      const buttons = [...scene.querySelectorAll("button:not(#home-back):not(#past-puzzles)")];
       let rows = 3;
       while (rows * (rows - 1) / 2 - 1 < buttons.length) rows++;
       scene.dataset.rows = rows;
@@ -54,8 +54,8 @@
           if (!button) { down.className = "home-filler"; down.setAttribute("aria-hidden", "true"); scene.append(down); }
           cell(down, x, row / rows, row);
           if (col < rows - row - 1) {
-            const up = document.createElement("i");
-            up.className = "home-filler home-up"; up.setAttribute("aria-hidden", "true");
+            const up = scene.id === "home-main" && row === rows - 2 && col === 0 ? el("past-puzzles") : document.createElement("i");
+            if (up.id !== "past-puzzles") { up.className = "home-filler home-up"; up.setAttribute("aria-hidden", "true"); }
             scene.append(up); cell(up, x + .5 / rows, row / rows, row);
           }
         }
@@ -65,7 +65,12 @@
       fitLabels(scene);
     }
     const view = home.dataset.view;
-    if (view !== "main") {
+    if (view === "calendar") {
+      const back = el("home-back");
+      back.classList.add("home-cell", "home-back");
+      if (!back.querySelector("span")) { const label = document.createElement("span"); label.textContent = back.textContent; back.replaceChildren(label); }
+      el("calendar-back-slot").append(back);
+    } else if (view !== "main") {
       const scene = el("home-" + view), rows = +scene.dataset.rows, back = el("home-back");
       back.classList.add("home-back"); if (back.parentElement !== scene) scene.append(back);
       cell(back, (rows - 1) / (2 * rows), (rows - 1) / rows, rows - 1);
@@ -80,12 +85,12 @@
     }
     outgoing.hidden = true; outgoing.inert = false; incoming.inert = false;
     home.removeAttribute("data-transition"); zoom = null;
-    if (!home.hidden) el(home.dataset.view === "main" ? "new-game" : "home-back").focus({ preventScroll: true });
+    if (!home.hidden) el(home.dataset.view === "main" ? "today-puzzle" : "home-back").focus({ preventScroll: true });
   }
   window.triHomePrepare = view => {
     finishZoom();
     const from = home.dataset.view;
-    pending = !home.hidden && from !== view && (from === "main" || view === "main")
+    pending = from !== "calendar" && view !== "calendar" && !home.hidden && from !== view && (from === "main" || view === "main")
       ? { from, to: view, source: from === "main" ? el(trigger[view])?.getBoundingClientRect() : null } : null;
   };
   function startZoom() {
@@ -137,7 +142,7 @@
         const banner = cell.classList.contains("home-banner");
         cell.style.setProperty("--row-glow", active ? glow : 0);
         if (active) {
-          const fill = TriPalette.flash(theme.getPropertyValue(banner ? "--cell" : "--empty"), Math.floor(step), glow, themeMode);
+          const fill = TriPalette.flash(theme.getPropertyValue(banner ? "--cell" : scene.id === "home-main" && cell.classList.contains("home-up") ? "--home-dim" : "--empty"), Math.floor(step), glow, themeMode);
           cell.style.setProperty("--flash-fill", fill);
           cell.style.setProperty("--row-ink", TriPalette.ink(fill));
         } else {
@@ -151,6 +156,10 @@
     writeTheme(home, currentTheme(themeMode === "colorful" ? {
       bg: TriPalette.oklch(.22, .04, hue), cell: TriPalette.oklch(.91, .11, hue + 145),
     } : undefined));
+    // Crossed cells are 50% empty over background; upward menu cells use half that intensity.
+    const dim = TriPalette.mix(home.style.getPropertyValue("--bg"), home.style.getPropertyValue("--empty"), .25);
+    home.style.setProperty("--home-dim", dim);
+    home.style.setProperty("--home-dim-ink", TriPalette.ink(dim));
   }
   function tick(now) {
     frame = 0;

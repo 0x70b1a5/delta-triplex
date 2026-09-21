@@ -5,7 +5,7 @@ for (const mode of ['light', 'dark', 'colorful']) {
 const darkMode = mode === 'dark';
 const h = harness(source, 'https://tri.test/', {'delta-triplex-theme': mode}, { reducedMotion: false, darkMode });
 const { w, d } = h;
-h.click('new-game');
+h.startPuzzle();
 const svg = d.getElementById('rotate-board');
 svg.setPointerCapture = () => {};
 function tap(index, releaseFrameDelay = 0) {
@@ -24,7 +24,7 @@ assert(glow(0) > .1, 'filled cells visibly pulse in the SVG renderer');
 assert.equal(svg.querySelector('[data-cell="0"]').getAttribute('fill'), palette.flash(d.documentElement.style.getPropertyValue('--cell'), 0, glow(0), mode), 'tap begins red in both themes');
 // Build an independent graph from shared triangle vertices, then verify
 // every outward tap stage and its rendered colour (including the violet tip).
-h.click('new-game'); tap(0);
+h.startPuzzle(); tap(0);
 const vertices = ({i, j, o}) => (o ? [[i+1,j], [i,j+1], [i+1,j+1]] : [[i,j], [i,j+1], [i+1,j]])
   .map(p => p.join(','));
 const points = h.state.cells.map(vertices), distances = new Map([[0, 0]]), queue = [0];
@@ -60,10 +60,9 @@ assert(d.getElementById('bottom-controls').contains(d.getElementById('completion
 assert(d.getElementById('share-result').querySelector('svg'));
 assert.equal(d.querySelector('#share-result .desktop-share-label').textContent, 'Share');
 assert.equal(d.querySelector('#share-result .mobile-share-suffix').textContent, 'Share solution');
-assert(d.getElementById('next-puzzle').querySelector('svg'));
-assert.equal(d.getElementById('next-puzzle').textContent.trim(), '');
+assert.equal(d.getElementById('next-puzzle').textContent, 'Next →');
 for (let view = 0; view < 3; view++) {
-  h.click('new-game');
+  h.startPuzzle();
   h.resize(view % 2 ? 390 : 1200, view % 2 ? 480 : 700);
   for (let i = 0; i < view; i++) { h.click('turn-right'); h.frame(500); }
   for (let i = 0; i < h.state.cells.length; i++) {
@@ -71,6 +70,9 @@ for (let view = 0; view < 3; view++) {
     if (c.active && h.state.solution[r * r + 2 * c.i + c.o]) tap(i);
   }
   assert(h.state.won);
+  const initialNextFill = d.getElementById('next-puzzle').style.getPropertyValue('--next-fill');
+  assert(initialNextFill);
+  assert(palette.contrast(initialNextFill, d.getElementById('next-puzzle').style.getPropertyValue('--next-ink')) >= 4.5);
   const solvedGeometry = w.TriRotation.geometry;
   const axisToBalance = solvedGeometry.desktop ? 1 : 0;
   const extent = solvedGeometry.desktop ? solvedGeometry.height : solvedGeometry.width;
@@ -86,6 +88,7 @@ for (let view = 0; view < 3; view++) {
   const startingPoints = svg.querySelector('polygon').getAttribute('points');
   const startingPivot = svg.querySelector('[data-board-layer]').dataset.pivot;
   h.frame(250);
+  assert.notEqual(d.getElementById('next-puzzle').style.getPropertyValue('--next-fill'), initialNextFill, 'Next draws attention with a hue shift');
   assert(Math.abs(h.exports.game_celebration_angle() - 315) < .01);
   assert(Math.abs(h.exports.game_celebration_scale() - 1.1) < .001);
   assert.equal(w.TriRotation.geometry.angle, startingAngle, 'victory does not change ordinary rotation geometry');
@@ -120,11 +123,15 @@ for (let view = 0; view < 3; view++) {
   assert([...svg.querySelectorAll('polygon')].every(p => +p.dataset.glow === 0));
   h.exports.game_celebrate(); assert(!h.exports.game_celebrating());
   h.exports.game_motion(1);
+  w.matchMedia('(prefers-reduced-motion: reduce)').change(true); h.frame();
+  const stillFill = d.getElementById('next-puzzle').style.getPropertyValue('--next-fill');
+  h.frame(500);
+  assert.equal(d.getElementById('next-puzzle').style.getPropertyValue('--next-fill'), stillFill, 'Next respects reduced motion');
+  w.matchMedia('(prefers-reduced-motion: reduce)').change(false); h.frame();
   h.click('next-puzzle');
-  assert.equal(h.state.level, 1);
-  assert(!h.state.won);
-  assert(d.getElementById('next-puzzle').querySelector('svg'), 'Next keeps its icon after navigation');
-  assert.equal(d.getElementById('next-puzzle').textContent.trim(), '');
+  assert(!d.getElementById('home').hidden, 'completed legacy stock puzzles return home');
+  assert.equal(d.getElementById('next-puzzle').textContent, 'Next →', 'Next keeps its label after navigation');
+  assert(d.getElementById('next-puzzle').style.getPropertyValue('--next-fill'));
 }
 h.close();
 }

@@ -1,7 +1,7 @@
 const assert = require("assert");
 const { harness, source } = require("./test_rotation_harness.cjs");
 const h = harness(source, "https://tri.test/", {}, { reducedMotion: false });
-h.click("new-game");
+h.startPuzzle();
 const { d, w } = h;
 const svg = d.getElementById("rotate-board");
 let expectedCenter;
@@ -133,7 +133,7 @@ for (let tick = 0; tick < 28; tick++) { h.frame(16); checkHue(); }
 assert.deepEqual(["bg", "cell"].map(key => d.documentElement.style.getPropertyValue("--" + key)), initialColors);
 h.close();
 const reduced = harness(source);
-reduced.click("new-game");
+reduced.startPuzzle();
 const reducedBoard = reduced.d.getElementById("rotate-board");
 const reducedWheel = () => {
   reducedBoard.dispatchEvent(new reduced.w.WheelEvent("wheel", { deltaY: 60, bubbles: true, cancelable: true }));

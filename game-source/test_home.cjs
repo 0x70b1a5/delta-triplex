@@ -11,12 +11,12 @@ for (const reducedMotion of [false, true]) {
   const after = home.style.getPropertyValue('--bg') + home.style.getPropertyValue('--cell');
   assert.equal(before, after, 'homepage base colours remain monochrome');
   assert.equal(h.d.documentElement.style.cssText, gameColours, 'homepage flashes do not change game colours');
-  assert.equal(h.d.querySelectorAll('#home-main button').length, 5);
+  assert.equal(h.d.querySelectorAll('#home-main button').length, 6);
   assert.equal(h.d.querySelector('.home-credit').href, 'https://lovecrypt.itch.io/');
-  h.click('select-level'); assert.equal(home.dataset.view, 'levels');
+  h.click('past-puzzles'); assert.equal(home.dataset.view, 'calendar');
   h.click('home-back'); assert.equal(home.dataset.view, 'main');
   h.click('endless-mode'); assert.equal(home.dataset.view, 'endless');
-  h.click('home-back'); h.click('new-game');
+  h.click('home-back'); h.click('how-to-play');
   const frozen = home.style.cssText;
   for (let i = 0; i < 10; i++) h.frame(100);
   assert.equal(home.style.cssText, frozen, 'hidden homepage stops animating');
@@ -31,11 +31,11 @@ for (const reducedMotion of [false, true]) {
   const { d, w } = h;
   const sceneRect = scene => ({ left: 20, top: 24, width: 960,
     height: 876 * +scene.dataset.rows / (+scene.dataset.rows - .5) });
-  for (const name of ['main', 'levels', 'endless']) {
+  for (const name of ['main', 'endless']) {
     const scene = d.getElementById('home-' + name);
     scene.getBoundingClientRect = () => sceneRect(scene);
   }
-  for (const id of ['select-level', 'endless-mode']) {
+  for (const id of ['endless-mode']) {
     const button = d.getElementById(id);
     button.getBoundingClientRect = () => {
       const rect = sceneRect(d.getElementById('home-main'));
@@ -46,8 +46,8 @@ for (const reducedMotion of [false, true]) {
   }
   w.triShowHome(); h.frame();
   const home = d.getElementById('home');
-  for (const view of ['levels', 'endless']) {
-    h.click(view === 'levels' ? 'select-level' : 'endless-mode');
+  for (const view of ['endless']) {
+    h.click('endless-mode');
     const scene = d.getElementById('home-' + view);
     assert(scene.contains(d.getElementById('home-back')), 'back button lives in the submenu tip');
     assert.equal(d.getElementById('home-back').dataset.row, String(+scene.dataset.rows - 1));
@@ -87,9 +87,9 @@ for (const reducedMotion of [false, true]) {
     }
     assert.equal(home.dataset.view, 'main'); assert(scene.hidden);
   }
-  w.triBuildLevels(Array.from({ length: 12 }, (_, i) => 'Level ' + i));
-  h.click('select-level'); h.frame(360);
-  const levels = d.getElementById('home-levels');
+  for (let i = 0; i < 7; i++) { const button = d.createElement('button'); button.textContent = 'Extra ' + i; d.getElementById('difficulties').append(button); }
+  h.click('endless-mode'); h.frame(360);
+  const levels = d.getElementById('home-endless');
   assert.equal(+levels.dataset.rows, 6, 'additional levels add enough complete rows');
   const positions = [...levels.querySelectorAll('button')].map(b => b.style.getPropertyValue('--x') + '/' + b.style.getPropertyValue('--y'));
   assert.equal(new Set(positions).size, 13, 'every level and back button has its own cell');
@@ -108,7 +108,7 @@ console.log('PASS: submenu zoom endpoints/midpoint/reverse, input guard, back ti
     [...scene.querySelectorAll('.home-up[data-row="2"]')],
     ['create-puzzle', 'load-puzzle'].map(id => h.d.getElementById(id)),
     [...scene.querySelectorAll('.home-up[data-row="1"]')],
-    ['new-game', 'select-level', 'endless-mode'].map(id => h.d.getElementById(id)),
+    ['today-puzzle', 'how-to-play', 'endless-mode'].map(id => h.d.getElementById(id)),
     [scene.querySelector('.home-banner')],
   ];
   assert.deepEqual(expected.map(cells => cells.length), [1, 1, 2, 2, 3, 1]);
@@ -118,7 +118,7 @@ console.log('PASS: submenu zoom endpoints/midpoint/reverse, input guard, back ti
     assert.deepEqual(new Set(active), new Set(expected[step % expected.length]),
       `shared-edge wave ${step}, including wraparound`);
     for (const cell of active) {
-      const base = h.d.documentElement.style.getPropertyValue(cell.classList.contains('home-banner') ? '--cell' : '--empty');
+      const base = cell.classList.contains('home-up') ? h.d.getElementById('home').style.getPropertyValue('--home-dim') : h.d.documentElement.style.getPropertyValue(cell.classList.contains('home-banner') ? '--cell' : '--empty');
       const glow = +cell.style.getPropertyValue('--row-glow');
       const fill = cell.style.getPropertyValue('--flash-fill');
       assert.equal(fill, palette.flash(base, step, glow), 'menu wave follows ROYGBIV, including violet across loops');

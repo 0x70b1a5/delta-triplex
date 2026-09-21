@@ -19,8 +19,8 @@ function toggleMenu(open) {
 el("menu-toggle").onclick = () => toggleMenu(menu.hidden);
 el("menu-close").onclick = () => toggleMenu(false);
 el("replay").onclick = () => {
-  window.triShowPlay?.();
   call("replay");
+  window.triShowPlay?.();
   toggleMenu(false);
 };
 el("memory").onclick = () => {
@@ -233,11 +233,7 @@ window.triInitializeCustom = () => {
   if (params.has("seed")) {
     try {
       loadCustom(
-        TriShare.seedPuzzle(
-          params.get("seed"),
-          params.get("difficulty"),
-          params.get("orientation") || undefined,
-        ),
+        TriShare.seedPuzzle(params.get("seed")),
         false,
         false,
       );

@@ -19,6 +19,13 @@ function harness(html, url = "https://tri.test/", storage = {}, options = {}) {
     }),
     w = dom.window,
     d = w.document;
+  if (options.now) {
+    const NativeDate = w.Date, fixed = new NativeDate(options.now).getTime();
+    w.Date = class extends NativeDate {
+      constructor(...args) { super(...(args.length ? args : [fixed])); }
+      static now() { return fixed; }
+    };
+  }
   if (!options.firstGame) w.localStorage.setItem('delta-triplex-theme-welcome', '1');
   w.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
   w.HTMLDialogElement.prototype.close = function () { this.open = false; };
@@ -129,7 +136,7 @@ function harness(html, url = "https://tri.test/", storage = {}, options = {}) {
     scripts
       .filter((s) => s !== engine)
       .map((s) => s.textContent)
-      .join("\n") + "\nObject.assign(Module,window.__bridge);",
+      .join("\n") + '\nObject.assign(Module,window.__bridge); window.__startPuzzle = () => { call("new"); window.triShowPlay(); };',
   );
   exports.game_boot();
   w.triReady();
@@ -205,6 +212,7 @@ function harness(html, url = "https://tri.test/", storage = {}, options = {}) {
     get state() {
       return latest;
     },
+    startPuzzle: () => { w.__startPuzzle(); flush(); },
     click: (id) => {
       d.getElementById(id).click();
       flush();

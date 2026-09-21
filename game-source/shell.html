@@ -1078,7 +1078,7 @@
       }
       #home .home-cell > span { z-index: 1; position: absolute; left: 10%; width: 80%; top: 32%; transform: translateY(-50%); }
       #home .home-cell small { display: block; font-size: .8em; margin: .3em 0 0; }
-      #home .home-filler.home-up { clip-path: polygon(50% 1%, 99% 99.5%, 1% 99.5%); }
+      #home .home-up { clip-path: polygon(50% 1%, 99% 99.5%, 1% 99.5%); }
       #home .home-filler { pointer-events: none; }
       #home .home-credit, #home .home-back { font-size: var(--label-size, clamp(9px, 1.1vw, 17px)); }
       #home .home-credit > span, #home .home-back > span { top: 24%; }
@@ -1105,6 +1105,32 @@
         .home-triangle { --top: 8px; }
         .home-banner h1, .home-banner h2 { font-size: clamp(27px, 9dvh, 45px); }
       }
+      #home-main .home-up { background: var(--flash-fill, var(--home-dim)); color: var(--row-ink, var(--home-dim-ink)); }
+      #home .home-up > span { top: 66%; }
+      #home-calendar { box-sizing: border-box; height: 100dvh; padding: 20px 16px max(12px, env(safe-area-inset-bottom)); overflow: auto; text-align: center; }
+      .calendar-heading h2 { font: 700 clamp(18px, 4vw, 32px) Michroma, sans-serif; margin: 0 0 12px; }
+      .calendar-heading label { font-size: 12px; margin-right: 8px; }
+      #calendar-month { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px; max-width: 65%; }
+      #calendar-grid { position: relative; width: min(94vw, calc((100dvh - 230px) / .8660254), 760px); min-width: 240px; aspect-ratio: 1 / .8660254; margin: 16px auto; }
+      #home #calendar-grid .calendar-cell { position: absolute; left: var(--x); top: var(--y); width: calc(100% / var(--rows)); height: calc(100% / var(--rows)); min-height: 0; padding: 0; border: 0; border-radius: 0; clip-path: polygon(1% 1%, 99% 1%, 50% 99%); background: var(--empty); color: var(--home-empty-ink); display: grid; place-items: start center; font: 600 clamp(10px, 2.6vw, 18px) system-ui, sans-serif; }
+      .calendar-cell > span { position: absolute; top: 30%; transform: translateY(-50%); }
+      #home #calendar-grid .calendar-up { clip-path: polygon(50% 1%, 99% 99%, 1% 99%); background: var(--home-dim); }
+      #home #calendar-grid .calendar-unused, #home #calendar-grid button:disabled { background: var(--home-dim); color: var(--muted); cursor: default; }
+      #home #calendar-grid button[aria-pressed="true"], #home #calendar-grid button:not(:disabled):hover, #home #calendar-grid button:focus-visible { background: var(--cell); color: var(--home-cell-ink); }
+      #home #calendar-grid button[aria-current="date"] > span { text-decoration: underline; text-underline-offset: 3px; }
+      #calendar-status { min-height: 2.8em; margin: 8px auto; max-width: 560px; font-size: 12px; text-transform: none; }
+      #home #calendar-back-slot .home-back { position: relative; left: auto; top: auto; width: 100px; height: 78px; margin: 0 auto; font-size: 12px; }
+      #session-details { max-width: 65%; display: flex; flex-wrap: wrap; align-items: baseline; justify-content: flex-end; column-gap: 12px; row-gap: 4px; }
+      #session-seed { padding: 0; min-height: 0; border-radius: 0; background: transparent; color: inherit; font: inherit; text-decoration: underline dotted; text-underline-offset: 3px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+      #completion #next-puzzle { width: auto; flex: 0 0 auto; padding: 8px 10px; font-weight: 650; background: var(--next-fill); color: var(--next-ink); }
+      @media (max-width: 360px) { #completion #next-puzzle { width: auto; flex-basis: auto; } #session-bar { left: 16px; right: 16px; } }
+      #load-dialog { box-sizing: border-box; width: min(440px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 22px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg); color: var(--ink); }
+      #load-dialog::backdrop { background: #0009; }
+      #load-dialog h2 { margin: 0; font-size: 22px; }
+      #load-dialog p { color: var(--muted); font-size: 13px; line-height: 1.5; }
+      #load-dialog label { display: block; margin-bottom: 8px; font-size: 13px; }
+      #puzzle-code { box-sizing: border-box; width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font: inherit; background: var(--surface); color: var(--ink); }
+      .load-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
       #theme-welcome { width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); box-sizing: border-box; padding: 24px; border: 1px solid var(--border); border-radius: 18px; background: var(--bg); color: var(--ink); overflow: auto; box-shadow: 0 16px 64px #0006; }
       #theme-welcome::backdrop { background: #0009; }
       #theme-welcome h2 { margin: 0; font-size: 23px; font-weight: 650; }
@@ -1127,6 +1153,29 @@
         #theme-welcome h2 { font-size: 20px; }
         .theme-preview svg { height: 60px; }
       }
+      #tutorial-intro { position: fixed; inset: 0; z-index: 30; overflow: auto; background: var(--bg); color: var(--ink); padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom)); box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+      #tutorial-intro[hidden] { display: none; }
+      .intro-copy { width: min(640px, 100%); text-align: center; }
+      .intro-copy h1 { font-size: clamp(20px, 3vw, 30px); margin: 8px 0 14px; }
+      .intro-copy p { line-height: 1.6; margin: 8px 0; }
+      #intro-progress { font-size: 12px; opacity: .65; }
+      #intro-nonogram { color: var(--ink); font-size: inherit; text-underline-offset: 3px; }
+      #intro-board { display: block; width: min(100%, 650px); flex: 1 0 210px; min-height: 210px; max-height: 52dvh; overflow: visible; }
+      .intro-cell { fill: var(--empty); stroke: var(--bg); stroke-width: 3; stroke-linejoin: round; }
+      .intro-cell.filled { fill: var(--cell); }
+      .intro-cell.emphasis { stroke: var(--ink); stroke-width: 2; }
+      .intro-cross { stroke: var(--cross); stroke-width: 3; fill: none; }
+      .intro-hint { fill: var(--ink); font-size: 24px; opacity: .65; }
+      .intro-hint.active { opacity: 1; font-weight: bold; }
+      .intro-halo { fill: none; stroke: var(--ink); stroke-width: 2; opacity: 0; }
+      .intro-hint.active .intro-halo { opacity: 1; }
+      @media (prefers-reduced-motion: no-preference) { .intro-hint.active .intro-halo { animation: intro-halo 1.8s ease-in-out infinite; } .intro-cell.emphasis { animation: intro-row 1.8s ease-in-out infinite; } @keyframes intro-row { 50% { opacity: .5; } } @keyframes intro-halo { 50% { stroke-width: 5; opacity: .45; } } }
+      #tutorial-intro[data-paused="true"] .intro-cell, #tutorial-intro[data-paused="true"] .intro-halo { animation-play-state: paused; }
+      #intro-controls { text-align: center; max-width: 640px; min-height: 90px; }
+      #intro-step-text { min-height: 2.8em; margin: 0 0 8px; line-height: 1.4; }
+      .intro-navigation { display: flex; gap: 8px; width: min(640px,100%); justify-content: space-between; margin-top: auto; }
+      #tutorial-intro button { color: var(--ink); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px; min-height: 44px; }
+      #intro-next { background: var(--cell) !important; color: var(--home-cell-ink) !important; }
     </style>
   </head>
   <body>
@@ -1249,19 +1298,25 @@
       <div class="home-card">
         <div id="home-main" class="home-actions home-triangle">
           <header class="home-banner"><h1>{{copy:home.brand}}</h1></header>
-          <button id="new-game" class="home-cell" style="--x:12.5%;--y:25%"><span>{{copy:home.newGame}}</span></button>
-          <button id="select-level" class="home-cell" style="--x:37.5%;--y:25%"><span>{{copy:home.levelSelect}}</span></button>
+          <button id="today-puzzle" class="home-cell" style="--x:12.5%;--y:25%"><span>{{copy:home.today}}</span></button>
+          <button id="how-to-play" class="home-cell" style="--x:37.5%;--y:25%"><span>{{copy:home.howToPlay}}</span></button>
           <button id="endless-mode" class="home-cell" style="--x:62.5%;--y:25%"><span>{{copy:home.endlessMode}}</span></button>
           <button id="create-puzzle" class="home-cell" style="--x:25%;--y:50%"><span>{{copy:home.createPuzzle}}</span></button>
           <button id="load-puzzle" class="home-cell" style="--x:50%;--y:50%"><span>{{copy:home.loadPuzzle}}</span></button>
           <i class="home-cell home-filler" style="--x:25%;--y:25%" aria-hidden="true"></i>
           <i class="home-cell home-filler" style="--x:50%;--y:25%" aria-hidden="true"></i>
-          <i class="home-cell home-filler" style="--x:37.5%;--y:50%" aria-hidden="true"></i>
+          <button id="past-puzzles" class="home-cell home-up" style="--x:37.5%;--y:50%"><span>{{copy:home.pastPuzzles}}</span></button>
           <a class="home-cell home-credit" style="--x:37.5%;--y:75%" href="https://lovecrypt.itch.io/" target="_blank" rel="noopener noreferrer"><span><small>{{copy:ui.by}}</small> {{copy:ui.lovecrypt}}</span></a>
         </div>
-        <section id="home-levels" class="home-triangle" hidden>
-          <header class="home-banner"><h2>{{copy:ui.level-select}}</h2></header>
-          <div id="level-grid"></div>
+        <section id="home-calendar" class="calendar-scene" aria-labelledby="calendar-title" hidden>
+          <header class="calendar-heading">
+            <h2 id="calendar-title">{{copy:calendar.title}}</h2>
+            <label for="calendar-month">{{copy:calendar.month}}</label>
+            <input id="calendar-month" type="month" min="2026-09" required>
+          </header>
+          <div id="calendar-grid" aria-label="{{copy:calendar.days}}"></div>
+          <p id="calendar-status" role="status">{{copy:calendar.unassigned}}</p>
+          <div id="calendar-back-slot"></div>
         </section>
         <section id="home-endless" class="home-triangle" hidden>
           <header class="home-banner"><h2>{{copy:ui.endless-mode}}</h2></header>
@@ -1285,7 +1340,7 @@
     <div id="completion" hidden role="status">
       <span id="solve-result"><span id="solve-details">{{copy:ui.solved}}</span></span>
       <button id="share-result" class="icon share-button" aria-label="{{copy:ui.share-solution}}" title="{{copy:ui.share-solution}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V3m-4 4 4-4 4 4M5 11v9h14v-9" /></svg><span class="desktop-share-label">{{copy:ui.share}}</span><span class="mobile-share-suffix">{{copy:ui.share-solution}}</span></button>
-      <button id="next-puzzle" class="icon" aria-label="{{copy:ui.next-puzzle}}" title="{{copy:ui.next-puzzle}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" /></svg></button>
+      <button id="next-puzzle" class="icon" aria-label="{{copy:ui.next-puzzle}}" title="{{copy:ui.next-puzzle}}">{{copy:ui.nextAction}}</button>
     </div>
     <div id="toast" hidden role="status"></div>
     <div id="status" role="status">{{copy:ui.loading}}</div>
@@ -1325,6 +1380,20 @@
         ><button id="memory-close">{{copy:ui.hide}}</button>
       </div>
     </aside>
+    <dialog id="load-dialog" aria-labelledby="load-title" aria-describedby="load-help">
+      <form id="load-code-form">
+        <h2 id="load-title">{{copy:load.title}}</h2>
+        <p id="load-help">{{copy:load.help}}</p>
+        <label for="puzzle-code">{{copy:load.codeLabel}}</label>
+        <input id="puzzle-code" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="{{copy:load.codePlaceholder}}" aria-describedby="load-code-error">
+        <p id="load-code-error" role="alert" hidden></p>
+        <div class="load-actions">
+          <button type="submit">{{copy:load.open}}</button>
+          <button id="load-json-file" type="button">{{copy:load.json}}</button>
+          <button id="load-cancel" type="button">{{copy:load.cancel}}</button>
+        </div>
+      </form>
+    </dialog>
     <dialog id="theme-welcome" aria-labelledby="theme-welcome-title" aria-describedby="theme-welcome-help">
       <form method="dialog">
         <h2 id="theme-welcome-title">{{copy:theme.welcome.title}}</h2>
@@ -1341,6 +1410,24 @@
       </form>
     </dialog>
     <script id="copy-catalog" type="application/json">{{COPY_CATALOG}}</script>
+    <section id="tutorial-intro" hidden aria-labelledby="intro-title">
+      <div class="intro-copy">
+        <p id="intro-progress"></p>
+        <h1 id="intro-title" tabindex="-1"></h1>
+        <p id="intro-description"></p>
+      </div>
+      <svg id="intro-board" viewBox="-300 -65 600 525" role="img" aria-labelledby="intro-board-title"></svg>
+      <div id="intro-controls">
+        <p id="intro-step-text" role="status"></p>
+        <button id="intro-pause">{{copy:intro.pause}}</button>
+        <button id="intro-step">{{copy:intro.step}}</button>
+      </div>
+      <nav class="intro-navigation" aria-label="{{copy:intro.navigation}}">
+        <button id="intro-back">{{copy:intro.back}}</button>
+        <button id="intro-exit">{{copy:intro.exit}}</button>
+        <button id="intro-next">{{copy:intro.next}}</button>
+      </nav>
+    </section>
     <script src="copy.js"></script>
     <script src="palette.js"></script>
     <script src="share.js"></script>
@@ -1349,6 +1436,8 @@
     <script src="editor.js"></script>
     <script src="theme-welcome.js"></script>
     <script src="flow.js"></script>
+    <script src="calendar.js"></script>
+    <script src="tutorial-intro.js"></script>
     <script src="back.js"></script>
     <script src="rotate.js"></script>
     <script src="home.js"></script>

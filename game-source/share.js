@@ -1,8 +1,27 @@
 "use strict";
 // Version 2: version, side length, then MSB-first packed solution bits.
-// View rotation is session state, never puzzle data. Legacy v1 links still load.
+// View rotation is session state, never puzzle data.
 // Base64url has no padding. Solution order is the existing north-row-major order.
 window.TriShare = {
+  // 32 seed bits + 3 difficulty bits fit in seven Base32 digits. Use arithmetic,
+  // not bitwise operators, because JavaScript bitwise operations truncate to 32 bits.
+  seedCode(seed, difficulty) {
+    if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff || !Number.isInteger(difficulty) || difficulty < 0 || difficulty > 4) return "";
+    const alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+    let value = difficulty * 0x100000000 + seed, code = "";
+    do { code = alphabet[value % 32] + code; value = Math.floor(value / 32); } while (value);
+    code = code.padStart(7, "0");
+    return code.slice(0, 3) + "-" + code.slice(3);
+  },
+  parseSeedCode(code) {
+    const normalized = String(code).trim().toUpperCase().replace(/[\s-]/g, "").replace(/O/g, "0").replace(/[IL]/g, "1");
+    if (!/^[0-9A-HJKMNP-TV-Z]{7}$/.test(normalized)) throw Error(TriCopy.t("share.invalid-seed-link"));
+    const alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+    const value = [...normalized].reduce((number, char) => number * 32 + alphabet.indexOf(char), 0);
+    const difficulty = Math.floor(value / 0x100000000), seed = value % 0x100000000;
+    if (difficulty > 4) throw Error(TriCopy.t("share.invalid-seed-link"));
+    return { seed, difficulty };
+  },
   encode(puzzle) {
     const n = puzzle.size;
     if (
@@ -32,12 +51,11 @@ window.TriShare = {
       (c) => c.charCodeAt(0),
     );
     const [version, n] = bytes;
-    const offset = version === 1 ? 3 : 2;
+    const offset = 2;
     if (
-      ![1, 2].includes(version) ||
+      version !== 2 ||
       n < 2 ||
       n > 10 ||
-      (version === 1 && bytes[2] > 3) ||
       bytes.length !== offset + Math.ceil((n * n) / 8)
     )
       throw Error(TriCopy.t("share.unsupported-puzzle-link"));
@@ -52,19 +70,13 @@ window.TriShare = {
         (_, i) => (bytes[offset + (i >> 3)] >> (7 - (i & 7))) & 1,
       ),
     };
-    if (version === 2 && this.encode(puzzle) !== code) throw Error(TriCopy.t("share.invalid-puzzle-link"));
+    if (this.encode(puzzle) !== code) throw Error(TriCopy.t("share.invalid-puzzle-link"));
     return puzzle;
   },
   // Replace this origin when the public release has an address.
   base: "https://delta.theologi.ca/",
-  seedPuzzle(seed, difficulty) {
-    if (
-      !/^[0-9a-f]{1,8}$/i.test(seed) ||
-      !["easy", "medium", "hard", "impossible", "sprout"].includes(difficulty)
-    )
-      throw Error(TriCopy.t("share.invalid-seed-link"));
-    const number = parseInt(seed, 16),
-      level = ["easy", "medium", "hard", "impossible", "sprout"].indexOf(difficulty);
+  seedPuzzle(code) {
+    const { seed: number, difficulty: level } = this.parseSeedCode(code);
     const json = Module.ccall(
       "game_generate",
       "string",
@@ -79,15 +91,20 @@ window.TriShare = {
       difficulty: level,
     };
   },
+  fromText(text) {
+    const input = text.trim();
+    if (!input) throw Error(TriCopy.t("share.invalid-seed-link"));
+    if (!input.includes("://") && !input.startsWith("#")) return this.seedPuzzle(input);
+    const url = new URL(input, this.base);
+    if (!["https:", "http:"].includes(url.protocol)) throw Error(TriCopy.t("share.invalid-puzzle-link"));
+    const params = new URLSearchParams(url.hash.slice(1));
+    if (params.has("seed")) return this.seedPuzzle(params.get("seed"));
+    if (params.has("p")) return this.decode(params.get("p"));
+    throw Error(TriCopy.t("share.invalid-puzzle-link"));
+  },
   url(puzzle) {
-    if (Number.isInteger(puzzle.seed) && Number.isInteger(puzzle.difficulty))
-      return (
-        this.base +
-        "#seed=" +
-        (puzzle.seed >>> 0).toString(16) +
-        "&difficulty=" +
-        ["easy", "medium", "hard", "impossible", "sprout"][puzzle.difficulty]
-      );
+    const code = this.seedCode(puzzle.seed, puzzle.difficulty);
+    if (code) return this.base + "#seed=" + code;
     return this.base + "#p=" + this.encode(puzzle);
   },
 };
