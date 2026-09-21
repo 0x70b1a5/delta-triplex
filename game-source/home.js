@@ -36,7 +36,7 @@
   }
   window.triHomeLayout = () => {
     for (const scene of scenes) {
-      const buttons = [...scene.querySelectorAll("button:not(#home-back):not(#past-puzzles)")];
+      const buttons = [...scene.querySelectorAll("button:not(#home-back):not(.home-up)")];
       let rows = 3;
       while (rows * (rows - 1) / 2 - 1 < buttons.length) rows++;
       scene.dataset.rows = rows;
@@ -54,8 +54,10 @@
           if (!button) { down.className = "home-filler"; down.setAttribute("aria-hidden", "true"); scene.append(down); }
           cell(down, x, row / rows, row);
           if (col < rows - row - 1) {
-            const up = scene.id === "home-main" && row === rows - 2 && col === 0 ? el("past-puzzles") : document.createElement("i");
-            if (up.id !== "past-puzzles") { up.className = "home-filler home-up"; up.setAttribute("aria-hidden", "true"); }
+            const up = scene.id === "home-main" && col === 0
+              ? row === rows - 2 ? el("past-puzzles") : row === 1 ? el("home-settings") : document.createElement("i")
+              : document.createElement("i");
+            if (!up.matches("button")) { up.className = "home-filler home-up"; up.setAttribute("aria-hidden", "true"); }
             scene.append(up); cell(up, x + .5 / rows, row / rows, row);
           }
         }
@@ -64,6 +66,7 @@
       if (credit) cell(credit, (rows - 1) / (2 * rows), (rows - 1) / rows, rows - 1);
       fitLabels(scene);
     }
+    window.triMenuBackground?.();
     const view = home.dataset.view;
     if (view === "calendar") {
       const back = el("home-back");
@@ -173,7 +176,7 @@
       }
     }
     previous = now;
-    flash(); drawZoom(now);
+    flash(); drawZoom(now); window.triMenuBackground?.(elapsed);
     frame = requestAnimationFrame(tick);
   }
   window.triHomeChanged = () => {

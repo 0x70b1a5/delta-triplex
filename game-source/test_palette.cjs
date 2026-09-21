@@ -101,7 +101,7 @@ for (const mode of ['system', 'light', 'dark', 'colorful']) {
   for (const node of home.querySelectorAll('[data-row]')) {
     const glow = +node.style.getPropertyValue('--row-glow');
     if (glow > 0 && mode === 'colorful') {
-      const base = home.style.getPropertyValue(node.classList.contains('home-banner') ? '--cell' : node.closest('#home-main') && node.classList.contains('home-up') ? '--home-dim' : '--empty');
+      const base = home.style.getPropertyValue(node.classList.contains('home-banner') ? '--cell' : node.classList.contains('home-up') ? '--home-dim' : '--empty');
       assert.equal(node.style.getPropertyValue('--flash-fill'), P.mix(base, '#ffffff', glow), 'colorful menu flashes white');
     }
   }

@@ -10,12 +10,29 @@ const menu = el("puzzle-menu");
 
 el("menu-tools").append(el("utilities"));
 el("utilities").hidden = false;
+let homeMenuState = null;
 function toggleMenu(open) {
+  const fromHome = open && !el("home").hidden;
+  const returnToHome = !!homeMenuState;
+  if (homeMenuState && !fromHome) {
+    for (const [control, disabled] of homeMenuState.controls) control.disabled = disabled;
+    el("editor-settings").hidden = homeMenuState.settingsHidden;
+    homeMenuState = null;
+  }
+  if (fromHome && !homeMenuState) {
+    const controls = [...menu.querySelectorAll('#return-home, #editor-open, #editor-settings input, #editor-settings select, #editor-settings button')];
+    homeMenuState = { controls: controls.map(control => [control, control.disabled]), settingsHidden: el("editor-settings").hidden };
+    controls.forEach(control => { control.disabled = true; });
+    el("editor-settings").hidden = false;
+  }
   menu.hidden = !open;
-  el("menu-toggle").setAttribute("aria-expanded", String(open));
-  (open ? el("menu-close") : el("menu-toggle")).focus();
+  el("home").inert = fromHome;
+  el("home-settings").setAttribute("aria-expanded", String(fromHome));
+  el("menu-toggle").setAttribute("aria-expanded", String(open && !fromHome));
+  (open ? el("menu-close") : returnToHome ? el("home-settings") : el("menu-toggle")).focus();
   window.triSyncHistory?.();
 }
+el("home-settings").onclick = () => toggleMenu(true);
 el("menu-toggle").onclick = () => toggleMenu(menu.hidden);
 el("menu-close").onclick = () => toggleMenu(false);
 el("replay").onclick = () => {
@@ -128,7 +145,7 @@ window.triCustomState = (next) => {
   const active = !!next.custom;
   workshop.hidden = !active;
   el("workshop-actions").hidden = !active;
-  settings.hidden = !active;
+  settings.hidden = !active && !homeMenuState;
   if (!active || !currentPuzzle) {
     el("reset").title = TriCopy.t("ui.reset-r-undo-restores-it");
     return;
@@ -152,7 +169,7 @@ window.triCustomState = (next) => {
   el("editor-test").textContent = next.editing ? TriCopy.t("editor.try") : TriCopy.t("editor.edit");
   el("editor-name").value = currentPuzzle.name;
   el("editor-size").value = String(next.n);
-  el("editor-size").disabled = !next.editing;
+  el("editor-size").disabled = !!homeMenuState || !next.editing;
   el("reset").title = next.editing
     ? TriCopy.t("editor.clear-solution-r-undo-restores-it")
     : TriCopy.t("ui.reset-r-undo-restores-it");

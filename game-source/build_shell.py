@@ -43,7 +43,7 @@ def build_shell(locale="en"):
     # Prevent catalog text from terminating its script element in standalone HTML.
     catalog = json.dumps({"locale": locale, "messages": messages}, ensure_ascii=False).replace("<", "\\u003c")
     shell = shell.replace("{{COPY_CATALOG}}", catalog)
-    for name in ("copy.js", "palette.js", "share.js", "app.js", "editor.js", "theme-welcome.js", "flow.js", "calendar.js", "tutorial-intro.js", "back.js", "rotate.js", "home.js"):
+    for name in ("copy.js", "palette.js", "share.js", "app.js", "editor.js", "theme-welcome.js", "flow.js", "calendar.js", "tutorial-intro.js", "back.js", "rotate.js", "menu-background.js", "home.js"):
         shell = shell.replace(f'<script src="{name}"></script>', '<script>\n' + (ROOT / name).read_text() + '\n</script>')
     shell = shell.replace('fonts/Michroma.ttf', 'data:font/ttf;base64,' + base64.b64encode((ROOT / 'fonts/Michroma.ttf').read_bytes()).decode())
     shell = shell.replace('../public/favicon.svg', 'data:image/svg+xml;base64,' + base64.b64encode((ROOT.parent / 'public/favicon.svg').read_bytes()).decode())

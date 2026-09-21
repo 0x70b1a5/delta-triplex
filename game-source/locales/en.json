@@ -256,5 +256,6 @@
   "intro.rotate": "Rotate",
   "intro.up-left": "up and left",
   "intro.up-right": "up and right",
-  "intro.down-left": "down and left"
+  "intro.down-left": "down and left",
+  "home.settings": "Settings"
 }

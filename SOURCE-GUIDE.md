@@ -9,6 +9,7 @@ The rotating nonogram design is now the main application. See [game-source/READM
 
 - `game-source/tutorial-intro.js`: four visual onboarding screens, shared five-row example, clue halos, deduction steps and rotation preview. Copy lives under `intro.*` in the locale catalog.
 - `game-source/calendar.js`: display-only daily archive, triangular date layout and month/year selection.
+- `game-source/menu-background.js`: three crisp overlapping triangular lattice fields behind all menus, driven by the shared menu animation clock.
 - `game-source/home.js`: triangle menu layout, submenu zoom transitions, row flashes, isolated hue animation and reduced-motion handling.
 - `game-source/rotate.js`: SVG board, responsive clue placement, rotation gestures, timing and result sharing.
 - `game-source/src/main.c`: C engine API, canonical cell snapshots, undo/saves, ripples, solved-row flashes and victory animation timing.

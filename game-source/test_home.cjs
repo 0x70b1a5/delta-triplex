@@ -11,7 +11,7 @@ for (const reducedMotion of [false, true]) {
   const after = home.style.getPropertyValue('--bg') + home.style.getPropertyValue('--cell');
   assert.equal(before, after, 'homepage base colours remain monochrome');
   assert.equal(h.d.documentElement.style.cssText, gameColours, 'homepage flashes do not change game colours');
-  assert.equal(h.d.querySelectorAll('#home-main button').length, 6);
+  assert.equal(h.d.querySelectorAll('#home-main button').length, 7);
   assert.equal(h.d.querySelector('.home-credit').href, 'https://lovecrypt.itch.io/');
   h.click('past-puzzles'); assert.equal(home.dataset.view, 'calendar');
   h.click('home-back'); assert.equal(home.dataset.view, 'main');
@@ -137,3 +137,77 @@ console.log('PASS: submenu zoom endpoints/midpoint/reverse, input guard, back ti
   h.close();
 }
 console.log('PASS: tip-first shared-edge flash sequence, upward fillers and wraparound.');
+
+// Shared shutter backdrop: three opaque clipped fields, independent movement,
+// and no decorative animation when motion is reduced or play is open.
+for (const reducedMotion of [false,true]) {
+  const h=harness(source,'https://tri.test/',{}, {reducedMotion});
+  const backdrop=h.d.getElementById('menu-background');
+  assert.equal(backdrop.getAttribute('aria-hidden'),'true');
+  const fields=[...backdrop.querySelectorAll('[data-menu-field]')];
+  assert.equal(fields.length,3);
+  for(const field of fields) {
+    assert(field.getAttribute('clip-path'));
+    assert.equal(field.children[0].getAttribute('fill'),'var(--bg)');
+    assert(field.children[1].getAttribute('fill').startsWith('url(#menu-lattice-'));
+  }
+  const transforms=()=>[...backdrop.querySelectorAll('pattern')].map(p=>p.getAttribute('patternTransform'));
+  const before=transforms(); h.frame(50);h.frame(50);
+  if(reducedMotion)assert.deepEqual(transforms(),before);
+  else for(let i=0;i<3;i++)assert.notEqual(transforms()[i],before[i]);
+  for(const path of backdrop.querySelectorAll('pattern path')) assert.equal(path.getAttribute('stroke'),'var(--empty)');
+  const main=h.d.getElementById('home-main');
+  Object.defineProperties(main,{offsetWidth:{value:600},offsetHeight:{value:500},offsetTop:{value:30}});
+  h.w.triMenuBackground(10);
+  const positions=()=>transforms().map(t=>t.match(/translate\(([^)]+)\)/)[1].split(' ').map(Number));
+  const start=positions(); h.w.triMenuBackground(11);
+  positions().forEach((p,i)=>assert(Math.abs(Math.hypot(p[0]-start[i][0],p[1]-start[i][1])-15)<1e-6,'fivefold drift: 15 pixels per second'));
+  const travel=positions().map((p,i)=>p.map((v,axis)=>v-start[i][axis]));
+  assert(travel[0][0]<0 && travel[0][1]===0,'top field travels left');
+  assert(travel[1][0]>0 && travel[1][1]<0,'bottom-right field travels up and right');
+  assert(travel[2][0]>0 && travel[2][1]>0,'bottom-left field follows its menu edge down and right');
+  const width=+backdrop.getAttribute('viewBox').split(' ')[2], left=(width-600)/2;
+  const edges=[[[left,30],[left+600,30]],[[left+600,30],[left+300,530]],[[left,30],[left+300,530]]];
+  for(const pattern of backdrop.querySelectorAll('pattern')) {
+    assert.equal(+pattern.getAttribute('x'),left,'lattice shares the menu origin');
+    assert.equal(+pattern.getAttribute('y'),30);
+    const tileWidth=+pattern.getAttribute('width'),tileHeight=+pattern.getAttribute('height');
+    assert(Math.abs(tileHeight/tileWidth-2*500/600)<1e-6,'diagonal grid lines match menu edge slopes');
+    assert.equal(tileWidth*2*(+main.dataset.rows),600,'two grid subdivisions per menu cell');
+  }
+  [...backdrop.querySelectorAll('clipPath polygon')].forEach((polygon,i)=>{
+    const [a,b]=polygon.getAttribute('points').split(' ').map(p=>p.split(',').map(Number));
+    for(const p of edges[i])assert(Math.abs((b[0]-a[0])*(p[1]-a[1])-(b[1]-a[1])*(p[0]-a[0]))<1e-5,'field boundary lies on the menu edge');
+  });
+  h.click('past-puzzles');assert(!h.d.getElementById('home').hidden);
+  assert.equal(h.d.querySelectorAll('#menu-background').length,1);
+  h.startPuzzle();const paused=transforms();h.frame(100);assert.deepEqual(transforms(),paused);
+  h.close();
+}
+console.log('PASS: opaque three-field menu backdrop, shared archive background, independent drift and motion pause.');
+
+{
+  const h=harness(source), {d,w}=h, get=id=>d.getElementById(id);
+  const settings=get('home-settings');
+  assert(settings.classList.contains('home-up'));
+  assert.equal(settings.style.getPropertyValue('--x'),'25%');
+  const initial=JSON.stringify(h.state);
+  h.click('home-settings');
+  assert(!get('puzzle-menu').hidden && get('home').inert);
+  assert(!get('editor-settings').hidden);
+  for(const id of ['return-home','editor-open','editor-name','editor-size','editor-export','editor-json','editor-share'])assert(get(id).disabled,id+' is unavailable from home');
+  for(const id of ['theme-mode','background-color','cell-color','sound-master','sound-music','sound-sfx'])assert(!get(id).disabled,id+' remains available');
+  h.click('editor-open');assert.equal(JSON.stringify(h.state),initial);
+  get('theme-mode').value='dark';get('theme-mode').dispatchEvent(new w.Event('change'));
+  assert(!get('puzzle-menu').hidden);
+  d.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));h.frame();
+  assert(get('puzzle-menu').hidden && !get('home').inert);
+  assert.equal(d.activeElement,settings);
+  assert(!get('editor-open').disabled && !get('return-home').disabled);
+  h.startPuzzle();h.click('menu-toggle');
+  assert(!get('return-home').disabled && !get('editor-open').disabled);
+  h.click('menu-close');h.click('return-home');h.click('home-settings');h.click('menu-close');
+  assert(!get('home').inert);
+  h.close();
+}
+console.log('PASS: upward Settings entry, home-only disabled actions, live appearance/sound controls and restored game menu.');
