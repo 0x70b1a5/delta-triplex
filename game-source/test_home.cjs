@@ -194,7 +194,7 @@ console.log('PASS: opaque three-field menu backdrop, shared archive background, 
   const initial=JSON.stringify(h.state);
   h.click('home-settings');
   assert(!get('puzzle-menu').hidden && get('home').inert);
-  assert(!get('editor-settings').hidden);
+  for(const id of ['return-home','menu-create','editor-settings'])assert(get(id).hidden,id+' is hidden from home');
   for(const id of ['return-home','editor-open','editor-name','editor-size','editor-export','editor-json','editor-share'])assert(get(id).disabled,id+' is unavailable from home');
   for(const id of ['theme-mode','background-color','cell-color','sound-master','sound-music','sound-sfx'])assert(!get(id).disabled,id+' remains available');
   h.click('editor-open');assert.equal(JSON.stringify(h.state),initial);
@@ -204,10 +204,11 @@ console.log('PASS: opaque three-field menu backdrop, shared archive background, 
   assert(get('puzzle-menu').hidden && !get('home').inert);
   assert.equal(d.activeElement,settings);
   assert(!get('editor-open').disabled && !get('return-home').disabled);
+  assert(!get('menu-create').hidden && !get('return-home').hidden);
   h.startPuzzle();h.click('menu-toggle');
   assert(!get('return-home').disabled && !get('editor-open').disabled);
   h.click('menu-close');h.click('return-home');h.click('home-settings');h.click('menu-close');
   assert(!get('home').inert);
   h.close();
 }
-console.log('PASS: upward Settings entry, home-only disabled actions, live appearance/sound controls and restored game menu.');
+console.log('PASS: upward Settings entry, home-only hidden sections, live appearance/sound controls and restored game menu.');

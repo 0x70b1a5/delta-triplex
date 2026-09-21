@@ -16,14 +16,15 @@ function toggleMenu(open) {
   const returnToHome = !!homeMenuState;
   if (homeMenuState && !fromHome) {
     for (const [control, disabled] of homeMenuState.controls) control.disabled = disabled;
-    el("editor-settings").hidden = homeMenuState.settingsHidden;
+    for (const [section, hidden] of homeMenuState.sections) section.hidden = hidden;
     homeMenuState = null;
   }
   if (fromHome && !homeMenuState) {
     const controls = [...menu.querySelectorAll('#return-home, #editor-open, #editor-settings input, #editor-settings select, #editor-settings button')];
-    homeMenuState = { controls: controls.map(control => [control, control.disabled]), settingsHidden: el("editor-settings").hidden };
+    homeMenuState = { controls: controls.map(control => [control, control.disabled]),
+      sections: ["return-home", "menu-create", "editor-settings"].map(id => [el(id), el(id).hidden]) };
     controls.forEach(control => { control.disabled = true; });
-    el("editor-settings").hidden = false;
+    for (const [section] of homeMenuState.sections) section.hidden = true;
   }
   menu.hidden = !open;
   el("home").inert = fromHome;
@@ -145,7 +146,7 @@ window.triCustomState = (next) => {
   const active = !!next.custom;
   workshop.hidden = !active;
   el("workshop-actions").hidden = !active;
-  settings.hidden = !active && !homeMenuState;
+  settings.hidden = !active || !!homeMenuState;
   if (!active || !currentPuzzle) {
     el("reset").title = TriCopy.t("ui.reset-r-undo-restores-it");
     return;
