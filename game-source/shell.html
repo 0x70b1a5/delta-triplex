@@ -692,8 +692,12 @@
         min-height: 32px;
         padding: 6px 9px;
       }
+      #puzzle-menu label[for="clue-style"][hidden] { display: none; }
+      @media (min-width: 900px) {
+        #puzzle-menu label[for="clue-style"] { display: none; }
+      }
       #editor-settings input,
-      #editor-settings select, #theme-mode {
+      #editor-settings select, #theme-mode, #clue-style {
         font: inherit;
         color: var(--ink);
         background: var(--surface);
@@ -969,6 +973,7 @@
       #rotate-board polygon { cursor: pointer; }
       #rotate-board text { font-family: system-ui, sans-serif; font-variant-numeric: tabular-nums; pointer-events: none; }
       #rotate-board text[data-axis] { fill: var(--cell); }
+      #rotate-board path[data-rail] { fill: none; pointer-events: none; stroke-linecap: round; stroke-linejoin: round; }
       #session-bar { position: fixed; top: 14px; left: 24px; right: 20px; display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--muted); font-size: 12px; }
       #session-clock { font-variant-numeric: tabular-nums; white-space: nowrap; }
       #turn-controls { display: flex; align-items: center; gap: 6px; }
@@ -1263,6 +1268,12 @@
           <option value="light">{{copy:theme.light.label}}</option>
           <option value="dark">{{copy:theme.dark.label}}</option>
           <option value="colorful">{{copy:theme.colorful.label}}</option>
+        </select>
+      </label>
+      <label for="clue-style">{{copy:ui.clueStyle}}
+        <select id="clue-style">
+          <option value="corner" selected>{{copy:ui.clueStyle.corner}}</option>
+          <option value="curve">{{copy:ui.clueStyle.curve}}</option>
         </select>
       </label>
       <label for="background-color">{{copy:ui.background}}

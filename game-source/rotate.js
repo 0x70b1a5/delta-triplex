@@ -158,6 +158,22 @@
     if (text !== undefined) item.textContent = text;
     return item;
   }
+  function exitSegment(cell, n, outward) {
+    const idx = cell.o
+      ? [[cell.i + 1, cell.j], [cell.i, cell.j + 1], [cell.i + 1, cell.j + 1]]
+      : [[cell.i, cell.j], [cell.i, cell.j + 1], [cell.i + 1, cell.j]];
+    const center = mean(corners(cell, n));
+    let best = null, bestDot = -Infinity;
+    for (let k = 0; k < 3; k++) {
+      const a = idx[k], b = idx[(k + 1) % 3];
+      if (!((a[0] === 0 && b[0] === 0) || (a[1] === 0 && b[1] === 0) || (a[0] + a[1] === n && b[0] + b[1] === n))) continue;
+      const edge = [vertex(a[0], a[1], n), vertex(b[0], b[1], n)];
+      const mid = mean(edge);
+      const score = (mid[0] - center[0]) * outward[0] + (mid[1] - center[1]) * outward[1];
+      if (score > bestDot) { best = edge; bestDot = score; }
+    }
+    return best;
+  }
   function clueRows(angle, desktop) {
     // Start-end directions of the canonical strips, through their end-cell centroids.
     const directions = [[.5, -SQRT3 / 2], [-.5, -SQRT3 / 2], [-1, 0]];
@@ -182,10 +198,80 @@
         const edge = center.map((v, a) => v + distance * outward[a]);
         const runs = state.clues[axis][row].runs.length ? [...state.clues[axis][row].runs] : [0];
         if (first) runs.reverse();
-        result.push({ axis, row, center, edge, outward, runs });
+        const segment = exitSegment(endpoint, state.n, outward) || [edge, edge];
+        result.push({ axis, row, center, edge, outward, runs, segment });
       }
     }
     return result;
+  }
+  // Phone columns are a full rank wide, so one line is the right side of one
+  // rank and the left side of the next. A 60° turn from vertical onto the rank
+  // puts that line half a radius to the right of the vertex it meets.
+  let columnStyle = "corner";
+  try {
+    const saved = localStorage.getItem("delta-triplex-clue-style");
+    if (saved === "corner" || saved === "curve") columnStyle = saved;
+  } catch {}
+  // Center spacing is three times the previous pitch. The inner numeral keeps
+  // its original offset from the corner joint the rail already measures.
+  function columnMetrics(font) {
+    const pitch = font * 1.12;
+    const gap = Math.max(4, font * .42);
+    const tail = font * .55;
+    const offset = i => gap + (i * 3 + .5) * pitch;
+    return { pitch, gap, tail, offset, reach: count => offset(count - 1) + pitch * .5 + tail };
+  }
+  function columnBands(clues, angle, font) {
+    const radius = .8 * 2 / state.n;
+    const shift = radius / 2;
+    const corner = columnStyle === "corner";
+    const rise = corner ? radius / (2 * Math.sqrt(3)) : radius * Math.sqrt(3) / 2;
+    const { pitch, gap, offset, reach } = columnMetrics(font);
+    const textHalf = value => font * .36 * String(value).length;
+    const grouped = [[], []];
+    for (const clue of clues) {
+      const seg = clue.segment.map(p => rotatePoint(p, angle));
+      const O = rotatePoint(clue.outward, angle);
+      grouped[O[1] > 0 ? 1 : 0].push({ ...clue, seg, O, mid: mean(seg) });
+    }
+    const constraints = [];
+    const sides = [];
+    grouped.forEach((items, index) => {
+      if (!items.length) return;
+      const below = index === 1;
+      const sign = below ? 1 : -1;
+      items.sort((a, b) => a.mid[0] - b.mid[0]);
+      const verts = [];
+      for (const item of items) for (const point of item.seg)
+        if (!verts.some(other => Math.hypot(other[0] - point[0], other[1] - point[1]) < 1e-5)) verts.push(point);
+      verts.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      items.forEach((item, rank) => {
+        const pair = [verts[rank], verts[rank + 1]];
+        const cornerY = below ? Math.max(pair[0][1], pair[1][1]) : Math.min(pair[0][1], pair[1][1]);
+        item.anchor = cornerY + sign * rise;
+        item.reach = reach(item.runs.length);
+        item.numX = (pair[0][0] + pair[1][0]) / 2 + shift;
+        item.runs.forEach((value, i) => {
+          const half = textHalf(value);
+          constraints.push({
+            p: [item.numX, item.anchor], extra: [0, sign * offset(i)],
+            min: [-half, -font / 2], max: [half, font / 2],
+          });
+        });
+      });
+      const lines = verts.map((vertex, line) => {
+        const x = vertex[0] + shift;
+        const neighbors = [];
+        if (line > 0) neighbors.push(items[line - 1]);
+        if (line < items.length) neighbors.push(items[line]);
+        for (const item of neighbors) constraints.push({
+          p: [x, item.anchor], extra: [0, sign * item.reach], min: [0, 0], max: [0, 0],
+        });
+        return { vertex, x, line, neighbors };
+      });
+      sides.push({ below, sign, O: items[0].O, rise, radius, gap, pitch, offset, lines, items, corner });
+    });
+    return { constraints, sides };
   }
   function clueAnchor(desktop, direction, font, value) {
     const right = desktop && direction[0] < 0;
@@ -197,11 +283,12 @@
       max: [right ? 0 : width, top ? font : 0],
     };
   }
-  function pose(angle, desktop, font, withClues) {
+  function pose(angle, desktop, font, withClues, columns) {
     const outer = [vertex(0, 0, state.n), vertex(state.n, 0, state.n), vertex(0, state.n, state.n)].map(p => rotatePoint(p, angle));
     const clues = withClues ? clueRows(angle, desktop) : [];
     const constraints = outer.map(p => ({ p, extra: [0, 0], min: [0, 0], max: [0, 0] }));
-    for (const clue of clues) {
+    if (columns && clues.length) constraints.push(...columnBands(clues, angle, font).constraints);
+    else for (const clue of clues) {
       const direction = rotatePoint(clue.outward, angle);
       clue.runs.forEach((value, i) => constraints.push({
         p: rotatePoint(clue.edge, angle), extra: direction.map(v => v * (font + i * font * 1.5)),
@@ -211,10 +298,10 @@
     return { clues, constraints };
   }
   let layoutCache = null;
-  function fitBoard(width, height, base, desktop, font, solved) {
-    const key = JSON.stringify([width, height, base, font, solved, state.n, state.clues.map(axis => axis.map(row => row.runs))]);
+  function fitBoard(width, height, base, desktop, font, solved, columns) {
+    const key = JSON.stringify([width, height, base, font, solved, !!columns, columnStyle, state.n, state.clues.map(axis => axis.map(row => row.runs))]);
     if (layoutCache?.key === key) return layoutCache;
-    const poses = [0, 120, 240].map(turn => pose(base + turn, desktop, font, !solved));
+    const poses = [0, 120, 240].map(turn => pose(base + turn, desktop, font, !solved, columns));
     const constraints = poses.flatMap(p => p.constraints);
     // Fit the whole composition, allowing translation as well as scale. Every
     // pair of bounds limits scale independently of where the pivot is placed.
@@ -251,14 +338,49 @@
     if (progress === 1) finishAnimation();
     return eased;
   }
+  let mobileChoice = null;
+  function widestRun() {
+    let digits = 1;
+    for (const axis of state.clues) for (const row of axis) for (const run of (row.runs.length ? row.runs : [0]))
+      digits = Math.max(digits, String(run).length);
+    return digits;
+  }
+  function chooseMobileLayout(width, height, base) {
+    const key = JSON.stringify([width, height, base, columnStyle, state.n, state.clues.map(axis => axis.map(row => row.runs))]);
+    if (mobileChoice?.key === key) return mobileChoice;
+    const digits = widestRun();
+    const pack = columns => {
+      const roomy = font => {
+        const scale = fitBoard(width, height, base, false, font, false, columns).scale;
+        const textWidth = font * .72 * digits;
+        return scale >= 1 && (!columns || textWidth <= scale * SQRT3 / state.n * .8);
+      };
+      const maxScale = fitBoard(width, height, base, false, 8, false, columns).scale;
+      let font = 8;
+      for (let candidate = columns ? 18 : 20; candidate >= 8; candidate--) {
+        const scale = fitBoard(width, height, base, false, candidate, false, columns).scale;
+        if (scale + 1e-6 >= maxScale * .97 && roomy(candidate)) { font = candidate; break; }
+      }
+      return { columns, font, scale: fitBoard(width, height, base, false, font, false, columns).scale };
+    };
+    const stacked = pack(true), diagonal = pack(false);
+    // Columns are the portrait layout. Keep diagonals when they leave larger cells,
+    // which is the short, wide case where a column band would steal the scarce height.
+    const choice = stacked.scale >= diagonal.scale - .25 ? stacked : diagonal;
+    mobileChoice = { key, ...choice };
+    return mobileChoice;
+  }
   function layout(width, height) {
     const desktop = window.innerWidth >= 900;
     const base = desktop ? 0 : -90;
     const angle = base + visualTurn + preview;
     const maxRuns = Math.max(1, ...state.clues.flat().map(line => line.runs.length));
-    const font = Math.max(8, Math.min(20, width / (state.n * 2.5), (height - 80) / (2.8 * maxRuns)));
     const solved = state.won && !state.editing;
-    const fitted = fitBoard(width, height, base, desktop, font, solved);
+    let font, columns = false;
+    if (desktop) font = Math.max(8, Math.min(20, width / (state.n * 2.5), (height - 80) / (2.8 * maxRuns)));
+    else if (solved) font = 8;
+    else ({ font, columns } = chooseMobileLayout(width, height, base));
+    const fitted = fitBoard(width, height, base, desktop, font, solved, columns);
     const resting = fitted.poses[view];
     const moving = animation !== null || preview !== 0;
     const restingScale = fitted.scale, center = fitted.center;
@@ -272,8 +394,74 @@
       }
     }
     const toScreen = p => rotatePoint(p, angle).map((v, axis) => center[axis] + v * scale);
-    return { width, height, desktop, angle, scale, center, font, toScreen, clues: moving ? [] : resting.clues,
+    return { width, height, desktop, angle, scale, center, font, columns, toScreen, clues: moving ? [] : resting.clues,
       moving, outer: vertices.map(toScreen) };
+  }
+  function drawColumns(fragment, geometry, cellColor) {
+    const place = (p, extra = [0, 0]) => [
+      geometry.center[0] + p[0] * geometry.scale + extra[0],
+      geometry.center[1] + p[1] * geometry.scale + extra[1],
+    ];
+    const { sides } = columnBands(geometry.clues, geometry.angle, geometry.font);
+    const defs = node("defs", {});
+    fragment.append(defs);
+    const font = geometry.font;
+    for (const side of sides) {
+      const sideName = side.below ? "below" : "above";
+      for (const line of side.lines) {
+        const start = place([line.x, line.vertex[1] + side.sign * side.rise]);
+        const far = place([line.x, line.neighbors[0].anchor], [0, side.sign * line.neighbors[0].reach]);
+        for (const item of line.neighbors) {
+          const y = place([line.x, item.anchor], [0, side.sign * item.reach])[1];
+          if (side.below ? y > far[1] : y < far[1]) far[1] = y;
+        }
+        const end = place(line.vertex);
+        const id = `clue-line-${sideName}-${line.line}`;
+        const span = Math.abs(far[1] - start[1]) || 1;
+        const solidAt = Math.min(.8, font * .62 / span);
+        const gradient = node("linearGradient", {
+          id, gradientUnits: "userSpaceOnUse", x1: 0, y1: far[1], x2: 0, y2: start[1],
+        });
+        for (const [offset, opacity] of [["0", "0"], [solidAt.toFixed(4), "1"], ["1", "1"]])
+          gradient.append(node("stop", { offset, "stop-color": cellColor, "stop-opacity": opacity }));
+        defs.append(gradient);
+        const attrs = {
+          fill: "none", stroke: `url(#${id})`, "stroke-width": Math.max(1.2, font / 11),
+          "stroke-linecap": "round", "stroke-linejoin": "round", "pointer-events": "none",
+          "data-rail": line.line, "data-side": sideName, "data-style": side.corner ? "corner" : "curve",
+          "data-direction-x": side.O[0], "data-direction-y": side.O[1],
+          "data-far-x": far[0], "data-far-y": far[1],
+          "data-near-x": start[0], "data-near-y": start[1],
+          "data-end-x": end[0], "data-end-y": end[1],
+        };
+        if (side.corner) attrs.d = `M ${far[0]} ${far[1]} L ${start[0]} ${start[1]} L ${end[0]} ${end[1]}`;
+        else {
+          const center = place([line.vertex[0] - side.radius / 2, line.vertex[1] + side.sign * side.rise]);
+          const rs = [start[0] - center[0], start[1] - center[1]];
+          const re = [end[0] - center[0], end[1] - center[1]];
+          // Positive cross is clockwise in this y-down plane, which is SVG sweep 1.
+          // The other flag draws the arc around the point instead of along the rank.
+          const sweep = rs[0] * re[1] - rs[1] * re[0] > 0 ? 1 : 0;
+          const radius = side.radius * geometry.scale;
+          attrs.d = `M ${far[0]} ${far[1]} L ${start[0]} ${start[1]} A ${radius} ${radius} 0 0 ${sweep} ${end[0]} ${end[1]}`;
+          attrs["data-cx"] = center[0]; attrs["data-cy"] = center[1]; attrs["data-radius"] = radius;
+        }
+        fragment.append(node("path", attrs));
+      }
+      for (const item of side.items) {
+        const center = geometry.toScreen(item.center);
+        item.runs.forEach((value, i) => {
+          const at = place([item.numX, item.anchor], [0, side.sign * side.offset(i)]);
+          fragment.append(node("text", {
+            x: at[0], y: at[1], "text-anchor": "middle", "dominant-baseline": "central", "font-size": font,
+            fill: "var(--cell)", "data-column": "1", "data-side": sideName,
+            "data-axis": item.axis, "data-row": item.row, "data-run": i,
+            "data-direction-x": side.O[0], "data-direction-y": side.O[1],
+            "data-center-x": center[0], "data-center-y": center[1],
+          }, value));
+        });
+      }
+    }
   }
   window.triPuzzleHue = () => window.triMenuOpen || state?.editing ? 0 : visualTurn + preview;
   window.triDrawBoard = () => {
@@ -314,21 +502,24 @@
       fragment.append(polygon);
       if (cell.state === 2) fragment.append(node("text", { x: mid[0], y: mid[1], "text-anchor": "middle", "dominant-baseline": "central", "font-size": Math.max(9, Math.min(20, geometry.scale / state.n / 2)), fill: TriPalette.ink(TriPalette.mix(style.getPropertyValue("--bg"), glow > 0 ? fill : colours[0], .5)) }, "×"));
     });
-    if (!state.won || state.editing) for (const clue of geometry.clues) {
-      const edge = geometry.toScreen(clue.edge), center = geometry.toScreen(clue.center);
-      const direction = rotatePoint(clue.outward, geometry.angle);
-      clue.runs.forEach((value, i) => {
-        const alignment = clueAnchor(geometry.desktop, direction, geometry.font, value);
-        fragment.append(node("text", {
-        x: edge[0] + direction[0] * (geometry.font + i * geometry.font * 1.5),
-        y: edge[1] + direction[1] * (geometry.font + i * geometry.font * 1.5),
-        "text-anchor": alignment.anchor, "dominant-baseline": alignment.baseline, "font-size": geometry.font,
-        fill: "var(--cell)",
-        "data-axis": clue.axis, "data-row": clue.row, "data-run": i,
-        "data-center-x": center[0], "data-center-y": center[1],
-        "data-direction-x": direction[0], "data-direction-y": direction[1],
-      }, value));
-      });
+    if (!state.won || state.editing) {
+      if (geometry.columns) drawColumns(fragment, geometry, colours[1] || "#ffffff");
+      else for (const clue of geometry.clues) {
+        const edge = geometry.toScreen(clue.edge), center = geometry.toScreen(clue.center);
+        const direction = rotatePoint(clue.outward, geometry.angle);
+        clue.runs.forEach((value, i) => {
+          const alignment = clueAnchor(geometry.desktop, direction, geometry.font, value);
+          fragment.append(node("text", {
+          x: edge[0] + direction[0] * (geometry.font + i * geometry.font * 1.5),
+          y: edge[1] + direction[1] * (geometry.font + i * geometry.font * 1.5),
+          "text-anchor": alignment.anchor, "dominant-baseline": alignment.baseline, "font-size": geometry.font,
+          fill: "var(--cell)",
+          "data-axis": clue.axis, "data-row": clue.row, "data-run": i,
+          "data-center-x": center[0], "data-center-y": center[1],
+          "data-direction-x": direction[0], "data-direction-y": direction[1],
+        }, value));
+        });
+      }
     }
     svg.replaceChildren(fragment);
     el("turn-left").disabled = el("turn-right").disabled = !!animation;
@@ -454,6 +645,21 @@
     try { await navigator.clipboard.writeText(text); toast(TriCopy.t("rotate.result-and-puzzle-link-copied")); }
     catch { copyPanel.hidden = false; el("result-text").value = text; el("result-text").focus(); el("result-text").select(); }
   };
+  const clueStyle = document.getElementById("clue-style");
+  if (clueStyle) {
+    clueStyle.value = columnStyle;
+    const phoneClueLabel = clueStyle.closest("label");
+    const syncPhoneClueSetting = () => { if (phoneClueLabel) phoneClueLabel.hidden = window.innerWidth >= 900; };
+    syncPhoneClueSetting();
+    window.addEventListener("resize", syncPhoneClueSetting);
+    clueStyle.addEventListener("change", () => {
+      columnStyle = clueStyle.value === "corner" ? "corner" : "curve";
+      try { localStorage.setItem("delta-triplex-clue-style", columnStyle); } catch {}
+      layoutCache = null;
+      mobileChoice = null;
+      requestFrame();
+    });
+  }
   // Read-only hooks for deterministic prototype regression tests.
   window.TriRotation = { formatTime, get stats() { return { view, elapsed, turns, running, finished, animating: !!animation }; }, get geometry() { return geometry; } };
   if (state) { window.triRotateState(state, null); requestFrame(); }

@@ -22,6 +22,113 @@ const { harness, source } = require("./test_rotation_harness.cjs");
     pointer("pointerup", board, 200, 200, 1, { button: tool });
   }
   const axes = () => new Set([...board.querySelectorAll("text[data-axis]")].map(e => Number(e.dataset.axis)));
+  function orient(a, b, c) { return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]); }
+  function insideTriangle(p, verts) {
+    const signs = [[verts[0], verts[1]], [verts[1], verts[2]], [verts[2], verts[0]]].map(([a, b]) => orient(a, b, p));
+    return signs.every(v => v > 1) || signs.every(v => v < -1);
+  }
+  function unit(a, b) {
+    const dx = b[0] - a[0], dy = b[1] - a[1], length = Math.hypot(dx, dy) || 1;
+    return [dx / length, dy / length];
+  }
+  function railSamples(rail) {
+    const far = [Number(rail.dataset.farX), Number(rail.dataset.farY)];
+    const near = [Number(rail.dataset.nearX), Number(rail.dataset.nearY)];
+    const end = [Number(rail.dataset.endX), Number(rail.dataset.endY)];
+    if (rail.dataset.style === "corner") return [far, near, [(near[0] + end[0]) / 2, (near[1] + end[1]) / 2]];
+    const center = [Number(rail.dataset.cx), Number(rail.dataset.cy)];
+    const radius = Number(rail.dataset.radius);
+    const a0 = Math.atan2(near[1] - center[1], near[0] - center[0]);
+    const a1 = Math.atan2(end[1] - center[1], end[0] - center[0]);
+    let turn = a1 - a0;
+    while (turn > Math.PI) turn -= 2 * Math.PI;
+    while (turn < -Math.PI) turn += 2 * Math.PI;
+    return [far, near, .35, .7].map((t, index) => index < 2 ? [far, near][index] : [
+      center[0] + radius * Math.cos(a0 + turn * t), center[1] + radius * Math.sin(a0 + turn * t),
+    ]);
+  }
+  function segmentsCross(a, b, c, d) {
+    const ab = orient(a, b, c) * orient(a, b, d);
+    const cd = orient(c, d, a) * orient(c, d, b);
+    return ab < -1e-4 && cd < -1e-4;
+  }
+  function assertColumnClues(board, geometry, width, height, n, composition) {
+    const rails = [...board.querySelectorAll("path[data-rail]")];
+    assert.equal(rails.length, (n + 1) * 2, "neighboring columns share a line, and both ends of the row keep one");
+    const cell = geometry.scale * 2 / n;
+    const byRank = new Map();
+    for (const label of board.querySelectorAll("text[data-column]")) {
+      const key = `${label.dataset.side}:${label.dataset.axis}:${label.dataset.row}`;
+      const list = byRank.get(key) || [];
+      list.push(label);
+      byRank.set(key, list);
+    }
+    assert.equal(byRank.size, n * 2, "one column for every rank on the two open edges");
+    for (const list of byRank.values()) {
+      list.sort((a, b) => Number(a.dataset.run) - Number(b.dataset.run));
+      const xs = list.map(label => Number(label.getAttribute("x")));
+      assert(Math.max(...xs) - Math.min(...xs) < 1e-6, "a column's numbers share one vertical line");
+      const first = Number(list[0].getAttribute("y")), last = Number(list[list.length - 1].getAttribute("y"));
+      const font = Number(list[0].getAttribute("font-size"));
+      if (list[0].dataset.side === "above") assert(first >= last - 1e-6, "upper columns read from the outside down toward the board");
+      else assert(first <= last + 1e-6, "lower columns read from the outside up toward the board");
+      for (let i = 1; i < list.length; i++) {
+        const step = Math.abs(Number(list[i].getAttribute("y")) - Number(list[i - 1].getAttribute("y")));
+        assert(Math.abs(step - font * 1.12 * 3) < .75, "numerals in a column are spaced three times further apart");
+      }
+    }
+    for (const side of ["above", "below"]) {
+      const sideRails = rails.filter(rail => rail.dataset.side === side).sort((a, b) => Number(a.dataset.rail) - Number(b.dataset.rail));
+      const columns = [...byRank.values()].filter(list => list[0].dataset.side === side)
+        .sort((a, b) => Number(a[0].getAttribute("x")) - Number(b[0].getAttribute("x")));
+      columns.forEach((list, index) => {
+        const x = Number(list[0].getAttribute("x"));
+        const left = Number(sideRails[index].dataset.farX), right = Number(sideRails[index + 1].dataset.farX);
+        assert(x > left + .4 && x < right - .4, "numerals sit in the open slot, to the right of the line that labels them");
+        const mid = (Number(sideRails[index].dataset.endX) + Number(sideRails[index + 1].dataset.endX)) / 2;
+        assert(x > mid + cell * .15, "the turn shifts numerals to the right of the rank");
+        const ends = [Number(sideRails[index].dataset.endY), Number(sideRails[index + 1].dataset.endY)];
+        const cornerY = side === "above" ? Math.min(...ends) : Math.max(...ends);
+        const font = Number(list[0].getAttribute("font-size"));
+        const rise = cell * .8 * (sideRails[index].dataset.style === "corner" ? 1 / (2 * Math.sqrt(3)) : Math.sqrt(3) / 2);
+        const sign = side === "above" ? -1 : 1;
+        const expected = cornerY + sign * (rise + Math.max(4, font * .42) + font * 1.12 * .5);
+        assert(Math.abs(Number(list[0].getAttribute("y")) - expected) < 1.25, "the inner numeral meets the outer bordering corner");
+        const toward = Number(list[0].getAttribute("y")) - sign * font / 2;
+        assert(!insideTriangle([x, toward], geometry.outer), "column numerals stay outside the grid");
+      });
+    }
+    for (const rail of rails) {
+      const far = [Number(rail.dataset.farX), Number(rail.dataset.farY)];
+      const near = [Number(rail.dataset.nearX), Number(rail.dataset.nearY)];
+      const end = [Number(rail.dataset.endX), Number(rail.dataset.endY)];
+      composition.push(far);
+      assert(far[0] >= 11.99 && far[0] <= width - 11.99 && far[1] >= 11.99 && far[1] <= height - 11.99, "column line stays inside the viewport");
+      assert(far[0] > end[0] + cell * .15, "vertical line sits to the right of the vertex it meets");
+      if (rail.dataset.style === "curve") {
+        assert(Math.abs(Number(rail.dataset.radius) - cell * .8) < .75, "curve radius is 80% of a cell");
+        const radius = [end[0] - Number(rail.dataset.cx), end[1] - Number(rail.dataset.cy)];
+        const dot = radius[0] * Number(rail.dataset.directionX) + radius[1] * Number(rail.dataset.directionY);
+        assert(Math.abs(dot) < cell * .05, "the arc arrives along the rank, 60° from vertical");
+        const sweep = /A [\d.eE+-]+ [\d.eE+-]+ 0 0 ([01])/.exec(rail.getAttribute("d"))[1];
+        let turn = Math.atan2(end[1] - Number(rail.dataset.cy), end[0] - Number(rail.dataset.cx))
+          - Math.atan2(near[1] - Number(rail.dataset.cy), near[0] - Number(rail.dataset.cx));
+        while (turn <= -Math.PI) turn += 2 * Math.PI;
+        while (turn > Math.PI) turn -= 2 * Math.PI;
+        assert.equal(sweep, turn > 0 ? "1" : "0", "the arc bends along the row, not around the point");
+      } else {
+        const dot = unit(far, near)[0] * unit(near, end)[0] + unit(far, near)[1] * unit(near, end)[1];
+        assert(Math.abs(dot - .5) < .03, "the corner is a single 120° joint");
+      }
+      for (const point of railSamples(rail)) assert(!insideTriangle(point, geometry.outer), "column lines do not cut through the grid");
+    }
+    const polylines = rails.map(rail => [...railSamples(rail), [Number(rail.dataset.endX), Number(rail.dataset.endY)]]);
+    for (let i = 0; i < polylines.length; i++) for (let j = i + 1; j < polylines.length; j++) {
+      if (rails[i].dataset.side !== rails[j].dataset.side) continue;
+      for (let a = 0; a < polylines[i].length - 1; a++) for (let b = 0; b < polylines[j].length - 1; b++)
+        assert(!segmentsCross(polylines[i][a], polylines[i][a + 1], polylines[j][b], polylines[j][b + 1]), "column lines do not cross");
+    }
+  }
   function assertAnchor() {
     const g = w.TriRotation.geometry;
     for (const axis of [0, 1]) assert(Math.abs(g.outer.reduce((sum, p) => sum + p[axis], 0) / 3 - g.center[axis]) < 1e-6);
@@ -126,25 +233,42 @@ const { harness, source } = require("./test_rotation_harness.cjs");
       h.resize(width, height);
       const composition = [];
       for (let turn = 0; turn < 3; turn++) {
-        composition.push(...w.TriRotation.geometry.outer);
+        const geometry = w.TriRotation.geometry;
+        composition.push(...geometry.outer);
         assert.equal(axes().size, 2);
         assertAnchor();
-        for (const label of board.querySelectorAll("text[data-axis]")) {
-          const x = Number(label.getAttribute("x")), y = Number(label.getAttribute("y"));
-          const dx = x - Number(label.dataset.centerX), dy = y - Number(label.dataset.centerY);
-          assert(Math.abs(dx * Number(label.dataset.directionY) - dy * Number(label.dataset.directionX)) < 1e-6, "clue aligned with end-cell centroid");
-          assert(Number(label.dataset[w.TriRotation.geometry.desktop ? "directionY" : "directionX"]) > 0, "both clue sides lead inward toward the bare edge");
-          assert.equal(label.getAttribute("fill"), "var(--cell)");
-          const desktop = w.TriRotation.geometry.desktop;
-          const right = desktop && Number(label.dataset.directionX) < 0;
-          const top = !desktop && Number(label.dataset.directionY) > 0;
-          assert.equal(label.getAttribute("text-anchor"), right ? "end" : "start");
-          assert.equal(label.getAttribute("dominant-baseline"), top ? "text-before-edge" : "text-after-edge");
-          const font = Number(label.getAttribute("font-size")), textWidth = font * .72 * label.textContent.length;
-          const left = x - (right ? textWidth : 0), bottom = y + (top ? font : 0);
-          composition.push([left, bottom - font], [left + textWidth, bottom]);
-          assert(left >= 11.99 && left + textWidth <= width - 11.99 && bottom - font >= 11.99 && bottom <= height - 11.99, `anchored clue inside ${width}×${height} viewport`);
+        if (!geometry.desktop && width === 390 && height === 760 && h.state.n >= 6) {
+          assert(geometry.columns, "a tall phone stacks clues so the triangle can use the width");
+          assert(geometry.scale * 2 / h.state.n >= 34, "portrait cells stay large enough to tap");
         }
+        const labels = [...board.querySelectorAll("text[data-axis]")];
+        for (const label of labels) {
+          const x = Number(label.getAttribute("x")), y = Number(label.getAttribute("y"));
+          assert(Number(label.dataset[geometry.desktop ? "directionY" : "directionX"]) > 0, "both clue sides lead inward toward the bare edge");
+          assert.equal(label.getAttribute("fill"), "var(--cell)");
+          const font = Number(label.getAttribute("font-size"));
+          if (geometry.columns) {
+            assert.equal(label.dataset.column, "1");
+            assert.equal(label.getAttribute("text-anchor"), "middle");
+            assert.equal(label.getAttribute("dominant-baseline"), "central");
+            const half = font * .72 * label.textContent.length / 2;
+            composition.push([x - half, y - font / 2], [x + half, y + font / 2]);
+            assert(x - half >= 11.99 && x + half <= width - 11.99 && y - font / 2 >= 11.99 && y + font / 2 <= height - 11.99, `column clue inside ${width}×${height} viewport`);
+          } else {
+            const dx = x - Number(label.dataset.centerX), dy = y - Number(label.dataset.centerY);
+            assert(Math.abs(dx * Number(label.dataset.directionY) - dy * Number(label.dataset.directionX)) < 1e-6, "clue aligned with end-cell centroid");
+            const desktop = geometry.desktop;
+            const right = desktop && Number(label.dataset.directionX) < 0;
+            const top = !desktop && Number(label.dataset.directionY) > 0;
+            assert.equal(label.getAttribute("text-anchor"), right ? "end" : "start");
+            assert.equal(label.getAttribute("dominant-baseline"), top ? "text-before-edge" : "text-after-edge");
+            const textWidth = font * .72 * label.textContent.length;
+            const left = x - (right ? textWidth : 0), bottom = y + (top ? font : 0);
+            composition.push([left, bottom - font], [left + textWidth, bottom]);
+            assert(left >= 11.99 && left + textWidth <= width - 11.99 && bottom - font >= 11.99 && bottom <= height - 11.99, `anchored clue inside ${width}×${height} viewport`);
+          }
+        }
+        if (geometry.columns) assertColumnClues(board, geometry, width, height, h.state.n, composition);
         h.click("turn-right");
       }
       const spans = [0, 1].map(axis => {
@@ -155,6 +279,27 @@ const { harness, source } = require("./test_rotation_harness.cjs");
       });
       assert(Math.abs(spans[0] - (width - 48)) < 1e-6 || Math.abs(spans[1] - (height - 48)) < 1e-6,
         "at least one dimension is fully used; enlarging would clip the triangle or a hint");
+    }
+    if (h.state.n === 10) {
+      h.resize(390, 760);
+      const select = d.getElementById("clue-style");
+      const phoneClues = select.closest("label");
+      assert.equal(phoneClues.hidden, false, "phone clue setting is available on a phone");
+      assert.equal(select.value, "corner");
+      assert.equal(board.querySelector("path[data-rail]").dataset.style, "corner");
+      select.value = "curve";
+      select.dispatchEvent(new w.Event("change"));
+      h.flush();
+      assert.equal(board.querySelector("path[data-rail]").dataset.style, "curve", "the menu switches phone clues to the curve");
+      assertColumnClues(board, w.TriRotation.geometry, 390, 760, h.state.n, []);
+      select.value = "corner";
+      select.dispatchEvent(new w.Event("change"));
+      h.flush();
+      assert.equal(board.querySelector("path[data-rail]").dataset.style, "corner", "the menu switches phone clues back to the corner joint");
+      assert.equal(w.localStorage.getItem("delta-triplex-clue-style"), "corner");
+      h.resize(1440, 760);
+      assert.equal(phoneClues.hidden, true, "phone clue setting is hidden on desktop");
+      h.resize(390, 760);
     }
     h.resize(900, 760);
   }
