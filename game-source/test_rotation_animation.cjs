@@ -14,7 +14,8 @@ function pointer(type, target, x, y) {
 function checkFrame() {
   const g = w.TriRotation.geometry;
   for (const axis of [0, 1]) assert(Math.abs(g.outer.reduce((sum, p) => sum + p[axis], 0) / 3 - expectedCenter[axis]) < 1e-6, "triangle centroid stays at its fixed rotation pivot");
-  for (const [x, y] of g.outer) assert(x >= 11.99 && y >= 11.99 && x <= g.width - 11.99 && y <= g.height - 11.99, "every animated vertex fits");
+  const pad = g.desktop ? 23.99 : 7.99;
+  for (const [x, y] of g.outer) assert(x >= pad && y >= pad && x <= g.width - pad && y <= g.height - pad, "every animated vertex fits");
   if (g.moving) assert.equal(svg.querySelectorAll("text[data-axis]").length, 0, "clues wait until the board settles");
 }
 for (const [width, height] of [[1440, 760], [900, 550], [390, 480], [320, 360], [800, 240]]) {

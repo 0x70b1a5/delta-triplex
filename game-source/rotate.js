@@ -5,6 +5,11 @@
   const NS = "http://www.w3.org/2000/svg";
   const SQRT3 = Math.sqrt(3);
   const EDGE = 24;
+  // Portrait and other phone layouts can spend the side gutter on the triangle.
+  const MOBILE_EDGE = 8;
+  // Column-boundary numerals draw half again as large as the pitch they sit on.
+  const COLUMN_NUMERAL = 1.5;
+  const screenEdge = desktop => desktop ? EDGE : MOBILE_EDGE;
   const TURN_MS = 420;
   const svg = document.createElementNS(NS, "svg");
   svg.id = "rotate-board";
@@ -221,13 +226,13 @@
     const offset = i => gap + (i * 3 + .5) * pitch;
     return { pitch, gap, tail, offset, reach: count => offset(count - 1) + pitch * .5 + tail };
   }
-  function columnBands(clues, angle, font) {
+  function columnBands(clues, angle, font, numeralFont = font) {
     const radius = .8 * 2 / state.n;
     const shift = radius / 2;
     const corner = columnStyle === "corner";
     const rise = corner ? radius / (2 * Math.sqrt(3)) : radius * Math.sqrt(3) / 2;
     const { pitch, gap, offset, reach } = columnMetrics(font);
-    const textHalf = value => font * .36 * String(value).length;
+    const textHalf = value => numeralFont * .36 * String(value).length;
     const grouped = [[], []];
     for (const clue of clues) {
       const seg = clue.segment.map(p => rotatePoint(p, angle));
@@ -255,7 +260,7 @@
           const half = textHalf(value);
           constraints.push({
             p: [item.numX, item.anchor], extra: [0, sign * offset(i)],
-            min: [-half, -font / 2], max: [half, font / 2],
+            min: [-half, -numeralFont / 2], max: [half, numeralFont / 2],
           });
         });
       });
@@ -283,11 +288,11 @@
       max: [right ? 0 : width, top ? font : 0],
     };
   }
-  function pose(angle, desktop, font, withClues, columns) {
+  function pose(angle, desktop, font, withClues, columns, numeralFont = font) {
     const outer = [vertex(0, 0, state.n), vertex(state.n, 0, state.n), vertex(0, state.n, state.n)].map(p => rotatePoint(p, angle));
     const clues = withClues ? clueRows(angle, desktop) : [];
     const constraints = outer.map(p => ({ p, extra: [0, 0], min: [0, 0], max: [0, 0] }));
-    if (columns && clues.length) constraints.push(...columnBands(clues, angle, font).constraints);
+    if (columns && clues.length) constraints.push(...columnBands(clues, angle, font, numeralFont).constraints);
     else for (const clue of clues) {
       const direction = rotatePoint(clue.outward, angle);
       clue.runs.forEach((value, i) => constraints.push({
@@ -298,17 +303,18 @@
     return { clues, constraints };
   }
   let layoutCache = null;
-  function fitBoard(width, height, base, desktop, font, solved, columns) {
-    const key = JSON.stringify([width, height, base, font, solved, !!columns, columnStyle, state.n, state.clues.map(axis => axis.map(row => row.runs))]);
+  function fitBoard(width, height, base, desktop, font, solved, columns, numeralFont = font) {
+    const key = JSON.stringify([width, height, base, font, numeralFont, solved, !!columns, columnStyle, state.n, state.clues.map(axis => axis.map(row => row.runs))]);
     if (layoutCache?.key === key) return layoutCache;
-    const poses = [0, 120, 240].map(turn => pose(base + turn, desktop, font, !solved, columns));
+    const poses = [0, 120, 240].map(turn => pose(base + turn, desktop, font, !solved, columns, numeralFont));
     const constraints = poses.flatMap(p => p.constraints);
     // Fit the whole composition, allowing translation as well as scale. Every
     // pair of bounds limits scale independently of where the pivot is placed.
     // Include all resting orientations so turning cannot shift the pivot.
+    const edge = screenEdge(desktop);
     let scale = Infinity;
     for (const axis of [0, 1]) {
-      const available = (axis ? height : width) - 2 * EDGE;
+      const available = (axis ? height : width) - 2 * edge;
       for (const high of constraints) for (const low of constraints) {
         const distance = high.p[axis] - low.p[axis];
         if (distance > 1e-7) scale = Math.min(scale,
@@ -380,17 +386,19 @@
     if (desktop) font = Math.max(8, Math.min(20, width / (state.n * 2.5), (height - 80) / (2.8 * maxRuns)));
     else if (solved) font = 8;
     else ({ font, columns } = chooseMobileLayout(width, height, base));
-    const fitted = fitBoard(width, height, base, desktop, font, solved, columns);
+    const numeralFont = columns ? font * COLUMN_NUMERAL : font;
+    const fitted = fitBoard(width, height, base, desktop, font, solved, columns, numeralFont);
     const resting = fitted.poses[view];
     const moving = animation !== null || preview !== 0;
     const restingScale = fitted.scale, center = fitted.center;
     const vertices = [vertex(0, 0, state.n), vertex(state.n, 0, state.n), vertex(0, state.n, state.n)];
+    const edge = screenEdge(desktop);
     let scale = restingScale;
     if (moving) for (const point of vertices.map(p => rotatePoint(p, angle))) {
       for (const axis of [0, 1]) {
         const v = point[axis];
-        if (v > 1e-7) scale = Math.min(scale, ((axis ? height : width) - EDGE - center[axis]) / v);
-        else if (v < -1e-7) scale = Math.min(scale, (EDGE - center[axis]) / v);
+        if (v > 1e-7) scale = Math.min(scale, ((axis ? height : width) - edge - center[axis]) / v);
+        else if (v < -1e-7) scale = Math.min(scale, (edge - center[axis]) / v);
       }
     }
     const toScreen = p => rotatePoint(p, angle).map((v, axis) => center[axis] + v * scale);
@@ -453,7 +461,7 @@
         item.runs.forEach((value, i) => {
           const at = place([item.numX, item.anchor], [0, side.sign * side.offset(i)]);
           fragment.append(node("text", {
-            x: at[0], y: at[1], "text-anchor": "middle", "dominant-baseline": "central", "font-size": font,
+            x: at[0], y: at[1], "text-anchor": "middle", "dominant-baseline": "central", "font-size": font * COLUMN_NUMERAL,
             fill: "var(--cell)", "data-column": "1", "data-side": sideName,
             "data-axis": item.axis, "data-row": item.row, "data-run": i,
             "data-direction-x": side.O[0], "data-direction-y": side.O[1],

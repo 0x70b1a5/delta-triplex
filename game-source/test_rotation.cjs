@@ -70,11 +70,12 @@ const { harness, source } = require("./test_rotation_harness.cjs");
       assert(Math.max(...xs) - Math.min(...xs) < 1e-6, "a column's numbers share one vertical line");
       const first = Number(list[0].getAttribute("y")), last = Number(list[list.length - 1].getAttribute("y"));
       const font = Number(list[0].getAttribute("font-size"));
+      const pitchFont = font / 1.5;
       if (list[0].dataset.side === "above") assert(first >= last - 1e-6, "upper columns read from the outside down toward the board");
       else assert(first <= last + 1e-6, "lower columns read from the outside up toward the board");
       for (let i = 1; i < list.length; i++) {
         const step = Math.abs(Number(list[i].getAttribute("y")) - Number(list[i - 1].getAttribute("y")));
-        assert(Math.abs(step - font * 1.12 * 3) < .75, "numerals in a column are spaced three times further apart");
+        assert(Math.abs(step - pitchFont * 1.12 * 3) < .75, "numerals in a column are spaced three times further apart");
       }
     }
     for (const side of ["above", "below"]) {
@@ -90,9 +91,10 @@ const { harness, source } = require("./test_rotation_harness.cjs");
         const ends = [Number(sideRails[index].dataset.endY), Number(sideRails[index + 1].dataset.endY)];
         const cornerY = side === "above" ? Math.min(...ends) : Math.max(...ends);
         const font = Number(list[0].getAttribute("font-size"));
+        const pitchFont = font / 1.5;
         const rise = cell * .8 * (sideRails[index].dataset.style === "corner" ? 1 / (2 * Math.sqrt(3)) : Math.sqrt(3) / 2);
         const sign = side === "above" ? -1 : 1;
-        const expected = cornerY + sign * (rise + Math.max(4, font * .42) + font * 1.12 * .5);
+        const expected = cornerY + sign * (rise + Math.max(4, pitchFont * .42) + pitchFont * 1.12 * .5);
         assert(Math.abs(Number(list[0].getAttribute("y")) - expected) < 1.25, "the inner numeral meets the outer bordering corner");
         const toward = Number(list[0].getAttribute("y")) - sign * font / 2;
         assert(!insideTriangle([x, toward], geometry.outer), "column numerals stay outside the grid");
@@ -103,7 +105,8 @@ const { harness, source } = require("./test_rotation_harness.cjs");
       const near = [Number(rail.dataset.nearX), Number(rail.dataset.nearY)];
       const end = [Number(rail.dataset.endX), Number(rail.dataset.endY)];
       composition.push(far);
-      assert(far[0] >= 11.99 && far[0] <= width - 11.99 && far[1] >= 11.99 && far[1] <= height - 11.99, "column line stays inside the viewport");
+      const pad = width >= 900 ? 23.99 : 7.99;
+      assert(far[0] >= pad && far[0] <= width - pad && far[1] >= pad && far[1] <= height - pad, "column line stays inside the viewport");
       assert(far[0] > end[0] + cell * .15, "vertical line sits to the right of the vertex it meets");
       if (rail.dataset.style === "curve") {
         assert(Math.abs(Number(rail.dataset.radius) - cell * .8) < .75, "curve radius is 80% of a cell");
@@ -247,13 +250,14 @@ const { harness, source } = require("./test_rotation_harness.cjs");
           assert(Number(label.dataset[geometry.desktop ? "directionY" : "directionX"]) > 0, "both clue sides lead inward toward the bare edge");
           assert.equal(label.getAttribute("fill"), "var(--cell)");
           const font = Number(label.getAttribute("font-size"));
+          const pad = width >= 900 ? 23.99 : 7.99;
           if (geometry.columns) {
             assert.equal(label.dataset.column, "1");
             assert.equal(label.getAttribute("text-anchor"), "middle");
             assert.equal(label.getAttribute("dominant-baseline"), "central");
             const half = font * .72 * label.textContent.length / 2;
             composition.push([x - half, y - font / 2], [x + half, y + font / 2]);
-            assert(x - half >= 11.99 && x + half <= width - 11.99 && y - font / 2 >= 11.99 && y + font / 2 <= height - 11.99, `column clue inside ${width}×${height} viewport`);
+            assert(x - half >= pad && x + half <= width - pad && y - font / 2 >= pad && y + font / 2 <= height - pad, `column clue inside ${width}×${height} viewport`);
           } else {
             const dx = x - Number(label.dataset.centerX), dy = y - Number(label.dataset.centerY);
             assert(Math.abs(dx * Number(label.dataset.directionY) - dy * Number(label.dataset.directionX)) < 1e-6, "clue aligned with end-cell centroid");
@@ -265,7 +269,7 @@ const { harness, source } = require("./test_rotation_harness.cjs");
             const textWidth = font * .72 * label.textContent.length;
             const left = x - (right ? textWidth : 0), bottom = y + (top ? font : 0);
             composition.push([left, bottom - font], [left + textWidth, bottom]);
-            assert(left >= 11.99 && left + textWidth <= width - 11.99 && bottom - font >= 11.99 && bottom <= height - 11.99, `anchored clue inside ${width}×${height} viewport`);
+            assert(left >= pad && left + textWidth <= width - pad && bottom - font >= pad && bottom <= height - pad, `anchored clue inside ${width}×${height} viewport`);
           }
         }
         if (geometry.columns) assertColumnClues(board, geometry, width, height, h.state.n, composition);
@@ -277,7 +281,8 @@ const { harness, source } = require("./test_rotation_harness.cjs");
         assert(Math.abs((low + high) / 2 - (axis ? height : width) / 2) < 1e-6, "triangle and all hints are centered together");
         return high - low;
       });
-      assert(Math.abs(spans[0] - (width - 48)) < 1e-6 || Math.abs(spans[1] - (height - 48)) < 1e-6,
+      const margin = (width >= 900 ? 24 : 8) * 2;
+      assert(Math.abs(spans[0] - (width - margin)) < 1e-6 || Math.abs(spans[1] - (height - margin)) < 1e-6,
         "at least one dimension is fully used; enlarging would clip the triangle or a hint");
     }
     if (h.state.n === 10) {

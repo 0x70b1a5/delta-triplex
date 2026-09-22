@@ -80,7 +80,7 @@ for (let view = 0; view < 3; view++) {
   const high = Math.max(...solvedGeometry.outer.map(p => p[axisToBalance]));
   assert(Math.abs(low - (extent - high)) < 1e-6, 'solved board has equal opposite margins');
   assert.equal(svg.querySelectorAll('text[data-axis]').length, 0, 'solved board reserves no clue space');
-  if (!solvedGeometry.desktop) assert(Math.abs(low - 24) < 1e-6, 'mobile solved board fills available width');
+  if (!solvedGeometry.desktop) assert(Math.abs(low - 8) < 1e-6, 'mobile solved board fills available width');
   assert(h.exports.game_celebrating(), 'solving starts the original engine celebration');
   const result = JSON.stringify(w.TriRotation.stats.finished);
   const startingAngle = w.TriRotation.geometry.angle;
