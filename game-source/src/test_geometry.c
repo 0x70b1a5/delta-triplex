@@ -90,6 +90,25 @@ int main(void){
  assert(!game_effects(20000));for(int t=0;t<board.count;t++)assert(light[t]==0);
  game_clear_effects();ripple(source);game_effects(21000);game_effects(21035);float single=light[source];
  game_clear_effects();ripple(source);ripple(source);game_effects(21000);game_effects(21035);assert(fabsf(light[source]-single)<.00001f);
+ game_clear_effects();ripple(source);game_effects(22000);game_effects(22035);
+ assert(fabsf(game_echo_light(source,0)-light[source])<.00001f);
+ assert(game_echo_stage(source,0)==game_flash_stage(source));
+ assert(game_echo_light(source,1)==0);
+ game_effects(22000+55+30);assert(game_echo_light(source,1)>0);assert(game_echo_stage(source,1)==1);
+ assert(game_echo_light(source,2)==0);
+ int echo_distance[MAX_TILES],echo_queue[MAX_TILES],echo_head=0,echo_tail=0,echo_max=0;
+ for(int t=0;t<board.count;t++)echo_distance[t]=-1;
+ echo_distance[source]=0;echo_queue[echo_tail++]=source;
+ while(echo_head<echo_tail){int a=echo_queue[echo_head++];
+  for(int b=0;b<board.count;b++)if(board.tiles[b].active&&echo_distance[b]<0&&adjacent(a,b)){
+   echo_distance[b]=echo_distance[a]+1;if(echo_distance[b]>echo_max)echo_max=echo_distance[b];echo_queue[echo_tail++]=b;
+  }
+ }
+ game_clear_effects();ripple(source);game_effects(23000);
+ assert(game_effects(23000+echo_max*55+260+30));
+ assert(game_echo_light(source,echo_max+1)>0);assert(game_echo_stage(source,echo_max+1)==echo_max+1);
+ assert(!game_effects(23000+80*55+260));
+ game_motion(0);ripple(source);assert(game_echo_light(source,1)==0);game_motion(1);
  selected_axis=2;selected_row=0;game_clear_effects();game_shine();assert(game_effects(22000));game_effects(22400);
  for(int t=0;t<board.count;t++)if(tile_line(&board,t,2)!=0)assert(light[t]==0);
  assert(!game_effects(23000));

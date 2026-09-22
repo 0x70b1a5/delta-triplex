@@ -82,11 +82,12 @@
     }
     return false;
   }
-  function numeralAttrs(axis, row, run, count, cellColor) {
+  function numeralAttrs(axis, row, run, count, cellColor, endpoint) {
     // Both layouts place run 0 nearest the board and the last run on the outside.
+    // A fill ripple keeps going outward: the nearest numeral is the next hop.
     const order = count - 1 - run;
     const entry = solvedRows.get(`${axis}:${row}`);
-    let opacity = 1, glow = 0;
+    let opacity = 1, glow = 0, stage = order;
     if (entry) {
       opacity = .5;
       if (motionEnabled && entry.start >= 0) {
@@ -100,12 +101,21 @@
         }
       }
     }
+    if (motionEnabled && endpoint >= 0) {
+      const echo = Number(call("echo_light", endpoint, run + 1)) || 0;
+      if (echo > glow) {
+        glow = echo;
+        stage = Number(call("echo_stage", endpoint, run + 1)) || 0;
+        opacity = 1;
+      }
+    }
     return {
-      fill: glow > 0 ? TriPalette.flash(cellColor, order, glow, themeMode) : "var(--cell)",
+      fill: glow > 0 ? TriPalette.flash(cellColor, stage, glow, themeMode) : "var(--cell)",
       opacity,
       "data-glow": glow,
-      "data-flash-stage": order,
+      "data-flash-stage": stage,
       "data-flash-order": order,
+      "data-endpoint": endpoint,
     };
   }
   let attemptKey = "", lastSaved = -Infinity;
@@ -272,6 +282,9 @@
         const cells = state.cells.filter(c => axisRow(c, axis, state.n) === row);
         cells.sort((a, b) => (2 * (axis === 0 ? b.j : b.i) + b.o) - (2 * (axis === 0 ? a.j : a.i) + a.o));
         const endpoint = first ? cells[0] : cells[cells.length - 1];
+        const active = cells.filter(c => c.active);
+        const echoCell = active.length ? (first ? active[0] : active[active.length - 1]) : null;
+        const echoIndex = echoCell ? state.cells.indexOf(echoCell) : -1;
         const center = mean(corners(endpoint, state.n));
         const distance = Math.min(...normals.filter(n => dot(outward, n) > 1e-6)
           .map(n => (SQRT3 / 3 - dot(center, n)) / dot(outward, n)));
@@ -279,7 +292,7 @@
         const runs = state.clues[axis][row].runs.length ? [...state.clues[axis][row].runs] : [0];
         if (first) runs.reverse();
         const segment = exitSegment(endpoint, state.n, outward) || [edge, edge];
-        result.push({ axis, row, center, edge, outward, runs, segment });
+        result.push({ axis, row, center, edge, outward, runs, segment, echoIndex });
       }
     }
     return result;
@@ -542,7 +555,7 @@
             "data-axis": item.axis, "data-row": item.row, "data-run": i,
             "data-direction-x": side.O[0], "data-direction-y": side.O[1],
             "data-center-x": center[0], "data-center-y": center[1],
-            ...numeralAttrs(item.axis, item.row, i, item.runs.length, cellColor),
+            ...numeralAttrs(item.axis, item.row, i, item.runs.length, cellColor, item.echoIndex),
           }, value));
         });
       }
@@ -612,7 +625,7 @@
           "data-axis": clue.axis, "data-row": clue.row, "data-run": i,
           "data-center-x": center[0], "data-center-y": center[1],
           "data-direction-x": direction[0], "data-direction-y": direction[1],
-          ...numeralAttrs(clue.axis, clue.row, i, clue.runs.length, colours[1] || "#ffffff"),
+          ...numeralAttrs(clue.axis, clue.row, i, clue.runs.length, colours[1] || "#ffffff", clue.echoIndex),
         }, value));
         });
       }

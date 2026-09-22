@@ -112,19 +112,54 @@ static void ripple(int source){
         }
     }
 }
+// One shared-edge hop is 55ms. The pulse itself lasts 260ms.
+static float ripple_pulse(double age,int distance){
+    float phase=(age-distance*55)/260.0f;
+    if(phase<0||phase>1)return 0;
+    float envelope=fminf(1,phase/.12f)*(1-phase)*(1-phase);
+    return .48f*envelope/(1+.10f*distance);
+}
+// Clue numerals continue the ripple past the strip's outer cell, one hop each.
+static int clue_echo_span(void){
+    int span=1;
+    for(int a=0;a<3;a++)for(int r=0;r<board.n;r++){
+        int n=board.lines[a][r].clue_count;if(n<1)n=1;if(n>span)span=n;
+    }
+    return span;
+}
+static double effects_now=0;
+// Virtual cells beyond `tile`: extra 1 is the numeral nearest the board.
+API float game_echo_light(int tile,int extra){
+    if(!motion||tile<0||tile>=board.count||extra<0)return 0;
+    float best=0;
+    for(int i=0;i<RIPPLE_COUNT;i++){
+        Ripple *r=&ripples[i];
+        if(!r->active||r->start<0||r->distance[tile]<0)continue;
+        float pulse=ripple_pulse(effects_now-r->start,r->distance[tile]+extra);
+        if(pulse>best)best=pulse;
+    }
+    return best;
+}
+API int game_echo_stage(int tile,int extra){
+    if(!motion||tile<0||tile>=board.count||extra<0)return 0;
+    float best=0;int stage=0;
+    for(int i=0;i<RIPPLE_COUNT;i++){
+        Ripple *r=&ripples[i];
+        if(!r->active||r->start<0||r->distance[tile]<0)continue;
+        int distance=r->distance[tile]+extra;
+        float pulse=ripple_pulse(effects_now-r->start,distance);
+        if(pulse>best){best=pulse;stage=distance;}
+    }
+    return stage;
+}
 API int game_effects(double now){
-    memset(light,0,sizeof light);bool active=false;
+    effects_now=now;memset(light,0,sizeof light);bool active=false;
     for(int i=0;i<RIPPLE_COUNT;i++){
         Ripple *r=&ripples[i];if(!r->active)continue;if(r->start<0)r->start=now;
         double age=now-r->start;
-        if(age>r->max_distance*55+260){r->active=false;continue;}active=true;
-        for(int t=0;t<board.count;t++)if(r->distance[t]>=0){
-            float phase=(age-r->distance[t]*55)/260.0f;
-            if(phase>=0&&phase<=1){
-                float envelope=fminf(1,phase/.12f)*(1-phase)*(1-phase);
-                float pulse=.48f*envelope/(1+.10f*r->distance[t]);set_light(t,pulse,r->distance[t]);
-            }
-        }
+        if(age>r->max_distance*55+clue_echo_span()*55+260){r->active=false;continue;}active=true;
+        for(int t=0;t<board.count;t++)if(r->distance[t]>=0)
+            set_light(t,ripple_pulse(age,r->distance[t]),r->distance[t]);
     }
     if(!won||!motion)solved_start=-1;
     if(won&&motion){

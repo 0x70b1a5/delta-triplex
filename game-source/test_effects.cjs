@@ -46,6 +46,52 @@ for (let stage = 0; stage < 7; stage++) {
   h.frame(55);
 }
 h.frame(1000); assert([...svg.querySelectorAll('polygon')].every(p => +p.dataset.glow === 0), 'fill ripple decays');
+h.startPuzzle();
+{
+  const labels = [...svg.querySelectorAll('text[data-axis]')];
+  const groups = new Map();
+  for (const label of labels) {
+    const key = `${label.dataset.axis}:${label.dataset.row}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(label);
+  }
+  const clue = [...groups.values()].sort((a, b) => b.length - a.length)[0];
+  assert(clue.length >= 2, 'a visible clue has numerals to carry the ripple');
+  const outward = [...clue].sort((a, b) => Number(a.dataset.run) - Number(b.dataset.run));
+  for (let i = 1; i < outward.length; i++)
+    assert(distanceFromCenter(outward[i]) > distanceFromCenter(outward[i - 1]) + .5, 'run 0 is the numeral nearest the board');
+  const endpoint = Number(outward[0].dataset.endpoint);
+  const fromEdge = new Map([[endpoint, 0]]), edgeQueue = [endpoint];
+  for (const from of edgeQueue) for (let to = 0; to < points.length; to++) {
+    if (!fromEdge.has(to) && points[from].filter(p => points[to].includes(p)).length === 2) {
+      fromEdge.set(to, fromEdge.get(from) + 1); edgeQueue.push(to);
+    }
+  }
+  tap(endpoint, 0);
+  h.frame(55 + 20);
+  const echoed = () => [...svg.querySelectorAll(`text[data-axis="${outward[0].dataset.axis}"][data-row="${outward[0].dataset.row}"]`)];
+  let nearest = echoed().find(label => Number(label.dataset.run) === 0);
+  const cellColor = d.documentElement.style.getPropertyValue('--cell');
+  assert(Number(nearest.dataset.glow) > 0, 'the numeral beside the edge flashes after that cell');
+  assert.equal(Number(nearest.dataset.flashStage), 1, 'the first numeral takes the next rainbow stage');
+  assert.equal(nearest.getAttribute('fill'), palette.flash(cellColor, 1, Number(nearest.dataset.glow), mode));
+  assert.equal(Number(echoed().find(label => Number(label.dataset.run) === 1).dataset.glow), 0, 'the next numeral waits one hop');
+  const shell = [...fromEdge].find(([, distance]) => distance === 1);
+  assert(shell, 'the outer cell has a neighbour at the next hop');
+  assert.equal(Number(nearest.dataset.glow), glow(shell[0]), 'a numeral pulses like the cell at the same hop');
+  h.frame(55);
+  const second = echoed().find(label => Number(label.dataset.run) === 1);
+  assert(Number(second.dataset.glow) > 0, 'the next numeral flashes on the following hop');
+  assert.equal(Number(second.dataset.flashStage), 2);
+  assert.equal(second.getAttribute('fill'), palette.flash(cellColor, 2, Number(second.dataset.glow), mode));
+  h.click('undo');
+  w.matchMedia('(prefers-reduced-motion: reduce)').change(true); h.frame();
+  tap(endpoint, 0); h.frame(55 + 20);
+  assert([...svg.querySelectorAll('text[data-axis]')].every(label => Number(label.dataset.glow) === 0), 'reduced motion does not flash numerals from a tap');
+  h.click('undo');
+  w.matchMedia('(prefers-reduced-motion: reduce)').change(false); h.frame();
+}
+tap(0, 0); h.frame(1000);
 tap(0); h.frame(32); assert.equal(glow(0), 0, 'crossing does not start a fill ripple');
 assert.equal(svg.querySelector('[data-cell="0"]').getAttribute('fill-opacity'), '0.5', 'crossed background has half opacity');
 assert.equal(svg.querySelector('[data-cell="1"]').getAttribute('fill-opacity'), '1', 'unmarked background stays opaque');
@@ -101,6 +147,7 @@ function solveVisibleRow(preferMultiple) {
 }
 {
   const solved = solveVisibleRow(true);
+  h.exports.game_clear_effects();
   const step = w.TriRotation.numeralStep, pulse = w.TriRotation.numeralPulse;
   const cellColor = d.documentElement.style.getPropertyValue('--cell');
   let labels = numerals(solved.axis, solved.row);
@@ -231,6 +278,33 @@ console.log('PASS: completion footer/icons, visible fill ripples, solved-row num
   const svg = d.getElementById('rotate-board');
   svg.setPointerCapture = () => {};
   assert.equal(w.TriRotation.geometry.columns, true, 'a tall phone draws column numerals');
+  {
+    const groups = new Map();
+    for (const label of svg.querySelectorAll('text[data-column]')) {
+      const key = `${label.dataset.axis}:${label.dataset.row}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(label);
+    }
+    const clue = [...groups.values()].sort((a, b) => b.length - a.length)[0];
+    assert(clue.length >= 2, 'a column clue has numerals past the edge');
+    const endpoint = Number(clue[0].dataset.endpoint);
+    const outward = [...clue].sort((a, b) => Number(a.dataset.run) - Number(b.dataset.run));
+    const centerDistance = label => Math.hypot(Number(label.getAttribute('x')) - Number(label.dataset.centerX), Number(label.getAttribute('y')) - Number(label.dataset.centerY));
+    assert(centerDistance(outward[1]) > centerDistance(outward[0]) + .5, 'column run 0 stays nearest the board');
+    for (const type of ['pointerdown', 'pointerup']) {
+      const event = new w.Event(type, { bubbles: true, cancelable: true });
+      Object.assign(event, { pointerId: 1, pointerType: 'touch', button: 0, clientX: 80, clientY: 80 });
+      (type === 'pointerdown' ? svg.querySelector(`[data-cell="${endpoint}"]`) : svg).dispatchEvent(event);
+      h.frame(type === 'pointerup' ? 75 : 0);
+    }
+    const nearest = [...svg.querySelectorAll(`text[data-column][data-axis="${outward[0].dataset.axis}"][data-row="${outward[0].dataset.row}"]`)]
+      .find(label => Number(label.dataset.run) === 0);
+    const following = [...svg.querySelectorAll(`text[data-column][data-axis="${outward[0].dataset.axis}"][data-row="${outward[0].dataset.row}"]`)]
+      .find(label => Number(label.dataset.run) === 1);
+    assert(Number(nearest.dataset.glow) > 0 && Number(nearest.dataset.flashStage) === 1, 'a column numeral echoes the tap');
+    assert.equal(Number(following.dataset.glow), 0, 'the next column numeral waits a hop');
+    h.click('undo'); h.exports.game_clear_effects(); h.frame();
+  }
   const preset = [...svg.querySelectorAll('text[data-column]')].filter(node => h.state.clues[node.dataset.axis][node.dataset.row].match);
   assert(preset.length > 0 && preset.every(node => node.getAttribute('opacity') === '0.5' && Number(node.dataset.glow) === 0), 'rows already solved stay dim');
   function rowOf(cell, axis, n) {
@@ -257,6 +331,7 @@ console.log('PASS: completion footer/icons, visible fill ripples, solved-row num
   }
   assert.equal(h.state.clues[choice.axis][choice.row].match, true);
   assert.equal(h.state.won, false);
+  h.exports.game_clear_effects();
   const labels = () => [...svg.querySelectorAll(`text[data-column][data-axis="${choice.axis}"][data-row="${choice.row}"]`)]
     .sort((a, b) => Number(a.dataset.flashOrder) - Number(b.dataset.flashOrder));
   h.frame(w.TriRotation.numeralPulse / 2);
