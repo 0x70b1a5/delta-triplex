@@ -135,8 +135,15 @@ function loadCustom(puzzle, editing, ownsDraft, endlessRun = null, fromLink = fa
   if (!validPuzzle(puzzle)) return toast(TriCopy.t("editor.invalid-puzzle-data"));
   window.triCancelGeneration?.();
   window.triEndlessRun = endlessRun;
-  window.triShowPlay?.();
   currentPuzzle = normalizePuzzle(puzzle);
+  window.triActiveSeedCode = TriShare.seedCode(currentPuzzle.seed, currentPuzzle.difficulty) || "";
+  const resumed = endlessRun && window.triReadEndlessProgress?.(window.triActiveSeedCode);
+  if (endlessRun && window.triActiveSeedCode && !resumed)
+    window.triStoreEndlessRun?.(endlessRun, window.triActiveSeedCode);
+  const marks = resumed?.marks;
+  const resumeMarks = typeof marks === "string" && marks.length === currentPuzzle.size * currentPuzzle.size && /^[012]+$/.test(marks) ? marks : "";
+  Module.ccall("game_resume_marks", null, ["string"], [resumeMarks]);
+  window.triShowPlay?.();
   authorSession = !!ownsDraft;
   window.triAuthorSession = authorSession;
   sharedArrival = !!fromLink && !authorSession && !endlessRun;
@@ -267,13 +274,12 @@ window.triInitializeCustom = () => {
   }
   if (params.has("seed")) {
     try {
-      loadCustom(
-        TriShare.seedPuzzle(params.get("seed")),
-        false,
-        false,
-        null,
-        true,
-      );
+      const puzzle = TriShare.seedPuzzle(params.get("seed"));
+      const code = TriShare.seedCode(puzzle.seed, puzzle.difficulty);
+      const saved = code ? window.triReadEndlessProgress?.(code) : null;
+      if (saved && saved.difficulty === puzzle.difficulty)
+        loadCustom(puzzle, false, false, window.triEndlessRunFromSave(saved), false);
+      else loadCustom(puzzle, false, false, null, true);
     } catch {
       window.triShowHome?.();
       el("load-error").textContent =

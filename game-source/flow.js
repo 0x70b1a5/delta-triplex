@@ -1,8 +1,71 @@
 "use strict";
 // Navigation observes the same engine state for stock, imported and trial puzzles.
 const endlessDifficulties = [TriCopy.t("ui.easy"), TriCopy.t("ui.medium"), TriCopy.t("ui.hard"), TriCopy.t("ui.impossible"), TriCopy.t("ui.sprout")];
+const ENDLESS_PROGRESS = "tri-rotate-endless-v1";
 let generationId = 0;
 window.triEndlessRun = null;
+window.triActiveSeedCode = "";
+function readEndless() {
+  try {
+    const data = JSON.parse(localStorage.getItem(ENDLESS_PROGRESS));
+    if (!data || typeof data.code !== "string") return null;
+    return data;
+  } catch { return null; }
+}
+function writeEndless(patch) {
+  const next = { ...(readEndless() || {}), ...patch };
+  try { localStorage.setItem(ENDLESS_PROGRESS, JSON.stringify(next)); } catch {}
+}
+function endlessRecent(value) {
+  return Array.isArray(value) ? value.filter(item => typeof item === "string").slice(-32) : [];
+}
+window.triReadEndlessProgress = function (code) {
+  const data = readEndless();
+  return data && data.code === code ? data : null;
+};
+window.triStoreEndlessRun = function (run, code) {
+  writeEndless({
+    code,
+    difficulty: run.difficulty,
+    number: run.number,
+    recent: endlessRecent(run.recent),
+    marks: "",
+    elapsed: 0,
+    turns: 0,
+    view: 0,
+    finished: null,
+  });
+};
+window.triSaveEndlessProgress = function (code, progress) {
+  const data = readEndless();
+  if (!data || data.code !== code || !progress) return;
+  const marks = typeof progress.marks === "string" && /^[012]*$/.test(progress.marks) ? progress.marks : data.marks;
+  writeEndless({
+    marks,
+    elapsed: progress.elapsed,
+    turns: progress.turns,
+    view: progress.view,
+    finished: progress.finished ?? null,
+  });
+};
+window.triEndlessRunFromSave = function (saved) {
+  const number = Number.isInteger(saved.number) && saved.number > 0 ? saved.number : 1;
+  return { difficulty: saved.difficulty, number, recent: endlessRecent(saved.recent) };
+};
+function placeHash() {
+  try {
+    if (window.parent.location.origin === location.origin) return window.parent.location.hash;
+  } catch {}
+  return location.hash;
+}
+window.triReattachEndless = function () {
+  if (window.triEndlessRun || window.triAuthorSession || !el("home").hidden || !state?.custom || state.editing) return;
+  const code = window.triActiveSeedCode || "";
+  if (!code || placeHash() !== "#seed=" + code) return;
+  const saved = window.triReadEndlessProgress(code);
+  if (!Number.isInteger(saved?.difficulty) || saved.difficulty < 0 || saved.difficulty > 4) return;
+  window.triEndlessRun = window.triEndlessRunFromSave(saved);
+};
 window.triCancelGeneration = function () {
   generationId++;
   el("difficulties").removeAttribute("aria-busy");
@@ -17,6 +80,7 @@ window.triShowHome = function (view = "main") {
   window.triHomePrepare?.(view);
   window.triCancelGeneration();
   window.triEndlessRun = null;
+  window.triClearEndlessPlace?.();
   el("endless-note").textContent = "";
   call("up");
   call("clear_effects");
@@ -33,6 +97,7 @@ window.triShowHome = function (view = "main") {
   window.triHomeChanged?.();
   el(view === "main" ? "today-puzzle" : "home-back").focus();
   window.triSyncHistory?.();
+  window.triPublishPlace?.();
 };
 window.triShowPlay = function () {
   window.triCloseIntro?.();
@@ -47,6 +112,9 @@ window.triShowPlay = function () {
 };
 window.triFlowState = function (next, previous) {
   if (!next.custom) window.triEndlessRun = null;
+  if (next.custom && window.triEndlessRun && window.triActiveSeedCode)
+    window.triSetEndlessPlace?.(window.triActiveSeedCode);
+  else window.triSetEndlessPlace?.("");
   el("editor-test").hidden = !!window.triEndlessRun || !window.triAuthorSession;
   if (next.custom && window.triEndlessRun) {
     const run = window.triEndlessRun;

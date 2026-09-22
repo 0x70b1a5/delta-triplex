@@ -115,6 +115,12 @@
     if (!attemptKey || (!force && performance.now() - lastSaved < 1000)) return;
     attempts[attemptKey] = { elapsed, turns, view, finished };
     try { localStorage.setItem("tri-rotate-attempts-v1", JSON.stringify(attempts)); } catch {}
+    if (attemptKey.startsWith("endless/")) {
+      window.triSaveEndlessProgress?.(attemptKey.slice("endless/".length), {
+        elapsed, turns, view, finished,
+        marks: state?.cells?.map(cell => cell.state).join(""),
+      });
+    }
     lastSaved = performance.now();
   }
   let wheelAmount = 0, wheelLast = -Infinity, wheelCooldownUntil = -Infinity;
@@ -181,9 +187,15 @@
       elapsed = turns = 0; finished = null; previousWon = false;
       lastTick = performance.now();
       // Built-in progress survives reload/navigation; its stopwatch must, too.
-      // Custom imports/trials start with an empty board and therefore a fresh attempt.
-      attemptKey = !next.custom ? `${next.tutorial}/${next.level}/${next.solution.join("")}` : "";
-      const saved = !forceFresh && attemptKey && attempts[attemptKey];
+      // Custom imports and editor trials start fresh. Endless attempts resume with the address.
+      const endlessCode = next.custom && window.triEndlessRun ? (window.triActiveSeedCode || "") : "";
+      attemptKey = !next.custom
+        ? `${next.tutorial}/${next.level}/${next.solution.join("")}`
+        : endlessCode ? `endless/${endlessCode}` : "";
+      const savedEndless = !forceFresh && endlessCode ? window.triReadEndlessProgress?.(endlessCode) : null;
+      const saved = savedEndless
+        ? { elapsed: Number(savedEndless.elapsed), turns: Number(savedEndless.turns), view: Number(savedEndless.view), finished: savedEndless.finished }
+        : !forceFresh && attemptKey && attempts[attemptKey];
       if (saved && Number.isFinite(saved.elapsed) && saved.elapsed >= 0 && Number.isInteger(saved.turns) && saved.turns >= 0) {
         elapsed = saved.elapsed; turns = saved.turns;
         view = Number.isInteger(saved.view) ? ((saved.view % 3) + 3) % 3 : 0;

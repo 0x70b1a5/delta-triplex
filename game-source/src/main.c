@@ -48,6 +48,9 @@ static bool custom=false,editing=false;
 // 0 South, 1 East, 2 North, 3 West: rotations of the canonical point-down view.
 static int orientation=0,custom_revision=0;
 static int author_history[HISTORY][MAX_TILES],author_history_count=0;
+// Marks queued by the page so a resumed Endless board is not first announced empty.
+static char resume_marks[MAX_TILES+1];
+static int resume_mark_count=0;
 static int canonical_id(Tile t){int r=t.i+t.j+t.o;return r*r+2*t.i+t.o;}
 static void refresh_editor_solution(void){
     if(editing){
@@ -357,9 +360,19 @@ API void game_reset(void){
     refresh_editor_solution();persist();sync_state();
 }
 // Custom puzzles use the same board, rules, rendering and history as built-in levels.
+// Empty or invalid input drops any queued resume so it cannot leak onto a later board.
+API void game_resume_marks(const char *marks){
+    resume_mark_count=0;
+    if(!marks)return;
+    int n=(int)strlen(marks);
+    if(n<1||n>MAX_TILES)return;
+    for(int i=0;i<n;i++)if(marks[i]<'0'||marks[i]>'2')return;
+    memcpy(resume_marks,marks,(size_t)n);
+    resume_marks[n]=0;resume_mark_count=n;
+}
 API int game_custom(int n,int direction,const char *canonical,int author){
-    if(n<2||n>MAX_N||direction<0||direction>3||!canonical||(int)strlen(canonical)!=n*n)return 0;
-    for(int t=0;t<n*n;t++)if(canonical[t]!='0'&&canonical[t]!='1')return 0;
+    if(n<2||n>MAX_N||direction<0||direction>3||!canonical||(int)strlen(canonical)!=n*n){resume_mark_count=0;return 0;}
+    for(int t=0;t<n*n;t++)if(canonical[t]!='0'&&canonical[t]!='1'){resume_mark_count=0;return 0;}
     game_up();persist();
     char pattern[MAX_TILES+1];int t=0;
     for(int i=0;i<n;i++)for(int j=0;j<n-i;j++)for(int o=0;o<2;o++){
@@ -369,6 +382,8 @@ API int game_custom(int n,int direction,const char *canonical,int author){
     pattern[t]=0;custom=true;editing=author!=0;orientation=direction;custom_revision++;
     board_init(&board,n,pattern);
     for(int i=0;i<board.count;i++)board.tiles[i].state=editing?board.tiles[i].solution:0;
+    if(!editing&&resume_mark_count==board.count)for(int i=0;i<board.count;i++)board.tiles[i].state=resume_marks[i]-'0';
+    resume_mark_count=0;
     history_count=author_history_count=0;selected_axis=selected_row=0;hovered=-1;stroke=false;
     game_clear_effects();refresh_editor_solution();sync_state();return 1;
 }

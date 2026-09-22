@@ -160,6 +160,11 @@ int main(void){
  }
  game_clear_effects();
  assert(!game_custom(11,0,asymmetric,0));assert(!game_custom(2,0,"1x00",0));
+ game_resume_marks("1201");assert(game_custom(2,0,"1000",0));
+ assert(board.tiles[0].state==1&&board.tiles[1].state==2&&board.tiles[2].state==0&&board.tiles[3].state==1);
+ game_resume_marks("99");assert(game_custom(2,0,"1000",0));assert(board.tiles[0].state==0&&board.tiles[1].state==0);
+ game_resume_marks("1201");assert(!game_custom(2,0,"1x00",0));assert(game_custom(2,0,"1000",0));assert(board.tiles[0].state==0);
+ game_resume_marks("1201");assert(game_custom(2,0,"1000",1));assert(board.tiles[0].state==board.tiles[0].solution);
  game_leave_custom();assert(!custom&&!editing&&level==1&&board.tiles[0].state==1);
  assert(!strcmp(before_custom,stored_game));assert(strlen(stored_game)==257);assert(strlen(stored_intro)==193);
  puts("PASS: shared custom authoring/play, every size and orientation, canonical cell IDs, hit testing, clue selection, solution matching, author undo across trial play, reset/undo, and legacy-save isolation.");
