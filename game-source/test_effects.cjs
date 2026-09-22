@@ -1,6 +1,10 @@
 const assert = require('assert');
 const { harness, source } = require('./test_rotation_harness.cjs');
 const palette = require('./palette.js');
+function paintedNumeral(color, stage, glow, mode) {
+  if (mode === "colorful") return palette.mix(color, "#ffffff", Math.min(1, glow * 3));
+  return palette.flash(color, stage, glow, mode);
+}
 for (const mode of ['light', 'dark', 'colorful']) {
 const darkMode = mode === 'dark';
 const h = harness(source, 'https://tri.test/', {'delta-triplex-theme': mode}, { reducedMotion: false, darkMode });
@@ -74,7 +78,9 @@ h.startPuzzle();
   const cellColor = d.documentElement.style.getPropertyValue('--cell');
   assert(Number(nearest.dataset.glow) > 0, 'the numeral beside the edge flashes after that cell');
   assert.equal(Number(nearest.dataset.flashStage), 1, 'the first numeral takes the next rainbow stage');
-  assert.equal(nearest.getAttribute('fill'), palette.flash(cellColor, 1, Number(nearest.dataset.glow), mode));
+  assert.equal(nearest.getAttribute('fill'), paintedNumeral(cellColor, 1, Number(nearest.dataset.glow), mode));
+  if (mode === "colorful") assert(nearest.getAttribute('fill') !== cellColor, 'a colorful numeral brightens toward white');
+  else assert(nearest.getAttribute('fill') !== cellColor, 'a light or dark numeral takes the rainbow');
   assert.equal(Number(echoed().find(label => Number(label.dataset.run) === 1).dataset.glow), 0, 'the next numeral waits one hop');
   const shell = [...fromEdge].find(([, distance]) => distance === 1);
   assert(shell, 'the outer cell has a neighbour at the next hop');
@@ -83,7 +89,7 @@ h.startPuzzle();
   const second = echoed().find(label => Number(label.dataset.run) === 1);
   assert(Number(second.dataset.glow) > 0, 'the next numeral flashes on the following hop');
   assert.equal(Number(second.dataset.flashStage), 2);
-  assert.equal(second.getAttribute('fill'), palette.flash(cellColor, 2, Number(second.dataset.glow), mode));
+  assert.equal(second.getAttribute('fill'), paintedNumeral(cellColor, 2, Number(second.dataset.glow), mode));
   h.click('undo');
   w.matchMedia('(prefers-reduced-motion: reduce)').change(true); h.frame();
   tap(endpoint, 0); h.frame(55 + 20);
@@ -159,7 +165,7 @@ function solveVisibleRow(preferMultiple) {
   labels = numerals(solved.axis, solved.row);
   assert(Number(labels[0].dataset.glow) > .9, 'the outer numeral flashes first');
   assert.equal(labels[0].getAttribute('opacity'), '1');
-  assert.equal(labels[0].getAttribute('fill'), palette.flash(cellColor, 0, Number(labels[0].dataset.glow), mode));
+  assert.equal(labels[0].getAttribute('fill'), paintedNumeral(cellColor, 0, Number(labels[0].dataset.glow), mode));
   assert.equal(Number(labels[1].dataset.glow), 0, 'the next numeral waits its turn');
   assert.equal(labels[1].getAttribute('opacity'), '1');
   h.frame(step);
@@ -168,7 +174,7 @@ function solveVisibleRow(preferMultiple) {
   assert.equal(Number(labels[0].dataset.glow), 0);
   assert.equal(labels[0].getAttribute('fill'), 'var(--cell)');
   assert(Number(labels[1].dataset.glow) > .9, 'the next numeral flashes after the first');
-  assert.equal(labels[1].getAttribute('fill'), palette.flash(cellColor, 1, Number(labels[1].dataset.glow), mode));
+  assert.equal(labels[1].getAttribute('fill'), paintedNumeral(cellColor, 1, Number(labels[1].dataset.glow), mode));
   h.frame(step * h.state.n + pulse);
   labels = numerals(solved.axis, solved.row);
   assert(labels.every(label => label.getAttribute('opacity') === '0.5' && Number(label.dataset.glow) === 0 && label.getAttribute('fill') === 'var(--cell)'), 'the solved clue rests at half opacity');

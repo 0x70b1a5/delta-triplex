@@ -82,6 +82,12 @@
     }
     return false;
   }
+  function numeralFill(cellColor, stage, glow) {
+    if (!(glow > 0)) return "var(--cell)";
+    // A colorful numeral is already near white, so the cell-sized white mix never shows.
+    if (themeMode === "colorful") return TriPalette.mix(cellColor, "#ffffff", Math.min(1, glow * 3));
+    return TriPalette.flash(cellColor, stage, glow, themeMode);
+  }
   function numeralAttrs(axis, row, run, count, cellColor, endpoint) {
     // Both layouts place run 0 nearest the board and the last run on the outside.
     // A fill ripple keeps going outward: the nearest numeral is the next hop.
@@ -109,8 +115,11 @@
         opacity = 1;
       }
     }
+    const fill = numeralFill(cellColor, stage, glow);
     return {
-      fill: glow > 0 ? TriPalette.flash(cellColor, stage, glow, themeMode) : "var(--cell)",
+      fill,
+      // The stylesheet also sets this fill; the inline value is what the pulse paints.
+      style: `fill:${fill}`,
       opacity,
       "data-glow": glow,
       "data-flash-stage": stage,
