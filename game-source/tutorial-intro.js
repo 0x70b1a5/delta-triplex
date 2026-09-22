@@ -42,6 +42,14 @@
   }
   window.TriIntroDemo = { cells, rows, steps };
   let page = 0, beat = 0, timer = 0, paused = false, frame = 0, angle = 0, lastTime = null, rotationElapsed = 0;
+  let returnToPuzzle = false;
+  function leaveIntro() {
+    const backToPuzzle = returnToPuzzle;
+    returnToPuzzle = false;
+    window.triCloseIntro();
+    if (backToPuzzle) window.triShowPlay();
+    else window.triShowHome();
+  }
   function svg(tag, attrs, parent = board) {
     const node = document.createElementNS(ns, tag);
     for (const [key,value] of Object.entries(attrs)) node.setAttribute(key, value);
@@ -156,13 +164,15 @@
         `<a id="intro-nonogram" href="https://en.wikipedia.org/wiki/Nonogram" target="_blank" rel="noopener noreferrer">${TriCopy.html('intro.nonogram')}</a>`);
     } else el('intro-description').textContent = TriCopy.t(`intro.${page}.body`);
     el('intro-controls').hidden = page === 0;
-    el('intro-next').textContent = TriCopy.t(page === 3 ? 'intro.start' : 'intro.next');
+    el('intro-next').textContent = TriCopy.t(page === 3 ? (returnToPuzzle ? 'intro.backToPuzzle' : 'intro.start') : 'intro.next');
+    el('intro-exit').textContent = TriCopy.t(returnToPuzzle ? 'intro.close' : 'intro.exit');
     draw(); schedule(); el('intro-title').focus();
   }
   window.triCloseIntro = () => { stop(); root.hidden = true; };
-  window.triStartIntro = () => {
+  window.triStartIntro = (options) => {
     if (!appReady) return toast(TriCopy.t('errors.loading'));
     window.triShowHome();
+    returnToPuzzle = options?.returnToPuzzle === true;
     el('home').hidden = true; window.triHomeChanged?.();
     root.hidden = false; page = 0; showPage(); window.triSyncHistory?.();
   };
@@ -170,10 +180,11 @@
   el('replay').onclick = window.triStartIntro;
   el('intro-next').onclick = () => {
     if (page < 3) { page++; showPage(); }
+    else if (returnToPuzzle) leaveIntro();
     else { window.triCloseIntro(); call('replay'); window.triShowPlay(); }
   };
-  el('intro-back').onclick = () => { if (page) { page--; showPage(); } else window.triShowHome(); };
-  el('intro-exit').onclick = () => window.triShowHome();
+  el('intro-back').onclick = () => { if (page) { page--; showPage(); } else leaveIntro(); };
+  el('intro-exit').onclick = () => leaveIntro();
   el('intro-step').onclick = () => { paused = true; if (page === 3) { angle = (Math.floor(angle / 120) + 1) * 120; rotationElapsed = angle / 120 * (REST_MS + TURN_MS); } beat = page === 1 ? (beat+1)%rows.length : (beat+1)%(steps.length+1); draw(); schedule(); };
   el('intro-pause').onclick = () => { paused = !paused; draw(); schedule(); };
   document.addEventListener('visibilitychange', schedule);

@@ -47,7 +47,7 @@ window.triShowPlay = function () {
 };
 window.triFlowState = function (next, previous) {
   if (!next.custom) window.triEndlessRun = null;
-  el("editor-test").hidden = !!window.triEndlessRun;
+  el("editor-test").hidden = !!window.triEndlessRun || !window.triAuthorSession;
   if (next.custom && window.triEndlessRun) {
     const run = window.triEndlessRun;
     el("workshop-title").textContent =
@@ -210,7 +210,7 @@ el("next-puzzle").onclick = () => {
     if (window.triEndlessRun) {
       const run = window.triEndlessRun;
       startEndless(run.difficulty, run.number + 1, run.recent);
-    } else if (authorSession) call("editing", 1);
+    } else if (window.triAuthorSession) call("editing", 1);
     else window.triShowHome();
   } else if (state.tutorial >= 0 && state.tutorial < 2) call("next");
   else window.triShowHome();

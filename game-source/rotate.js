@@ -9,6 +9,9 @@
   const MOBILE_EDGE = 8;
   // Column-boundary numerals draw half again as large as the pitch they sit on.
   const COLUMN_NUMERAL = 1.5;
+  // A solved row flashes from the outside numeral inward, then rests at half opacity.
+  const NUMERAL_STEP = 180;
+  const NUMERAL_PULSE = 240;
   const screenEdge = desktop => desktop ? EDGE : MOBILE_EDGE;
   const TURN_MS = 420;
   const svg = document.createElementNS(NS, "svg");
@@ -49,6 +52,62 @@
   let view = 0, visualTurn = 0, preview = 0, animation = null, key = "", restart = false;
   let elapsed = 0, turns = 0, lastTick = performance.now(), running = false;
   let finished = null, previousWon = false, geometry = null;
+  let shareHelpSettled = false;
+  // axis:row -> { start, count }. start < 0 means the row was already solved, so it stays dim.
+  const solvedRows = new Map();
+  function syncSolvedRows(next, flashNew) {
+    if (!next?.clues || next.editing) { solvedRows.clear(); return; }
+    // A finished board hides its clues, so keep the pre-win flashes for undo.
+    if (next.won) return;
+    const now = performance.now();
+    const live = new Set();
+    for (let axis = 0; axis < 3; axis++) for (let row = 0; row < next.n; row++) {
+      const clue = next.clues[axis][row];
+      if (!clue.match) continue;
+      const id = `${axis}:${row}`;
+      live.add(id);
+      if (!solvedRows.has(id)) {
+        const count = Math.max(1, clue.runs.length);
+        solvedRows.set(id, { start: flashNew && motionEnabled ? now : -1, count });
+      }
+    }
+    for (const id of solvedRows.keys()) if (!live.has(id)) solvedRows.delete(id);
+  }
+  function clueFlashPending() {
+    if (!motionEnabled) return false;
+    const now = performance.now();
+    for (const entry of solvedRows.values()) {
+      if (entry.start < 0) continue;
+      if (now - entry.start < (entry.count - 1) * NUMERAL_STEP + NUMERAL_PULSE) return true;
+    }
+    return false;
+  }
+  function numeralAttrs(axis, row, run, count, cellColor) {
+    // Both layouts place run 0 nearest the board and the last run on the outside.
+    const order = count - 1 - run;
+    const entry = solvedRows.get(`${axis}:${row}`);
+    let opacity = 1, glow = 0;
+    if (entry) {
+      opacity = .5;
+      if (motionEnabled && entry.start >= 0) {
+        const age = performance.now() - entry.start - order * NUMERAL_STEP;
+        if (age < NUMERAL_PULSE) {
+          opacity = 1;
+          if (age > 0) {
+            const wave = Math.sin(age / NUMERAL_PULSE * Math.PI);
+            glow = wave * wave;
+          }
+        }
+      }
+    }
+    return {
+      fill: glow > 0 ? TriPalette.flash(cellColor, order, glow, themeMode) : "var(--cell)",
+      opacity,
+      "data-glow": glow,
+      "data-flash-stage": order,
+      "data-flash-order": order,
+    };
+  }
   let attemptKey = "", lastSaved = -Infinity;
   let attempts = {};
   try { attempts = JSON.parse(localStorage.getItem("tri-rotate-attempts-v1")) || {}; } catch {}
@@ -113,7 +172,8 @@
   window.triRotateState = (next, previous) => {
     clock();
     const boardKey = `${next.custom}/${next.revision}/${next.level}/${next.tutorial}/${next.editing}`;
-    if (restart || key !== boardKey) {
+    const freshBoard = restart || key !== boardKey;
+    if (freshBoard) {
       cancelGesture();
       saveAttempt(true);
       const forceFresh = restart;
@@ -131,7 +191,10 @@
       }
       visualTurn = view * 120;
       if (next.won && !finished) finished = { unknown: true };
+      solvedRows.clear();
+      shareHelpSettled = false;
     }
+    syncSolvedRows(next, !freshBoard);
     if (next.won && !next.editing && !previousWon && !finished) finished = { elapsed, turns };
     if (!next.won) finished = null;
     previousWon = next.won;
@@ -426,7 +489,8 @@
         const end = place(line.vertex);
         const id = `clue-line-${sideName}-${line.line}`;
         const span = Math.abs(far[1] - start[1]) || 1;
-        const solidAt = Math.min(.8, font * .62 / span);
+        // Twice the former 0.62-pitch ramp, so the fade begins closer to the triangle.
+        const solidAt = Math.min(.8, font * 1.24 / span);
         const gradient = node("linearGradient", {
           id, gradientUnits: "userSpaceOnUse", x1: 0, y1: far[1], x2: 0, y2: start[1],
         });
@@ -462,10 +526,11 @@
           const at = place([item.numX, item.anchor], [0, side.sign * side.offset(i)]);
           fragment.append(node("text", {
             x: at[0], y: at[1], "text-anchor": "middle", "dominant-baseline": "central", "font-size": font * COLUMN_NUMERAL,
-            fill: "var(--cell)", "data-column": "1", "data-side": sideName,
+            "data-column": "1", "data-side": sideName,
             "data-axis": item.axis, "data-row": item.row, "data-run": i,
             "data-direction-x": side.O[0], "data-direction-y": side.O[1],
             "data-center-x": center[0], "data-center-y": center[1],
+            ...numeralAttrs(item.axis, item.row, i, item.runs.length, cellColor),
           }, value));
         });
       }
@@ -487,6 +552,17 @@
       const nextFill = TriPalette.oklch(.7, .16, motionEnabled ? performance.now() / 24 % 360 : 145);
       el("next-puzzle").style.setProperty("--next-fill", nextFill);
       el("next-puzzle").style.setProperty("--next-ink", TriPalette.ink(nextFill));
+    }
+    const shareHelp = el("share-help");
+    if (shareHelp && !shareHelp.hidden && (state.undo || turns > 0)) shareHelpSettled = true;
+    const shareHelpAttention = shareHelp && !shareHelp.hidden && !shareHelpSettled && !state.editing && !state.won;
+    if (shareHelpAttention) {
+      const helpFill = TriPalette.oklch(.7, .16, motionEnabled ? performance.now() / 24 % 360 : 145);
+      shareHelp.style.setProperty("--next-fill", helpFill);
+      shareHelp.style.setProperty("--next-ink", TriPalette.ink(helpFill));
+    } else if (shareHelp) {
+      shareHelp.style.removeProperty("--next-fill");
+      shareHelp.style.removeProperty("--next-ink");
     }
     svg.setAttribute("viewBox", `0 0 ${geometry.width} ${geometry.height}`);
     // Both ordinary turns and the celebration use the triangle centroid.
@@ -521,17 +597,17 @@
           x: edge[0] + direction[0] * (geometry.font + i * geometry.font * 1.5),
           y: edge[1] + direction[1] * (geometry.font + i * geometry.font * 1.5),
           "text-anchor": alignment.anchor, "dominant-baseline": alignment.baseline, "font-size": geometry.font,
-          fill: "var(--cell)",
           "data-axis": clue.axis, "data-row": clue.row, "data-run": i,
           "data-center-x": center[0], "data-center-y": center[1],
           "data-direction-x": direction[0], "data-direction-y": direction[1],
+          ...numeralAttrs(clue.axis, clue.row, i, clue.runs.length, colours[1] || "#ffffff"),
         }, value));
         });
       }
     }
     svg.replaceChildren(fragment);
     el("turn-left").disabled = el("turn-right").disabled = !!animation;
-    if (animation || (effects && !window.triMenuOpen)) requestFrame();
+    if (animation || clueFlashPending() || (shareHelpAttention && motionEnabled) || (effects && !window.triMenuOpen)) requestFrame();
   };
 
   function turn(delta, scroll = false) {
@@ -669,6 +745,10 @@
     });
   }
   // Read-only hooks for deterministic prototype regression tests.
-  window.TriRotation = { formatTime, get stats() { return { view, elapsed, turns, running, finished, animating: !!animation }; }, get geometry() { return geometry; } };
+  window.TriRotation = {
+    formatTime, numeralStep: NUMERAL_STEP, numeralPulse: NUMERAL_PULSE,
+    get stats() { return { view, elapsed, turns, running, finished, animating: !!animation }; },
+    get geometry() { return geometry; },
+  };
   if (state) { window.triRotateState(state, null); requestFrame(); }
 })();

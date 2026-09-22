@@ -124,6 +124,14 @@ const { harness, source } = require("./test_rotation_harness.cjs");
         assert(Math.abs(dot - .5) < .03, "the corner is a single 120° joint");
       }
       for (const point of railSamples(rail)) assert(!insideTriangle(point, geometry.outer), "column lines do not cut through the grid");
+      const id = /url\(#([^)]+)\)/.exec(rail.getAttribute("stroke"))[1];
+      const stops = [...board.querySelector(`#${id}`).querySelectorAll("stop")];
+      assert.deepEqual(stops.map(stop => stop.getAttribute("stop-opacity")), ["0", "1", "1"], "column lines fade in toward the triangle");
+      const span = Math.abs(Number(rail.dataset.farY) - Number(rail.dataset.nearY)) || 1;
+      const pitch = Number(board.querySelector(`text[data-column][data-side="${rail.dataset.side}"]`).getAttribute("font-size")) / 1.5;
+      const solidAt = Number(stops[1].getAttribute("offset"));
+      assert(Math.abs(solidAt - Math.min(.8, pitch * 1.24 / span)) < 1e-4, "the fade is twice as long and starts closer to the triangle");
+      assert(solidAt > Math.min(.8, pitch * .62 / span) + 1e-4, "dimming begins closer to the triangle than the short ramp");
     }
     const polylines = rails.map(rail => [...railSamples(rail), [Number(rail.dataset.endX), Number(rail.dataset.endY)]]);
     for (let i = 0; i < polylines.length; i++) for (let j = i + 1; j < polylines.length; j++) {

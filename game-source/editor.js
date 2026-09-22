@@ -102,7 +102,9 @@ if (!validPuzzle(draft))
   };
 draft = normalizePuzzle(draft);
 let currentPuzzle = null,
-  authorSession = false;
+  authorSession = false,
+  sharedArrival = false;
+window.triAuthorSession = false;
 
 const settings = document.createElement("section");
 settings.id = "editor-settings";
@@ -115,20 +117,29 @@ workshop.hidden = true;
 workshop.innerHTML = `<div id="workshop-title"></div><p id="workshop-help"></p><div class="lesson-actions" id="workshop-actions"><button id="editor-test">${TriCopy.html("editor.try")}</button></div>`;
 el("side").insertBefore(workshop, el("corner"));
 el("bottom-controls").prepend(el("workshop-actions"));
+const shareHelp = document.createElement("button");
+shareHelp.id = "share-help";
+shareHelp.type = "button";
+shareHelp.hidden = true;
+shareHelp.textContent = TriCopy.t("share.howToPlay");
+el("bottom-controls").prepend(shareHelp);
+shareHelp.onclick = () => window.triStartIntro?.({ returnToPuzzle: true });
 menu.append(el("controls-hint"));
 function saveDraft() {
   try {
     localStorage.setItem("tri-rotate-editor-v1", JSON.stringify(draft));
   } catch {}
 }
-function loadCustom(puzzle, editing, ownsDraft, endlessRun = null) {
+function loadCustom(puzzle, editing, ownsDraft, endlessRun = null, fromLink = false) {
   if (!appReady) return toast(TriCopy.t("errors.loading"));
   if (!validPuzzle(puzzle)) return toast(TriCopy.t("editor.invalid-puzzle-data"));
   window.triCancelGeneration?.();
   window.triEndlessRun = endlessRun;
   window.triShowPlay?.();
   currentPuzzle = normalizePuzzle(puzzle);
-  authorSession = ownsDraft;
+  authorSession = !!ownsDraft;
+  window.triAuthorSession = authorSession;
+  sharedArrival = !!fromLink && !authorSession && !endlessRun;
   const ok = Module.ccall(
     "game_custom",
     "number",
@@ -142,11 +153,18 @@ function loadCustom(puzzle, editing, ownsDraft, endlessRun = null) {
   );
   if (!ok) toast(TriCopy.t("editor.the-puzzle-could-not-be-loaded"));
 }
+function syncVisitorControls(next) {
+  const author = authorSession && !window.triEndlessRun;
+  const showHelp = sharedArrival && !!next?.custom && !authorSession && !next.editing && !next.won && el("home").hidden;
+  el("editor-test").hidden = !author;
+  shareHelp.hidden = !showHelp;
+  el("workshop-actions").hidden = !next?.custom || !author;
+}
 window.triCustomState = (next) => {
   const active = !!next.custom;
   workshop.hidden = !active;
-  el("workshop-actions").hidden = !active;
   settings.hidden = !active || !!homeMenuState;
+  syncVisitorControls(next);
   if (!active || !currentPuzzle) {
     el("reset").title = TriCopy.t("ui.reset-r-undo-restores-it");
     return;
@@ -180,8 +198,7 @@ el("editor-open").onclick = () => {
   toggleMenu(false);
 };
 el("editor-test").onclick = () => {
-  if (!state?.custom) return;
-  if (!state.editing) authorSession = true;
+  if (!state?.custom || !authorSession) return;
   call("editing", state.editing ? 0 : 1);
 };
 el("editor-name").oninput = () => {
@@ -254,6 +271,8 @@ window.triInitializeCustom = () => {
         TriShare.seedPuzzle(params.get("seed")),
         false,
         false,
+        null,
+        true,
       );
     } catch {
       window.triShowHome?.();
@@ -266,7 +285,7 @@ window.triInitializeCustom = () => {
   const code = params.get("p");
   if (code !== null) {
     try {
-      loadCustom(TriShare.decode(code), false, false);
+      loadCustom(TriShare.decode(code), false, false, null, true);
     } catch {
       window.triShowHome?.();
       el("load-error").textContent =
