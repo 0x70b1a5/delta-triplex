@@ -88,21 +88,42 @@
     if (themeMode === "colorful") return TriPalette.mix(cellColor, "#ffffff", Math.min(1, glow * 3));
     return TriPalette.flash(cellColor, stage, glow, themeMode);
   }
+  // glow*3 is how a full numeral reaches the flash color. Smoothstep keeps the
+  // ends flat so a dim glyph eases out of its half-opacity composite and back.
+  function flashEase(glow) {
+    const x = Math.min(1, Math.max(0, glow * 3));
+    return x * x * (3 - 2 * x);
+  }
+  function dimFlashPaint(cellColor, stage, glow, mode = themeMode) {
+    const t = flashEase(glow);
+    const bg = document.documentElement.style.getPropertyValue("--bg").trim() || "#000000";
+    const rest = TriPalette.mix(bg, cellColor, .5);
+    const peak = mode === "colorful" ? "#ffffff" : TriPalette.rainbow[((stage % 7) + 7) % 7];
+    return { fill: TriPalette.mix(rest, peak, t), opacity: 1, amount: t };
+  }
   function numeralAttrs(axis, row, run, count, cellColor, endpoint) {
     // Both layouts place run 0 nearest the board and the last run on the outside.
     // A fill ripple keeps going outward: the nearest numeral is the next hop.
     const order = count - 1 - run;
     const entry = solvedRows.get(`${axis}:${row}`);
-    let opacity = 1, glow = 0, stage = order;
+    let opacity = 1, glow = 0, stage = order, dimmed = false, settle = false;
     if (entry) {
+      dimmed = true;
       opacity = .5;
       if (motionEnabled && entry.start >= 0) {
         const age = performance.now() - entry.start - order * NUMERAL_STEP;
         if (age < NUMERAL_PULSE) {
-          opacity = 1;
-          if (age > 0) {
+          if (age <= 0) {
+            // Waiting numerals stay readable until their own pulse.
+            dimmed = false;
+            opacity = 1;
+          } else {
             const wave = Math.sin(age / NUMERAL_PULSE * Math.PI);
             glow = wave * wave;
+            if (age <= NUMERAL_PULSE / 2) {
+              dimmed = false;
+              opacity = 1;
+            } else settle = true;
           }
         }
       }
@@ -112,18 +133,22 @@
       if (echo > glow) {
         glow = echo;
         stage = Number(call("echo_stage", endpoint, run + 1)) || 0;
-        opacity = 1;
+        if (!dimmed && !settle) opacity = 1;
       }
     }
-    const fill = numeralFill(cellColor, stage, glow);
+    // Resting dim, an echo on it, and the falling half of a match pulse all
+    // paint the composited color. A step in opacity reads as a jump to white.
+    const tween = (dimmed || settle) && glow > 0;
+    const painted = tween ? dimFlashPaint(cellColor, stage, glow) : { fill: numeralFill(cellColor, stage, glow), opacity, amount: 0 };
     return {
-      fill,
+      fill: painted.fill,
       // The stylesheet also sets this fill; the inline value is what the pulse paints.
-      style: `fill:${fill}`,
-      opacity,
+      style: `fill:${painted.fill}`,
+      opacity: painted.opacity,
       "data-glow": glow,
       "data-flash-stage": stage,
       "data-flash-order": order,
+      "data-flash-amount": painted.amount,
       "data-endpoint": endpoint,
     };
   }
@@ -467,9 +492,9 @@
       return { columns, font, scale: fitBoard(width, height, base, false, font, false, columns).scale };
     };
     const stacked = pack(true), diagonal = pack(false);
-    // Columns are the portrait layout. Keep diagonals when they leave larger cells,
-    // which is the short, wide case where a column band would steal the scarce height.
-    const choice = stacked.scale >= diagonal.scale - .25 ? stacked : diagonal;
+    // Column clues are the portrait for every difficulty. A short, wide stage
+    // still keeps diagonals when that leaves the cells larger.
+    const choice = height >= width || stacked.scale >= diagonal.scale - .25 ? stacked : diagonal;
     mobileChoice = { key, ...choice };
     return mobileChoice;
   }
@@ -502,6 +527,13 @@
     return { width, height, desktop, angle, scale, center, font, columns, toScreen, clues: moving ? [] : resting.clues,
       moving, outer: vertices.map(toScreen) };
   }
+  // A solved column stays bright until its outside-in pulse has finished.
+  function columnRestingDim(axis, row) {
+    const entry = solvedRows.get(`${axis}:${row}`);
+    if (!entry) return false;
+    if (!motionEnabled || entry.start < 0) return true;
+    return performance.now() - entry.start >= (entry.count - 1) * NUMERAL_STEP + NUMERAL_PULSE;
+  }
   function drawColumns(fragment, geometry, cellColor) {
     const place = (p, extra = [0, 0]) => [
       geometry.center[0] + p[0] * geometry.scale + extra[0],
@@ -531,15 +563,22 @@
         for (const [offset, opacity] of [["0", "0"], [solidAt.toFixed(4), "1"], ["1", "1"]])
           gradient.append(node("stop", { offset, "stop-color": cellColor, "stop-opacity": opacity }));
         defs.append(gradient);
+        const columnIds = line.neighbors.map(item => `${item.axis}:${item.row}`);
+        const dimLine = columnIds.length >= 2 && line.neighbors.every(item => columnRestingDim(item.axis, item.row));
         const attrs = {
           fill: "none", stroke: `url(#${id})`, "stroke-width": Math.max(1.2, font / 11),
           "stroke-linecap": "round", "stroke-linejoin": "round", "pointer-events": "none",
           "data-rail": line.line, "data-side": sideName, "data-style": side.corner ? "corner" : "curve",
+          "data-columns": columnIds.join(","),
           "data-direction-x": side.O[0], "data-direction-y": side.O[1],
           "data-far-x": far[0], "data-far-y": far[1],
           "data-near-x": start[0], "data-near-y": start[1],
           "data-end-x": end[0], "data-end-y": end[1],
         };
+        if (dimLine) {
+          attrs.opacity = .5;
+          attrs["data-dim"] = "1";
+        }
         if (side.corner) attrs.d = `M ${far[0]} ${far[1]} L ${start[0]} ${start[1]} L ${end[0]} ${end[1]}`;
         else {
           const center = place([line.vertex[0] - side.radius / 2, line.vertex[1] + side.sign * side.rise]);
@@ -780,7 +819,7 @@
   }
   // Read-only hooks for deterministic prototype regression tests.
   window.TriRotation = {
-    formatTime, numeralStep: NUMERAL_STEP, numeralPulse: NUMERAL_PULSE,
+    formatTime, numeralStep: NUMERAL_STEP, numeralPulse: NUMERAL_PULSE, dimFlashPaint,
     get stats() { return { view, elapsed, turns, running, finished, animating: !!animation }; },
     get geometry() { return geometry; },
   };

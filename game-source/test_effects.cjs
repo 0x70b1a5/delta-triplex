@@ -168,7 +168,19 @@ function solveVisibleRow(preferMultiple) {
   assert.equal(labels[0].getAttribute('fill'), paintedNumeral(cellColor, 0, Number(labels[0].dataset.glow), mode));
   assert.equal(Number(labels[1].dataset.glow), 0, 'the next numeral waits its turn');
   assert.equal(labels[1].getAttribute('opacity'), '1');
-  h.frame(step);
+  const intoFall = Math.round(pulse * .4);
+  h.frame(intoFall);
+  labels = numerals(solved.axis, solved.row);
+  {
+    const falling = labels[0];
+    const glowNow = Number(falling.dataset.glow);
+    const paint = w.TriRotation.dimFlashPaint(cellColor, Number(falling.dataset.flashStage), glowNow, mode);
+    assert(glowNow > 0 && Number(falling.dataset.flashAmount) > .05 && Number(falling.dataset.flashAmount) < .85, 'the match pulse eases down instead of holding full brightness');
+    assert.equal(falling.getAttribute('fill'), paint.fill, 'the falling numeral paints the dim-to-flash composite');
+    assert.equal(falling.getAttribute('opacity'), '1');
+    assert.notEqual(falling.getAttribute('fill'), paintedNumeral(cellColor, Number(falling.dataset.flashStage), glowNow, mode));
+  }
+  h.frame(step - intoFall);
   labels = numerals(solved.axis, solved.row);
   assert.equal(labels[0].getAttribute('opacity'), '0.5', 'a numeral dims after it flashes');
   assert.equal(Number(labels[0].dataset.glow), 0);
@@ -178,6 +190,64 @@ function solveVisibleRow(preferMultiple) {
   h.frame(step * h.state.n + pulse);
   labels = numerals(solved.axis, solved.row);
   assert(labels.every(label => label.getAttribute('opacity') === '0.5' && Number(label.dataset.glow) === 0 && label.getAttribute('fill') === 'var(--cell)'), 'the solved clue rests at half opacity');
+  {
+    const nearest = labels.slice().sort((a, b) => Number(a.dataset.run) - Number(b.dataset.run))[0];
+    const endpoint = Number(nearest.dataset.endpoint);
+    const shareEdge = (a, b) => points[a].filter(p => points[b].includes(p)).length === 2;
+    const hops = to => {
+      const dist = new Map([[endpoint, 0]]), queue = [endpoint];
+      for (const from of queue) for (let next = 0; next < points.length; next++) {
+        if (!dist.has(next) && shareEdge(from, next)) { dist.set(next, dist.get(from) + 1); queue.push(next); }
+      }
+      return dist.get(to);
+    };
+    let probe = -1, probeHops = Infinity;
+    for (let i = 0; i < h.state.cells.length; i++) {
+      const c = h.state.cells[i];
+      if (!c.active || c.state !== 0 || rowOf(c, solved.axis, h.state.n) === solved.row) continue;
+      const rank = c.i + c.j + c.o;
+      if (h.state.solution[rank * rank + 2 * c.i + c.o]) continue;
+      const distance = hops(i);
+      if (distance !== undefined && distance < probeHops) { probeHops = distance; probe = i; }
+    }
+    assert(probe >= 0, 'an empty cell outside the solved row can start a ripple');
+    tap(probe, 0);
+    assert(h.state.clues[solved.axis][solved.row].match, 'the probe tap leaves the solved row dim');
+    const watch = () => numerals(solved.axis, solved.row).find(label => Number(label.dataset.run) === Number(nearest.dataset.run));
+    let first = null;
+    for (let i = 0; i < 500 && !first; i++) {
+      h.frame(4);
+      const node = watch();
+      if (Number(node.dataset.glow) > 0) first = node;
+    }
+    assert(first, 'the dim numeral flashes from the ripple');
+    const firstGlow = Number(first.dataset.glow);
+    const firstPaint = w.TriRotation.dimFlashPaint(cellColor, Number(first.dataset.flashStage), firstGlow, mode);
+    assert(firstGlow < .1 && Number(first.dataset.flashAmount) < .25, 'a dim numeral eases out of its half-opacity color');
+    assert.equal(first.getAttribute('fill'), firstPaint.fill);
+    assert.equal(first.getAttribute('opacity'), '1');
+    assert.notEqual(first.getAttribute('fill'), paintedNumeral(cellColor, Number(first.dataset.flashStage), firstGlow, mode));
+    let peak = Number(first.dataset.flashAmount), previous = peak, largestStep = 0, rested = false;
+    for (let i = 0; i < 250 && !rested; i++) {
+      h.frame(8);
+      const node = watch();
+      const amount = Number(node.dataset.flashAmount);
+      const glowNow = Number(node.dataset.glow);
+      if (glowNow > 0) {
+        const paint = w.TriRotation.dimFlashPaint(cellColor, Number(node.dataset.flashStage), glowNow, mode);
+        assert.equal(node.getAttribute('fill'), paint.fill, 'each dim flash frame paints the eased composite');
+        largestStep = Math.max(largestStep, Math.abs(amount - previous));
+        peak = Math.max(peak, amount);
+        previous = amount;
+      } else if (peak > .45 && node.getAttribute('opacity') === '0.5' && node.getAttribute('fill') === 'var(--cell)') rested = true;
+    }
+    assert(peak > .45, 'the eased flash still becomes bright');
+    assert(largestStep < .55, 'the visible color does not jump from dim to bright in one step');
+    assert(rested, 'the numeral rests dim after the flash');
+    h.click('undo');
+    h.exports.game_clear_effects();
+    h.frame();
+  }
   for (const label of svg.querySelectorAll('text[data-axis]')) {
     const matched = h.state.clues[label.dataset.axis][label.dataset.row].match;
     if (Number(label.dataset.axis) === solved.axis && Number(label.dataset.row) === solved.row) continue;
@@ -313,6 +383,29 @@ console.log('PASS: completion footer/icons, visible fill ripples, solved-row num
   }
   const preset = [...svg.querySelectorAll('text[data-column]')].filter(node => h.state.clues[node.dataset.axis][node.dataset.row].match);
   assert(preset.length > 0 && preset.every(node => node.getAttribute('opacity') === '0.5' && Number(node.dataset.glow) === 0), 'rows already solved stay dim');
+  function restingColumns() {
+    return new Set([...svg.querySelectorAll('text[data-column]')].filter(node => node.getAttribute('opacity') === '0.5' && Number(node.dataset.glow) === 0).map(node => `${node.dataset.axis}:${node.dataset.row}`));
+  }
+  function assertRailDim() {
+    const resting = restingColumns();
+    let dimmed = 0;
+    for (const rail of svg.querySelectorAll('path[data-rail]')) {
+      const ids = (rail.dataset.columns || '').split(',').filter(Boolean);
+      const both = ids.length >= 2 && ids.every(id => resting.has(id));
+      if (both) {
+        dimmed++;
+        assert.equal(rail.getAttribute('opacity'), '0.5', 'the line between two dim columns is dim');
+        assert.equal(rail.dataset.dim, '1');
+        const gradient = /url\(#([^)]+)\)/.exec(rail.getAttribute('stroke'))[1];
+        assert.deepEqual([...svg.querySelector('#' + gradient).querySelectorAll('stop')].map(stop => stop.getAttribute('stop-opacity')), ['0', '1', '1'], 'a dim line keeps its fade and only drops in strength');
+      } else {
+        assert.equal(rail.hasAttribute('opacity'), false, 'a line beside an unsolved or still-flashing column stays bright');
+        assert.equal(rail.dataset.dim, undefined);
+      }
+    }
+    return dimmed;
+  }
+  assertRailDim();
   function rowOf(cell, axis, n) {
     return axis === 0 ? cell.i : axis === 1 ? cell.j : n - 1 - cell.i - cell.j - cell.o;
   }
@@ -346,8 +439,62 @@ console.log('PASS: completion footer/icons, visible fill ripples, solved-row num
   const centerDistance = label => Math.hypot(Number(label.getAttribute('x')) - Number(label.dataset.centerX), Number(label.getAttribute('y')) - Number(label.dataset.centerY));
   assert(centerDistance(flashing[1]) < centerDistance(flashing[0]) - .5, 'column numerals flash from the outside inward');
   assert(Number(flashing[0].dataset.glow) > .9 && flashing[1].getAttribute('opacity') === '1' && Number(flashing[1].dataset.glow) === 0);
+  for (const rail of svg.querySelectorAll('path[data-rail]')) {
+    const ids = (rail.dataset.columns || '').split(',');
+    if (ids.includes(`${choice.axis}:${choice.row}`)) assert.equal(rail.dataset.dim, undefined, 'a shared line stays bright while one column is still flashing');
+  }
   h.frame(w.TriRotation.numeralStep * h.state.n + w.TriRotation.numeralPulse);
   assert(labels().every(label => label.getAttribute('opacity') === '0.5' && Number(label.dataset.glow) === 0), 'a solved column clue dims by half');
+  const choiceId = `${choice.axis}:${choice.row}`;
+  let partner = null;
+  for (const rail of svg.querySelectorAll('path[data-rail]')) {
+    const ids = (rail.dataset.columns || '').split(',').filter(Boolean);
+    if (ids.length < 2 || !ids.includes(choiceId)) continue;
+    const other = ids.find(id => id !== choiceId);
+    const [axis, row] = other.split(':').map(Number);
+    if (!h.state.clues[axis][row].match) partner = { axis, row, rail };
+  }
+  if (partner) {
+    let needed = 0, elsewhere = 0;
+    for (let i = 0; i < h.state.cells.length; i++) {
+      const c = h.state.cells[i];
+      if (!c.active || c.state === 1) continue;
+      const rank = c.i + c.j + c.o;
+      if (!h.state.solution[rank * rank + 2 * c.i + c.o]) continue;
+      if (rowOf(c, partner.axis, h.state.n) === partner.row) needed++;
+      else elsewhere++;
+    }
+    assert(needed > 0 && elsewhere > 0, 'solving the neighbor does not finish the puzzle');
+    for (let i = 0; i < h.state.cells.length; i++) {
+      const c = h.state.cells[i];
+      if (!c.active || c.state === 1 || rowOf(c, partner.axis, h.state.n) !== partner.row) continue;
+      const rank = c.i + c.j + c.o;
+      if (!h.state.solution[rank * rank + 2 * c.i + c.o]) continue;
+      for (const type of ['pointerdown', 'pointerup']) {
+        const event = new w.Event(type, { bubbles: true, cancelable: true });
+        Object.assign(event, { pointerId: 1, pointerType: 'touch', button: 0, clientX: 140, clientY: 140 });
+        (type === 'pointerdown' ? svg.querySelector(`[data-cell="${i}"]`) : svg).dispatchEvent(event);
+        h.frame(0);
+      }
+    }
+    assert.equal(h.state.clues[partner.axis][partner.row].match, true);
+    assert.equal(h.state.won, false);
+    h.exports.game_clear_effects();
+    h.frame(w.TriRotation.numeralPulse / 2);
+    const shared = [...svg.querySelectorAll('path[data-rail]')].find(rail => {
+      const ids = (rail.dataset.columns || '').split(',');
+      return ids.includes(choiceId) && ids.includes(`${partner.axis}:${partner.row}`);
+    });
+    assert(shared && shared.dataset.dim === undefined, 'the shared line waits until both columns have settled');
+    h.frame(w.TriRotation.numeralStep * h.state.n + w.TriRotation.numeralPulse);
+    const settled = [...svg.querySelectorAll('path[data-rail]')].find(rail => {
+      const ids = (rail.dataset.columns || '').split(',');
+      return ids.includes(choiceId) && ids.includes(`${partner.axis}:${partner.row}`);
+    });
+    assert.equal(settled.getAttribute('opacity'), '0.5', 'the shared line dims once both columns rest');
+    assert.equal(settled.dataset.dim, '1');
+  }
+  assert(assertRailDim() > 0, 'at least one border between dim columns is dim');
   h.close();
 }
 console.log('PASS: column clues flash one by one and then sit at half opacity.');

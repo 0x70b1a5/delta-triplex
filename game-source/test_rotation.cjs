@@ -248,9 +248,10 @@ const { harness, source } = require("./test_rotation_harness.cjs");
         composition.push(...geometry.outer);
         assert.equal(axes().size, 2);
         assertAnchor();
-        if (!geometry.desktop && width === 390 && height === 760 && h.state.n >= 6) {
-          assert(geometry.columns, "a tall phone stacks clues so the triangle can use the width");
-          assert(geometry.scale * 2 / h.state.n >= 34, "portrait cells stay large enough to tap");
+        if (!geometry.desktop && height >= width) {
+          assert(geometry.columns, "a portrait phone stacks clues for every difficulty");
+          if (width === 390 && height === 760 && h.state.n >= 6)
+            assert(geometry.scale * 2 / h.state.n >= 34, "portrait cells stay large enough to tap");
         }
         const labels = [...board.querySelectorAll("text[data-axis]")];
         for (const label of labels) {
