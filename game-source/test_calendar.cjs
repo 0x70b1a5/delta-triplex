@@ -5,10 +5,14 @@ const h = harness(source, 'https://tri.test/', {}, { now: '2026-09-20T12:00:00' 
 const { d, w } = h;
 assert(!d.getElementById('level-grid'), 'stock selector is retired');
 assert.equal(d.getElementById('today-puzzle').textContent.replace(/\s+/g, ''), "Today'sPuzzle");
-const past = d.getElementById('past-puzzles');
-assert(past.classList.contains('home-up'));
-assert.equal(past.style.getPropertyValue('--x'), '37.5%');
+// Past Puzzles is point-down like the calendar it zooms into; Create takes the dim upward cell.
+const past = d.getElementById('past-puzzles'), create = d.getElementById('create-puzzle');
+assert(!past.classList.contains('home-up'));
+assert.equal(past.style.getPropertyValue('--x'), '25%');
 assert.equal(past.style.getPropertyValue('--y'), '50%');
+assert(create.classList.contains('home-up'));
+assert.equal(create.style.getPropertyValue('--x'), '37.5%');
+assert.equal(create.style.getPropertyValue('--y'), '50%');
 const homeStyle = d.getElementById('home').style;
 assert.equal(homeStyle.getPropertyValue('--home-dim'), palette.mix(homeStyle.getPropertyValue('--bg'), homeStyle.getPropertyValue('--empty'), .25));
 const initial = JSON.stringify(h.state);

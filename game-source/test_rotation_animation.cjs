@@ -53,12 +53,14 @@ for (const [width, height] of [[1440, 760], [900, 550], [390, 480], [320, 360], 
   assert(Math.abs(w.TriRotation.geometry.scale - initialScale) < 1e-6, "settling restores the full size");
   // Drag follows the finger. The remaining angle animates rather than jumping.
   const beforeSwipe = w.TriRotation.geometry.angle, beforeTurns = w.TriRotation.stats.turns;
-  pointer("pointerdown", svg, 200, 200);
-  pointer("pointermove", svg, 275, 200);
+  // Start above the pivot, where a rightward phone drag turns clockwise.
+  const above = Math.max(1, w.TriRotation.geometry.center[1] - 40);
+  pointer("pointerdown", svg, 200, above);
+  pointer("pointermove", svg, 275, above);
   assert(Math.abs(w.TriRotation.geometry.angle - beforeSwipe - (width >= 900 ? 75 : 37.5)) < 1e-6, "mobile swipe preview has half desktop sensitivity");
   checkFrame();
   const releaseAngle = w.TriRotation.geometry.angle;
-  pointer("pointerup", svg, 275, 200);
+  pointer("pointerup", svg, 275, above);
   assert(Math.abs(w.TriRotation.geometry.angle - releaseAngle) < 1e-6, "no jump at gesture release");
   for (let tick = 0; tick < 28; tick++) { h.frame(16); checkFrame(); }
   assert(!w.TriRotation.stats.animating);
@@ -147,4 +149,29 @@ assert.equal(reduced.w.TriRotation.stats.turns, 2);
 reduced.click("turn-right");
 assert.equal(reduced.w.TriRotation.stats.turns, 3, "scroll cooldown does not block buttons");
 reduced.close();
-console.log("PASS: horizontal desktop base, centered/maximized layout, smooth turns and gesture settling, fixed pivot, maximized desktop rest size and bounded turns, input suppression, and subthreshold snap-back.");
+// Phone drags turn the board like a wheel about its pivot; desktop keeps plain directions.
+for (const [width, height] of [[390, 760], [1200, 760]]) {
+  const wheel = harness(source, "https://tri.test/", {}, { reducedMotion: true });
+  wheel.startPuzzle(); wheel.resize(width, height);
+  const board = wheel.d.getElementById("rotate-board");
+  board.setPointerCapture = () => {};
+  const drag = (x, y, dx, dy) => {
+    const before = wheel.w.TriRotation.stats.view;
+    for (const [type, px, py] of [["pointerdown", x, y], ["pointermove", x + dx, y + dy], ["pointerup", x + dx, y + dy]]) {
+      const event = new wheel.w.Event(type, { bubbles: true, cancelable: true });
+      Object.assign(event, { pointerId: 1, button: 0, pointerType: "touch", clientX: px, clientY: py });
+      board.dispatchEvent(event); wheel.flush();
+    }
+    wheel.frame(1000);
+    return ((wheel.w.TriRotation.stats.view - before) % 3 + 3) % 3 === 1 ? "cw" : "ccw";
+  };
+  const [cx, cy] = wheel.w.TriRotation.geometry.center, phone = width < 900;
+  assert.equal(drag(cx, cy - 100, 150, 0), "cw", "rightward drag above the pivot turns clockwise");
+  assert.equal(drag(cx, cy + 100, 150, 0), phone ? "ccw" : "cw", "rightward drag below the pivot turns counterclockwise on a phone");
+  assert.equal(drag(cx, cy + 100, -150, 0), phone ? "cw" : "ccw");
+  assert.equal(drag(cx + 100, cy, 0, 150), "cw", "downward drag right of the pivot turns clockwise");
+  assert.equal(drag(cx - 100, cy, 0, -150), phone ? "cw" : "ccw", "upward drag left of the pivot turns clockwise on a phone");
+  assert.equal(drag(cx - 100, cy, 0, 150), phone ? "ccw" : "cw");
+  wheel.close();
+}
+console.log("PASS: horizontal desktop base, centered/maximized layout, smooth turns and gesture settling, fixed pivot, maximized desktop rest size and bounded turns, input suppression, subthreshold snap-back, and wheel-like phone drags.");

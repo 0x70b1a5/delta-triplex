@@ -106,7 +106,7 @@ console.log('PASS: submenu zoom endpoints/midpoint/reverse, input guard, back ti
   const expected = [
     [scene.querySelector('.home-credit')],
     [...scene.querySelectorAll('.home-up[data-row="2"]')],
-    ['create-puzzle', 'load-puzzle'].map(id => h.d.getElementById(id)),
+    ['past-puzzles', 'load-puzzle'].map(id => h.d.getElementById(id)),
     [...scene.querySelectorAll('.home-up[data-row="1"]')],
     ['today-puzzle', 'how-to-play', 'endless-mode'].map(id => h.d.getElementById(id)),
     [scene.querySelector('.home-banner')],

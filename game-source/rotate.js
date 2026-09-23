@@ -769,13 +769,21 @@
     const half = Math.min((900 - 96) / 2, (760 - 144) / SQRT3);
     return [450 + (c.j - c.i) * half / n, 380 - half * SQRT3 / 2 + (n - c.i - c.j - (c.o ? 4 / 3 : 2 / 3)) * half / n * SQRT3];
   }
+  // On a phone a drag turns the board like a wheel about its pivot: rightward
+  // below the pivot, or upward left of it, turns counterclockwise. The side is
+  // fixed where the drag starts. [horizontal sign, vertical sign]
+  function wheelSigns(e) {
+    if (window.innerWidth >= 900 || !geometry) return [1, 1];
+    const rect = stage.getBoundingClientRect();
+    return [e.clientY - rect.top > geometry.center[1] ? -1 : 1, e.clientX - rect.left < geometry.center[0] ? -1 : 1];
+  }
   svg.addEventListener("contextmenu", e => e.preventDefault());
   svg.addEventListener("pointerdown", e => {
     if (!mayPlay() || state.won || animation || (e.button !== 0 && e.button !== 2)) return;
     e.preventDefault(); svg.focus({ preventScroll: true });
     svg.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, pointerPosition(e));
-    if (pointers.size === 1) gesture = { start: pointerPosition(e), cell: e.target.closest?.("[data-cell]")?.getAttribute("data-cell"), tool: e.button === 2 ? 2 : 1, moved: false, twist: false, delta: 0 };
+    if (pointers.size === 1) gesture = { start: pointerPosition(e), cell: e.target.closest?.("[data-cell]")?.getAttribute("data-cell"), tool: e.button === 2 ? 2 : 1, moved: false, twist: false, delta: 0, wheel: wheelSigns(e) };
     else if (pointers.size === 2) { gesture.twist = true; gesture.lastAngle = pairAngle(); gesture.delta = 0; preview = 0; }
     else { gesture.cancelled = true; preview = 0; }
   });
@@ -791,7 +799,8 @@
     } else if (!gesture.twist) {
       const dx = e.clientX - gesture.start[0], dy = e.clientY - gesture.start[1];
       if (Math.hypot(dx, dy) > 8) gesture.moved = true;
-      gesture.delta = (Math.abs(dx) >= Math.abs(dy) ? dx : dy) * (window.innerWidth < 900 ? .5 : 1);
+      const horizontal = Math.abs(dx) >= Math.abs(dy);
+      gesture.delta = (horizontal ? dx : dy) * gesture.wheel[horizontal ? 0 : 1] * (window.innerWidth < 900 ? .5 : 1);
       if (gesture.moved) { preview = Math.max(-120, Math.min(120, gesture.delta)); requestFrame(); }
     }
   });

@@ -57,7 +57,7 @@
           cell(down, x, row / rows, row);
           if (col < rows - row - 1) {
             const up = scene.id === "home-main" && col === 0
-              ? row === rows - 2 ? el("past-puzzles") : row === 1 ? el("home-settings") : document.createElement("i")
+              ? row === rows - 2 ? el("create-puzzle") : row === 1 ? el("home-settings") : document.createElement("i")
               : document.createElement("i");
             if (!up.matches("button")) { up.className = "home-filler home-up"; up.setAttribute("aria-hidden", "true"); }
             scene.append(up); cell(up, x + .5 / rows, row / rows, row);
