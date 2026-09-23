@@ -14,7 +14,8 @@ let depth = historyHost.history.state?.[historyKey]?.depth || 0;
 let pending = false,
   applying = false,
   endlessPlace = "",
-  publishedHash = "";
+  publishedHash = "",
+  traversedHref = "";
 function replaceHash(hash) {
   const url = new URL(historyHost.location.href);
   url.hash = hash.replace(/^#/, "");
@@ -41,6 +42,11 @@ window.triSetEndlessPlace = function (code) {
   publishPlace();
 };
 window.triPublishPlace = publishPlace;
+window.triConsumeTraversal = function (href) {
+  const own = href === traversedHref;
+  traversedHref = "";
+  return own;
+};
 function uiDepth() {
   const playing = !el("home").hidden ? 0 : 1;
   const section = !el("home-back").hidden && !el("home").hidden;
@@ -69,6 +75,10 @@ window.triSyncHistory = function () {
 };
 function handleHistoryPop(event) {
   const entry = event.state?.[historyKey];
+  // Moving between our own entries can also change the hash (#seed= is only
+  // written on the play entry). Remember it so the hashchange that follows
+  // is not mistaken for a newly opened link.
+  traversedHref = entry?.id === historyId ? historyHost.location.href : "";
   depth = entry?.id === historyId ? entry.depth : 0;
   if (pending) {
     pending = false;

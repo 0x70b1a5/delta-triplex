@@ -50,6 +50,10 @@
   el("result-close").onclick = () => { copyPanel.hidden = true; el("share-result").focus(); };
 
   let view = 0, visualTurn = 0, preview = 0, animation = null, key = "", restart = false;
+  // A crafted puzzle faces its author's chosen way: it opens there and the
+  // victory spin always lands there. reveal holds the extra turn that spin adds.
+  let reveal = null;
+  const homeView = () => state?.custom ? currentPuzzle?.orientation || 0 : 0;
   let elapsed = 0, turns = 0, lastTick = performance.now(), running = false;
   let finished = null, previousWon = false, geometry = null;
   let shareHelpSettled = false;
@@ -227,7 +231,7 @@
       cancelGesture();
       saveAttempt(true);
       const forceFresh = restart;
-      key = boardKey; restart = false; view = visualTurn = preview = 0; animation = null;
+      key = boardKey; restart = false; view = homeView(); visualTurn = preview = 0; animation = null; reveal = null;
       elapsed = turns = 0; finished = null; previousWon = false;
       lastTick = performance.now();
       // Built-in progress survives reload/navigation; its stopwatch must, too.
@@ -242,9 +246,10 @@
         : !forceFresh && attemptKey && attempts[attemptKey];
       if (saved && Number.isFinite(saved.elapsed) && saved.elapsed >= 0 && Number.isInteger(saved.turns) && saved.turns >= 0) {
         elapsed = saved.elapsed; turns = saved.turns;
-        view = Number.isInteger(saved.view) ? ((saved.view % 3) + 3) % 3 : 0;
+        if (Number.isInteger(saved.view)) view = ((saved.view % 3) + 3) % 3;
         finished = saved.finished;
       }
+      if (next.won && !next.editing) view = homeView();
       visualTurn = view * 120;
       if (next.won && !finished) finished = { unknown: true };
       solvedRows.clear();
@@ -252,6 +257,14 @@
     }
     syncSolvedRows(next, !freshBoard);
     if (next.won && !next.editing && !previousWon && !finished) finished = { elapsed, turns };
+    if (next.won && !next.editing && !previousWon && !freshBoard) {
+      // Land on the home view. The spin is never less than a full turn: it adds
+      // 120° either way when the board is off home, choosing the shorter side.
+      finishAnimation(); preview = 0;
+      const extra = [0, 120, -120][((homeView() - view) % 3 + 3) % 3];
+      view = homeView(); visualTurn += extra;
+      reveal = { extra, total: extra < 0 ? extra - 360 : extra + 360 };
+    }
     if (!next.won) finished = null;
     previousWon = next.won;
     saveAttempt(true);
@@ -339,21 +352,23 @@
     const saved = localStorage.getItem("delta-triplex-clue-style");
     if (saved === "corner" || saved === "curve") columnStyle = saved;
   } catch {}
-  // Center spacing is three times the previous pitch. The inner numeral keeps
-  // its original offset from the corner joint the rail already measures.
-  function columnMetrics(font) {
+  // Center spacing is three times the previous pitch; very short screens
+  // tighten it (see chooseMobileLayout). The inner numeral keeps its original
+  // offset from the corner joint the rail already measures.
+  const COLUMN_SPREADS = [3, 2, 1.5];
+  function columnMetrics(font, spread = COLUMN_SPREADS[0]) {
     const pitch = font * 1.12;
     const gap = Math.max(4, font * .42);
     const tail = font * .55;
-    const offset = i => gap + (i * 3 + .5) * pitch;
+    const offset = i => gap + (i * spread + .5) * pitch;
     return { pitch, gap, tail, offset, reach: count => offset(count - 1) + pitch * .5 + tail };
   }
-  function columnBands(clues, angle, font, numeralFont = font) {
+  function columnBands(clues, angle, font, numeralFont = font, spread) {
     const radius = .8 * 2 / state.n;
     const shift = radius / 2;
     const corner = columnStyle === "corner";
     const rise = corner ? radius / (2 * Math.sqrt(3)) : radius * Math.sqrt(3) / 2;
-    const { pitch, gap, offset, reach } = columnMetrics(font);
+    const { pitch, gap, offset, reach } = columnMetrics(font, spread);
     const textHalf = value => numeralFont * .36 * String(value).length;
     const grouped = [[], []];
     for (const clue of clues) {
@@ -410,11 +425,11 @@
       max: [right ? 0 : width, top ? font : 0],
     };
   }
-  function pose(angle, desktop, font, withClues, columns, numeralFont = font) {
+  function pose(angle, desktop, font, withClues, columns, numeralFont = font, spread) {
     const outer = [vertex(0, 0, state.n), vertex(state.n, 0, state.n), vertex(0, state.n, state.n)].map(p => rotatePoint(p, angle));
     const clues = withClues ? clueRows(angle, desktop) : [];
     const constraints = outer.map(p => ({ p, extra: [0, 0], min: [0, 0], max: [0, 0] }));
-    if (columns && clues.length) constraints.push(...columnBands(clues, angle, font, numeralFont).constraints);
+    if (columns && clues.length) constraints.push(...columnBands(clues, angle, font, numeralFont, spread).constraints);
     else for (const clue of clues) {
       const direction = rotatePoint(clue.outward, angle);
       clue.runs.forEach((value, i) => constraints.push({
@@ -425,10 +440,10 @@
     return { clues, constraints };
   }
   let layoutCache = null;
-  function fitBoard(width, height, base, desktop, font, solved, columns, numeralFont = font) {
-    const key = JSON.stringify([width, height, base, font, numeralFont, solved, !!columns, columnStyle, state.n, state.clues.map(axis => axis.map(row => row.runs))]);
+  function fitBoard(width, height, base, desktop, font, solved, columns, numeralFont = font, spread = COLUMN_SPREADS[0]) {
+    const key = JSON.stringify([width, height, base, font, numeralFont, spread, solved, !!columns, columnStyle, state.n, state.clues.map(axis => axis.map(row => row.runs))]);
     if (layoutCache?.key === key) return layoutCache;
-    const poses = [0, 120, 240].map(turn => pose(base + turn, desktop, font, !solved, columns, numeralFont));
+    const poses = [0, 120, 240].map(turn => pose(base + turn, desktop, font, !solved, columns, numeralFont, spread));
     const constraints = poses.flatMap(p => p.constraints);
     // Fit the whole composition, allowing translation as well as scale. Every
     // pair of bounds limits scale independently of where the pivot is placed.
@@ -443,13 +458,15 @@
           (available - high.extra[axis] - high.max[axis] + low.extra[axis] + low.min[axis]) / distance);
       }
     }
+    // Below 1 the composition cannot fit; callers may retry with tighter clues.
+    const fits = scale >= 1;
     scale = Math.max(1, scale);
     const center = [0, 1].map(axis => {
       const low = Math.min(...constraints.map(c => c.p[axis] * scale + c.extra[axis] + c.min[axis]));
       const high = Math.max(...constraints.map(c => c.p[axis] * scale + c.extra[axis] + c.max[axis]));
       return ((axis ? height : width) - low - high) / 2;
     });
-    layoutCache = { key, poses, scale, center };
+    layoutCache = { key, poses, scale, center, fits };
     return layoutCache;
   }
   function finishAnimation() {
@@ -477,21 +494,27 @@
     const key = JSON.stringify([width, height, base, columnStyle, state.n, state.clues.map(axis => axis.map(row => row.runs))]);
     if (mobileChoice?.key === key) return mobileChoice;
     const digits = widestRun();
-    const pack = columns => {
+    const pack = (columns, spread) => {
+      const fit = font => fitBoard(width, height, base, false, font, false, columns, font, spread);
       const roomy = font => {
-        const scale = fitBoard(width, height, base, false, font, false, columns).scale;
+        const scale = fit(font).scale;
         const textWidth = font * .72 * digits;
         return scale >= 1 && (!columns || textWidth <= scale * SQRT3 / state.n * .8);
       };
-      const maxScale = fitBoard(width, height, base, false, 8, false, columns).scale;
+      const maxScale = fit(8).scale;
       let font = 8;
       for (let candidate = columns ? 18 : 20; candidate >= 8; candidate--) {
-        const scale = fitBoard(width, height, base, false, candidate, false, columns).scale;
+        const scale = fit(candidate).scale;
         if (scale + 1e-6 >= maxScale * .97 && roomy(candidate)) { font = candidate; break; }
       }
-      return { columns, font, scale: fitBoard(width, height, base, false, font, false, columns).scale };
+      const fits = !columns || fitBoard(width, height, base, false, font, false, true, font * COLUMN_NUMERAL, spread).fits;
+      return { columns, font, spread, fits, scale: fit(font).scale };
     };
-    const stacked = pack(true), diagonal = pack(false);
+    // Tall stacks on a short screen tighten from the full spacing only as far
+    // as they must to stay on screen.
+    let stacked;
+    for (const spread of COLUMN_SPREADS) if ((stacked = pack(true, spread)).fits) break;
+    const diagonal = pack(false);
     // Column clues are the portrait for every difficulty. A short, wide stage
     // still keeps diagonals when that leaves the cells larger.
     const choice = height >= width || stacked.scale >= diagonal.scale - .25 ? stacked : diagonal;
@@ -500,16 +523,18 @@
   }
   function layout(width, height) {
     const desktop = window.innerWidth >= 900;
-    const base = desktop ? 0 : -90;
+    // Desktop is base-up; mobile is base-left, turned 30° from desktop so the
+    // corner pointing up-right on desktop points right on a phone.
+    const base = desktop ? 0 : 30;
     const angle = base + visualTurn + preview;
     const maxRuns = Math.max(1, ...state.clues.flat().map(line => line.runs.length));
     const solved = state.won && !state.editing;
-    let font, columns = false;
+    let font, columns = false, spread;
     if (desktop) font = Math.max(8, Math.min(20, width / (state.n * 2.5), (height - 80) / (2.8 * maxRuns)));
     else if (solved) font = 8;
-    else ({ font, columns } = chooseMobileLayout(width, height, base));
+    else ({ font, columns, spread } = chooseMobileLayout(width, height, base));
     const numeralFont = columns ? font * COLUMN_NUMERAL : font;
-    const fitted = fitBoard(width, height, base, desktop, font, solved, columns, numeralFont);
+    const fitted = fitBoard(width, height, base, desktop, font, solved, columns, numeralFont, spread);
     const resting = fitted.poses[view];
     const moving = animation !== null || preview !== 0;
     const restingScale = fitted.scale, center = fitted.center;
@@ -524,7 +549,7 @@
       }
     }
     const toScreen = p => rotatePoint(p, angle).map((v, axis) => center[axis] + v * scale);
-    return { width, height, desktop, angle, scale, center, font, columns, toScreen, clues: moving ? [] : resting.clues,
+    return { width, height, desktop, angle, scale, center, font, columns, spread, toScreen, clues: moving ? [] : resting.clues,
       moving, outer: vertices.map(toScreen) };
   }
   // A solved column stays bright until its outside-in pulse has finished.
@@ -539,7 +564,7 @@
       geometry.center[0] + p[0] * geometry.scale + extra[0],
       geometry.center[1] + p[1] * geometry.scale + extra[1],
     ];
-    const { sides } = columnBands(geometry.clues, geometry.angle, geometry.font);
+    const { sides } = columnBands(geometry.clues, geometry.angle, geometry.font, geometry.font, geometry.spread);
     const defs = node("defs", {});
     fragment.append(defs);
     const font = geometry.font;
@@ -609,13 +634,19 @@
       }
     }
   }
-  window.triPuzzleHue = () => window.triMenuOpen || state?.editing ? 0 : visualTurn + preview;
+  // Hue turns with the board, measured from the puzzle's home view. During the
+  // reveal it follows the extra turn so the palette settles smoothly.
+  const revealProgress = () => call("celebrating") ? call("celebration_angle") / 360 : 1;
+  window.triPuzzleHue = () => window.triMenuOpen || state?.editing ? 0
+    : visualTurn + preview - homeView() * 120 - (reveal ? reveal.extra * (1 - revealProgress()) : 0);
   window.triDrawBoard = () => {
     if (!state?.cells) return;
     const rect = stage.getBoundingClientRect();
     advanceAnimation();
     applyPalette();
-    call("effect_axis", [2, 1, 0][view]);
+    // The victory wave starts at the visible point. Mobile's base is 30° past
+    // desktop's, which puts the point on the corner desktop shows one turn later.
+    call("effect_axis", [2, 1, 0][window.innerWidth >= 900 ? view : (view + 1) % 3]);
     const effects = call("effects", performance.now());
     const victory = !!call("celebrating");
     geometry = layout(Math.max(160, rect.width), Math.max(160, rect.height));
@@ -643,7 +674,8 @@
     const fragment = node("g", { "data-board-layer": "" });
     if (victory) {
       const pivot = geometry.center;
-      fragment.setAttribute("transform", `translate(${pivot.join(" ")}) rotate(${call("celebration_angle")}) scale(${call("celebration_scale")}) translate(${-pivot[0]} ${-pivot[1]})`);
+      const spin = reveal ? call("celebration_angle") * reveal.total / 360 - reveal.extra : call("celebration_angle");
+      fragment.setAttribute("transform", `translate(${pivot.join(" ")}) rotate(${spin}) scale(${call("celebration_scale")}) translate(${-pivot[0]} ${-pivot[1]})`);
       fragment.dataset.pivot = pivot.join(",");
     }
     state.cells.forEach((cell, index) => {
@@ -693,6 +725,7 @@
     const to = (animation?.to ?? visualTurn) + steps * 120;
     view = ((view + steps) % 3 + 3) % 3;
     if (!state.editing) turns += Math.abs(steps);
+    else window.triSetPuzzleOrientation?.(view);
     preview = 0;
     if (motionEnabled && Math.abs(to - from) > .01) {
       animation = { from, to, scroll, start: performance.now(),

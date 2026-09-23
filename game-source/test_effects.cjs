@@ -306,13 +306,22 @@ for (let view = 0; view < 3; view++) {
   assert.equal(svg.querySelector('polygon').getAttribute('points'), startingPoints, 'the camera transforms the entire board, including gaps');
   const layer = svg.querySelector('[data-board-layer]');
   assert.equal(layer.dataset.pivot, startingPivot, 'victory pivot stays fixed');
-  assert(layer.getAttribute('transform').includes('rotate(315) scale(1.100000'), 'original camera angle and zoom are applied without clamping');
+  // The spin always ends on the home view (0 here), adding 120° the shorter way when turned away.
+  const extra = [0, 120, -120][(3 - view) % 3], total = extra < 0 ? extra - 360 : extra + 360;
+  assert(Math.abs(total) >= 360, 'the reveal is never less than a full turn');
+  assert.equal(w.TriRotation.stats.view, 0, 'solving lands on the home view');
+  assert(layer.getAttribute('transform').includes(`rotate(${315 * total / 360 - extra}) scale(1.100000`), 'original camera easing and zoom, scaled to reach home');
   h.frame(250); assert(!h.exports.game_celebrating());
   assert.equal(h.exports.game_celebration_angle(), 0);
   assert.equal(h.exports.game_celebration_scale(), 1);
   assert.equal(JSON.stringify(w.TriRotation.stats.finished), result, 'victory effects do not change solve stats');
   h.exports.game_clear_effects(); h.frame();
-  const axis = [2, 1, 0][view];
+  const axis = [2, 1, 0][solvedGeometry.desktop ? 0 : 1];
+  // That axis starts at the visible point: bottom on desktop, right on mobile.
+  const tip = [...svg.querySelectorAll('polygon')].map(p => [Number(p.dataset.cell), p.getAttribute('points').split(' ').map(q => q.split(',').map(Number))])
+    .map(([i, pts]) => [i, pts.reduce((sum, q) => sum + q[solvedGeometry.desktop ? 1 : 0], 0)]).sort((a, b) => b[1] - a[1])[0][0];
+  const tc = h.state.cells[tip];
+  assert.equal(axis === 0 ? tc.i : axis === 1 ? tc.j : h.state.n - 1 - tc.i - tc.j - tc.o, h.state.n - 1, 'the wave axis starts at the visible point');
   for (let step = 0; step < (2 * h.state.n - 1) * 2; step++) {
     if (step) h.frame(1);
     for (let i = 0; i < h.state.cells.length; i++) {
@@ -345,7 +354,7 @@ for (let view = 0; view < 3; view++) {
 }
 h.close();
 }
-console.log('PASS: completion footer/icons, visible fill ripples, solved-row numeral flashes, finite victory spin/scale, rotated point-to-base ROYGBIV edge waves, frozen solve stats, fixed victory pivot and reduced motion.');
+console.log('PASS: completion footer/icons, visible fill ripples, solved-row numeral flashes, finite victory spin/scale that lands on the home view, point-to-base ROYGBIV edge waves, frozen solve stats, fixed victory pivot and reduced motion.');
 
 {
   const h = harness(source, 'https://tri.test/#level=3', {}, { reducedMotion: false });
@@ -381,6 +390,9 @@ console.log('PASS: completion footer/icons, visible fill ripples, solved-row num
     assert.equal(Number(following.dataset.glow), 0, 'the next column numeral waits a hop');
     h.click('undo'); h.exports.game_clear_effects(); h.frame();
   }
+  // Turn until a row that was solved from the start is on a visible side.
+  const matchedShown = () => [...svg.querySelectorAll('text[data-column]')].some(node => h.state.clues[node.dataset.axis][node.dataset.row].match);
+  for (let i = 0; i < 2 && !matchedShown(); i++) { h.click('turn-right'); h.frame(500); h.frame(); }
   const preset = [...svg.querySelectorAll('text[data-column]')].filter(node => h.state.clues[node.dataset.axis][node.dataset.row].match);
   assert(preset.length > 0 && preset.every(node => node.getAttribute('opacity') === '0.5' && Number(node.dataset.glow) === 0), 'rows already solved stay dim');
   function restingColumns() {

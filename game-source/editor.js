@@ -59,7 +59,8 @@ document.addEventListener("pointerdown", (event) => {
     toggleMenu(false);
 });
 
-const directionCodes = ["S", "E", "N", "W"];
+// Orientation counts clockwise 120° turns from the canonical base-up view.
+const orientations = [0, 1, 2];
 function validPuzzle(value) {
   return (
     value &&
@@ -69,17 +70,18 @@ function validPuzzle(value) {
     Array.isArray(value.solution) &&
     value.solution.length === value.size ** 2 &&
     value.solution.every((v) => v === 0 || v === 1) &&
-    (!value.orientation || directionCodes.includes(value.orientation))
+    (value.orientation === undefined || orientations.includes(value.orientation))
   );
 }
 function normalizePuzzle(value) {
   return {
     format: "tri-logic",
-    version: 2,
+    version: 3,
     cellOrder: "north-row-major",
     name: String(value.name || TriCopy.t("editor.my-puzzle")).slice(0, 80),
     size: value.size,
     solution: value.solution.slice(),
+    orientation: orientations.includes(value.orientation) ? value.orientation : 0,
     ...(Number.isInteger(value.seed) &&
     value.seed >= 0 &&
     value.seed <= 0xffffffff &&
@@ -199,6 +201,13 @@ window.triCustomState = (next) => {
   el("reset").title = next.editing
     ? TriCopy.t("editor.clear-solution-r-undo-restores-it")
     : TriCopy.t("ui.reset-r-undo-restores-it");
+};
+// Turning the board while editing sets how the puzzle opens and is revealed.
+window.triSetPuzzleOrientation = (view) => {
+  if (!currentPuzzle || !authorSession) return;
+  currentPuzzle.orientation = view;
+  draft = normalizePuzzle(currentPuzzle);
+  saveDraft();
 };
 el("editor-open").onclick = () => {
   loadCustom(draft, true, true);
@@ -329,7 +338,9 @@ el("editor-share").onclick = async () => {
     toast(TriCopy.t("editor.select-and-copy-the-puzzle-link"));
   }
 };
-window.addEventListener("hashchange", () => {
+window.addEventListener("hashchange", event => {
+  // back.js already restored the view for its own history moves.
+  if (window.triConsumeTraversal?.(event.newURL)) return;
   initializedCustom = false;
   window.triInitializeCustom();
 });

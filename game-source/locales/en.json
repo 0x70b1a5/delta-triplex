@@ -60,7 +60,7 @@
   "editor.select-and-copy-the-puzzle-link": "Select and copy the puzzle link.",
   "editor.settings": "Settings",
   "editor.settings-export": "Settings / export",
-  "editor.settingsHelp": "Paint the solution on the board. Clues update automatically.",
+  "editor.settingsHelp": "Paint the solution on the board. Clues update automatically. Players see the puzzle facing the way you turn it here, both at the start and at the reveal.",
   "editor.size": "Size",
   "editor.the-embedded-puzzle-is-invalid": "The embedded puzzle is invalid.",
   "editor.the-puzzle-could-not-be-loaded": "The puzzle could not be loaded.",

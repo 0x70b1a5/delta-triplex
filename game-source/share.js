@@ -1,6 +1,6 @@
 "use strict";
-// Version 2: version, side length, then MSB-first packed solution bits.
-// View rotation is session state, never puzzle data.
+// Version 3: version, then side length (low four bits) with the author's
+// orientation (0-2, the next two bits), then MSB-first packed solution bits.
 // Base64url has no padding. Solution order is the existing north-row-major order.
 window.TriShare = {
   // 32 seed bits + 3 difficulty bits fit in seven Base32 digits. Use arithmetic,
@@ -30,11 +30,12 @@ window.TriShare = {
       n > 10 ||
       !Array.isArray(puzzle.solution) ||
       puzzle.solution.length !== n * n ||
-      !puzzle.solution.every((v) => v === 0 || v === 1)
+      !puzzle.solution.every((v) => v === 0 || v === 1) ||
+      ![undefined, 0, 1, 2].includes(puzzle.orientation)
     )
       throw Error(TriCopy.t("share.invalid-puzzle"));
     const bytes = new Uint8Array(2 + Math.ceil((n * n) / 8));
-    bytes.set([2, n]);
+    bytes.set([3, n | (puzzle.orientation || 0) << 4]);
     puzzle.solution.forEach((v, i) => {
       bytes[2 + (i >> 3)] |= v << (7 - (i & 7));
     });
@@ -50,10 +51,12 @@ window.TriShare = {
       atob(code.replace(/-/g, "+").replace(/_/g, "/")),
       (c) => c.charCodeAt(0),
     );
-    const [version, n] = bytes;
+    const [version, shape] = bytes;
+    const n = shape & 15, orientation = shape >> 4;
     const offset = 2;
     if (
-      version !== 2 ||
+      version !== 3 ||
+      orientation > 2 ||
       n < 2 ||
       n > 10 ||
       bytes.length !== offset + Math.ceil((n * n) / 8)
@@ -61,10 +64,11 @@ window.TriShare = {
       throw Error(TriCopy.t("share.unsupported-puzzle-link"));
     const puzzle = {
       format: "tri-logic",
-      version: 2,
+      version: 3,
       cellOrder: "north-row-major",
       name: TriCopy.t("share.defaultName"),
       size: n,
+      orientation,
       solution: Array.from(
         { length: n * n },
         (_, i) => (bytes[offset + (i >> 3)] >> (7 - (i & 7))) & 1,

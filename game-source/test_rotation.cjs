@@ -75,7 +75,7 @@ const { harness, source } = require("./test_rotation_harness.cjs");
       else assert(first <= last + 1e-6, "lower columns read from the outside up toward the board");
       for (let i = 1; i < list.length; i++) {
         const step = Math.abs(Number(list[i].getAttribute("y")) - Number(list[i - 1].getAttribute("y")));
-        assert(Math.abs(step - pitchFont * 1.12 * 3) < .75, "numerals in a column are spaced three times further apart");
+        assert(Math.abs(step - pitchFont * 1.12 * geometry.spread) < .75, "numerals in a column are spaced by the chosen spread");
       }
     }
     for (const side of ["above", "below"]) {
@@ -222,17 +222,17 @@ const { harness, source } = require("./test_rotation_harness.cjs");
     await h.settle(() => h.state.custom && w.triEndlessRun?.difficulty === difficulty);
     assert.equal(h.state.n, [4, 6, 8, 10, 3][difficulty]);
     h.click("editor-json"); const puzzle = JSON.parse(await h.download());
-    assert(!("orientation" in puzzle), "export omits orientation");
+    assert.equal(puzzle.orientation, 0, "generated puzzles face the default way");
     assert.equal(d.getElementById("session-seed").textContent, "Code " + w.TriShare.seedCode(puzzle.seed, puzzle.difficulty));
     assert(d.getElementById("session-seed").title.includes(puzzle.seed.toString(16).toUpperCase().padStart(8, "0")));
     const code = w.TriShare.seedCode(puzzle.seed, puzzle.difficulty);
     assert.deepEqual(w.TriShare.seedPuzzle(code).solution, puzzle.solution, "one code reproduces this difficulty and seed");
-    const url = w.TriShare.url(puzzle); assert(!url.includes("orientation") && !url.includes("difficulty"));
+    const url = w.TriShare.url(puzzle); assert(url.includes("#seed=") && !url.includes("orientation") && !url.includes("difficulty"));
     const linkedSeed = harness(source, url);
     assert.deepEqual(linkedSeed.state.solution, h.state.solution);
     assert.equal(linkedSeed.w.TriRotation.stats.view, 0); linkedSeed.close();
     const packed = w.TriShare.decode(w.TriShare.encode(puzzle));
-    assert(!("orientation" in packed)); assert.deepEqual(packed.solution, puzzle.solution);
+    assert.equal(packed.orientation, 0); assert.deepEqual(packed.solution, puzzle.solution);
     h.click("editor-export");
     const standalone = harness(await h.download());
     assert.deepEqual(standalone.state.solution, h.state.solution);
@@ -318,5 +318,24 @@ const { harness, source } = require("./test_rotation_harness.cjs");
     h.resize(900, 760);
   }
   h.close();
-  console.log("PASS: real WASM rules, centered view, all clue sides, tap/swipe/twist/cancel/wheel, rotation counts, timing/pause/freeze/undo/reset, brag fallback, level links, five Endless difficulties, orientation-free exports and seed links.");
+  // Worst cases for stacked clues: every line alternates, so one column holds
+  // ten runs. Short phones tighten the spacing only as far as needed.
+  for (const [pattern, expected] of [[i => i % 2, [1.5, 2, 3]], [i => (i >> 1) % 2, [3, 3, 3]]]) {
+    const url = w.TriShare.url({ format: "tri-logic", version: 2, cellOrder: "north-row-major", size: 10,
+      solution: Array.from({ length: 100 }, (_, i) => pattern(i)) }).replace("https://delta.theologi.ca/", "https://tri.test/");
+    const dense = harness(source, url), denseBoard = dense.d.getElementById("rotate-board");
+    [[320, 360], [390, 480], [390, 760]].forEach(([width, height], index) => {
+      dense.resize(width, height);
+      const geometry = dense.w.TriRotation.geometry;
+      assert(geometry.columns);
+      assert.equal(geometry.spread, expected[index], `clue spread at ${width}×${height}`);
+      assertColumnClues(denseBoard, geometry, width, height, 10, []);
+      for (const label of denseBoard.querySelectorAll("text[data-axis]")) {
+        const y = Number(label.getAttribute("y")), font = Number(label.getAttribute("font-size"));
+        assert(y - font / 2 >= 7.99 && y + font / 2 <= height - 7.99, `dense clues stay inside ${width}×${height}`);
+      }
+    });
+    dense.close();
+  }
+  console.log("PASS: real WASM rules, centered view, all clue sides, tap/swipe/twist/cancel/wheel, rotation counts, timing/pause/freeze/undo/reset, brag fallback, level links, five Endless difficulties, default-facing exports and seed links, tightened clue spacing on short phones.");
 })().catch(error => { console.error(error); process.exit(1); });

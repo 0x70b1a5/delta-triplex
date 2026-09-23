@@ -180,6 +180,9 @@ for (const reducedMotion of [false,true]) {
     for(const p of edges[i])assert(Math.abs((b[0]-a[0])*(p[1]-a[1])-(b[1]-a[1])*(p[0]-a[0]))<1e-5,'field boundary lies on the menu edge');
   });
   h.click('past-puzzles');assert(!h.d.getElementById('home').hidden);
+  const tile=[...backdrop.querySelectorAll('pattern')].map(p=>p.getAttribute('width'));
+  h.w.triMenuBackground(12);
+  assert.deepEqual([...backdrop.querySelectorAll('pattern')].map(p=>p.getAttribute('width')),tile,'the seven-row calendar keeps the main lattice size');
   assert.equal(h.d.querySelectorAll('#menu-background').length,1);
   h.startPuzzle();const paused=transforms();h.frame(100);assert.deepEqual(transforms(),paused);
   h.close();

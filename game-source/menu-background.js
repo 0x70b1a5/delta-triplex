@@ -46,7 +46,9 @@
     const menuHeight = scene?.offsetHeight || parseFloat(style?.height) || menu?.height || height;
     const menuLeft = (width-menuWidth)/2, menuTop = scene?.offsetTop || parseFloat(style?.top) || 24;
     const ratio = menuWidth && menuHeight ? menuHeight/menuWidth : Math.sqrt(3)/2;
-    const rows = +scene?.dataset.rows || 4;
+    // Lattice size follows the main menu so submenus with more rows (the
+    // calendar) don't shrink the backdrop when they open.
+    const rows = +el('home-main').dataset.rows || 4;
     const nextShape = `${width}/${height}/${menuWidth}/${menuHeight}/${menuTop}/${rows}`;
     if (shape !== nextShape) {
       shape = nextShape;

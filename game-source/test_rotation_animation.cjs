@@ -112,7 +112,7 @@ for (const [id, value] of [["background-color", "#18304c"], ["cell-color", "#edb
 }
 h.frame();
 const saved = w.localStorage.getItem("delta-triplex-rotation-colours");
-const baseAngle = w.TriRotation.geometry.desktop ? 0 : -90;
+const baseAngle = w.TriRotation.geometry.desktop ? 0 : 30;
 function checkHue() {
   const angle = w.TriRotation.geometry.angle - baseAngle;
   for (const [key, value] of [["bg", "#18304c"], ["cell", "#edbd91"]])
