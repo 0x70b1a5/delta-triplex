@@ -5,7 +5,7 @@
   let hue = Math.random() * 360, elapsed = 0, previous = null, frame = 0;
   let pending = null, zoom = null;
   const scenes = [...home.querySelectorAll(".home-triangle")];
-  const trigger = { endless: "endless-mode" };
+  const trigger = { endless: "endless-mode", get calendar() { return window.triCalendarSource || "today-puzzle"; } };
   function cell(node, x, y, row) {
     node.classList.add("home-cell");
     node.style.setProperty("--x", x * 100 + "%");
@@ -36,6 +36,8 @@
   }
   window.triHomeLayout = () => {
     for (const scene of scenes) {
+      // calendar.js lays out its own day cells on the same grid.
+      if (scene.id === "home-calendar") continue;
       const buttons = [...scene.querySelectorAll("button:not(#home-back):not(.home-up)")];
       let rows = 3;
       while (rows * (rows - 1) / 2 - 1 < buttons.length) rows++;
@@ -68,12 +70,7 @@
     }
     window.triMenuBackground?.();
     const view = home.dataset.view;
-    if (view === "calendar") {
-      const back = el("home-back");
-      back.classList.add("home-cell", "home-back");
-      if (!back.querySelector("span")) { const label = document.createElement("span"); label.textContent = back.textContent; back.replaceChildren(label); }
-      el("calendar-back-slot").append(back);
-    } else if (view !== "main") {
+    if (view !== "main") {
       const scene = el("home-" + view), rows = +scene.dataset.rows, back = el("home-back");
       back.classList.add("home-back"); if (back.parentElement !== scene) scene.append(back);
       cell(back, (rows - 1) / (2 * rows), (rows - 1) / rows, rows - 1);
@@ -88,12 +85,13 @@
     }
     outgoing.hidden = true; outgoing.inert = false; incoming.inert = false;
     home.removeAttribute("data-transition"); zoom = null;
-    if (!home.hidden) el(home.dataset.view === "main" ? "today-puzzle" : "home-back").focus({ preventScroll: true });
+    const view = home.dataset.view;
+    if (!home.hidden) (view === "main" ? el("today-puzzle") : view === "calendar" ? window.triCalendarFocus() : el("home-back")).focus({ preventScroll: true });
   }
   window.triHomePrepare = view => {
     finishZoom();
     const from = home.dataset.view;
-    pending = from !== "calendar" && view !== "calendar" && !home.hidden && from !== view && (from === "main" || view === "main")
+    pending = !home.hidden && from !== view && (from === "main" || view === "main")
       ? { from, to: view, source: from === "main" ? el(trigger[view])?.getBoundingClientRect() : null } : null;
   };
   function startZoom() {

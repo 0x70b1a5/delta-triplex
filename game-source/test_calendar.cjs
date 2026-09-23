@@ -17,14 +17,21 @@ assert.equal(d.getElementById('home').dataset.view, 'calendar');
 const picker = d.getElementById('calendar-month'), grid = d.getElementById('calendar-grid');
 assert.equal(picker.type, 'month'); assert.equal(picker.min, '2026-09'); assert.equal(picker.max, '2026-09');
 assert.equal(grid.querySelectorAll('button').length, 30);
-assert.equal(grid.querySelectorAll('.calendar-unused').length, 6);
+assert.equal(grid.querySelectorAll('.calendar-unused').length, 5);
 assert.equal(grid.querySelectorAll('button:disabled').length, 10, 'future days are unavailable');
 assert.equal(grid.querySelector('[aria-pressed="true"]').dataset.day, '20');
 assert.equal(grid.querySelector('[aria-current="date"]').dataset.day, '20');
 const day = n => grid.querySelector(`[data-day="${n}"]`);
-assert(parseFloat(day(1).style.getPropertyValue('--y')) > parseFloat(day(2).style.getPropertyValue('--y')), 'day 1 is at the bottom point');
-assert.equal(day(2).style.getPropertyValue('--y'), day(3).style.getPropertyValue('--y'));
+const scene = d.getElementById('home-calendar');
+assert(scene.classList.contains('home-triangle'), 'calendar is a single submenu triangle');
+assert.equal(scene.dataset.rows, '7');
+assert.equal(day(1).dataset.row, '1'); assert.equal(day(1).style.getPropertyValue('--x'), (1 / 14 * 100) + '%');
+assert(!day(1).classList.contains('home-up') && day(2).classList.contains('home-up') && !day(3).classList.contains('home-up'), 'days alternate down and up');
+assert.equal(day(1).style.getPropertyValue('--y'), day(11).style.getPropertyValue('--y'));
+assert(parseFloat(day(12).style.getPropertyValue('--y')) > parseFloat(day(11).style.getPropertyValue('--y')), 'day 12 starts the next row');
 assert(parseFloat(day(2).style.getPropertyValue('--x')) < parseFloat(day(3).style.getPropertyValue('--x')));
+assert(scene.contains(d.getElementById('home-back')), 'Back sits in the calendar tip');
+assert.equal(d.getElementById('home-back').dataset.row, '6');
 day(4).click();
 assert.equal(grid.querySelector('[aria-pressed="true"]').dataset.day, '4');
 assert(d.getElementById('calendar-status').textContent.includes('not assigned'));
@@ -66,7 +73,7 @@ for (let difficulty = 0; difficulty < 5; difficulty++) for (const seed of [0, 1,
 assert.equal(w.TriShare.seedCode(-1), ''); assert.equal(w.TriShare.seedCode(undefined), '');
 h.startPuzzle(); assert(d.getElementById('session-seed').hidden, 'unseeded puzzles do not invent a seed');
 h.close();
-for (const [month, days, unused] of [['2028-02', 29, 7], ['2029-02', 28, 0], ['2029-01', 31, 5]]) {
+for (const [month, days, unused] of [['2028-02', 29, 6], ['2029-02', 28, 7], ['2029-01', 31, 4]]) {
   const m = harness(source, 'https://tri.test/', {}, { now: '2030-03-20T12:00:00' });
   m.click('past-puzzles');
   const input = m.d.getElementById('calendar-month'); input.value = month; input.dispatchEvent(new m.w.Event('change'));

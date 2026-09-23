@@ -1,9 +1,15 @@
 "use strict";
 // Display-only daily archive. No date is mapped to a generated puzzle yet.
 (() => {
-  const picker = el("calendar-month"), grid = el("calendar-grid");
+  const scene = el("home-calendar"), picker = el("calendar-month"), grid = el("calendar-grid");
+  // Seven rows fit 35 day cells, enough for any month.
+  const ROWS = 7;
+  scene.dataset.rows = ROWS;
+  scene.style.setProperty("--rows", ROWS);
+  scene.style.setProperty("--tip", 50 / ROWS + "%");
+  Object.assign(scene.querySelector(".home-banner").dataset, { row: 0, wave: 2 * ROWS - 3 });
   const firstMonth = "2026-09";
-  let selected = "";
+  let selected = "", focusToday = false;
   const monthKey = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
   const dateKey = date => `${monthKey(date)}-${String(date.getDate()).padStart(2, "0")}`;
   const latestMonth = () => [firstMonth, monthKey(new Date())].sort().at(-1);
@@ -23,42 +29,37 @@
     }
     const [year, number] = month.split("-").map(Number);
     const days = new Date(year, number, 0).getDate();
-    const rows = Math.ceil((Math.sqrt(8 * days + 1) - 1) / 2);
     const today = dateKey(new Date());
-    grid.style.setProperty("--rows", rows);
-    grid.dataset.rows = rows;
     grid.replaceChildren();
     let day = 1;
-    // The point is day 1. Read each successive row left-to-right toward the wide edge.
-    for (let row = 0; row < rows; row++) for (let col = 0; col <= row; col++) {
-      const x = (rows - row - 1) / 2 + col, y = rows - row - 1;
-      function position(cell, x, up = false) {
-        cell.className = "calendar-cell" + (up ? " calendar-up" : "");
-        cell.style.setProperty("--x", x / rows * 100 + "%");
-        cell.style.setProperty("--y", y / rows * 100 + "%");
-        grid.append(cell);
-      }
+    // Same geometry as the other submenus: banner on row 0, Back in the tip.
+    // Rows 1..5 hold 11+9+7+5+3 = 35 alternating down/up cells, read
+    // left-to-right from the top-left corner.
+    for (let row = 1; row < ROWS - 1; row++) for (let col = 0; col < 2 * (ROWS - row) - 1; col++, day++) {
+      const up = col % 2 === 1, x = (row + col) / 2 / ROWS;
+      let cell;
       if (day <= days) {
-        const date = new Date(year, number - 1, day, 12);
-        const key = dateKey(date), button = document.createElement("button");
-        position(button, x);
-        button.dataset.date = key;
-        button.dataset.day = day;
+        const date = new Date(year, number - 1, day, 12), key = dateKey(date);
+        cell = document.createElement("button");
+        cell.dataset.date = key;
+        cell.dataset.day = day;
         const label = document.createElement("span"); label.textContent = day;
-        button.append(label);
-        button.disabled = key > today;
-        button.setAttribute("aria-label", TriCopy.t(button.disabled ? "calendar.future" : "calendar.day", { date: dateLabel(date) }));
-        button.setAttribute("aria-pressed", String(key === selected));
-        if (key === today) button.setAttribute("aria-current", "date");
-        button.onclick = () => select(date);
+        cell.append(label);
+        cell.disabled = key > today;
+        cell.setAttribute("aria-label", TriCopy.t(cell.disabled ? "calendar.future" : "calendar.day", { date: dateLabel(date) }));
+        cell.setAttribute("aria-pressed", String(key === selected));
+        if (key === today) cell.setAttribute("aria-current", "date");
+        cell.onclick = () => select(date);
       } else {
-        const unused = document.createElement("i");
-        position(unused, x); unused.classList.add("calendar-unused"); unused.setAttribute("aria-hidden", "true");
+        cell = document.createElement("i");
+        cell.setAttribute("aria-hidden", "true");
       }
-      if (col < row) {
-        const filler = document.createElement("i"); position(filler, x + .5, true); filler.setAttribute("aria-hidden", "true");
-      }
-      day++;
+      cell.className = "home-cell " + (day <= days ? "calendar-day" : "home-filler calendar-unused") + (up ? " home-up" : "");
+      cell.style.setProperty("--x", x * 100 + "%");
+      cell.style.setProperty("--y", row / ROWS * 100 + "%");
+      cell.dataset.row = row;
+      cell.dataset.wave = 2 * (ROWS - 1 - row) - (up ? 1 : 0);
+      grid.append(cell);
     }
     if (!selected.startsWith(month + "-")) selected = "";
     el("calendar-status").textContent = selected
@@ -66,12 +67,17 @@
       : TriCopy.t("calendar.unassigned");
   }
   picker.addEventListener("change", render);
+  // The zoom transition starts from whichever home cell opened the calendar,
+  // and focuses today's date or the month picker once it settles.
+  window.triCalendarFocus = () => (focusToday && grid.querySelector('[aria-current="date"]')) || picker;
   window.triOpenCalendar = (today = false) => {
+    focusToday = today;
+    window.triCalendarSource = today ? "today-puzzle" : "past-puzzles";
     if (today) { selected = dateKey(new Date()); picker.value = selected.slice(0, 7); }
     if (!picker.value) picker.value = latestMonth();
     render();
     window.triShowHome("calendar");
-    (today ? grid.querySelector('[aria-current="date"]') : picker)?.focus({ preventScroll: true });
+    window.triCalendarFocus().focus({ preventScroll: true });
   };
   picker.value = latestMonth();
   render();

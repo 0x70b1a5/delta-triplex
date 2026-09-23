@@ -1102,19 +1102,25 @@
       }
       #home .home-triangle .home-up { background: var(--flash-fill, var(--home-dim)); color: var(--row-ink, var(--home-dim-ink)); }
       #home .home-up > span { top: 66%; }
-      #home-calendar { box-sizing: border-box; height: 100dvh; padding: 20px 16px max(12px, env(safe-area-inset-bottom)); overflow: auto; text-align: center; }
-      .calendar-heading h2 { font: 700 clamp(18px, 4vw, 32px) Michroma, sans-serif; margin: 0 0 12px; }
-      .calendar-heading label { font-size: 12px; margin-right: 8px; }
-      #calendar-month { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px; max-width: 65%; }
-      #calendar-grid { position: relative; width: min(94vw, calc((100dvh - 230px) / .8660254), 760px); min-width: 240px; aspect-ratio: 1 / .8660254; margin: 16px auto; }
-      #home #calendar-grid .calendar-cell { position: absolute; left: var(--x); top: var(--y); width: calc(100% / var(--rows)); height: calc(100% / var(--rows)); min-height: 0; padding: 0; border: 0; border-radius: 0; clip-path: polygon(1% 1%, 99% 1%, 50% 99%); background: var(--empty); color: var(--home-empty-ink); display: grid; place-items: start center; font: 600 clamp(10px, 2.6vw, 18px) system-ui, sans-serif; }
-      .calendar-cell > span { position: absolute; top: 30%; transform: translateY(-50%); }
-      #home #calendar-grid .calendar-up { clip-path: polygon(50% 1%, 99% 99%, 1% 99%); background: var(--home-dim); }
-      #home #calendar-grid .calendar-unused, #home #calendar-grid button:disabled { background: var(--home-dim); color: var(--muted); cursor: default; }
-      #home #calendar-grid button[aria-pressed="true"], #home #calendar-grid button:not(:disabled):hover, #home #calendar-grid button:focus-visible { background: var(--cell); color: var(--home-cell-ink); }
-      #home #calendar-grid button[aria-current="date"] > span { text-decoration: underline; text-underline-offset: 3px; }
-      #calendar-status { min-height: 2.8em; margin: 8px auto; max-width: 560px; font-size: 12px; text-transform: none; }
-      #home #calendar-back-slot .home-back { position: relative; left: auto; top: auto; width: 100px; height: 78px; margin: 0 auto; font-size: 12px; }
+      /* Past Puzzles shares the submenu triangle: days alternate down/up cells, Back sits in the tip. */
+      #home .calendar-heading { grid-auto-flow: row; align-content: center; gap: .35em; }
+      #home .calendar-heading h2 { font-size: clamp(18px, 3.6vw, 56px); }
+      #calendar-month { font: 600 clamp(11px, 1.3vw, 16px) Michroma, system-ui, sans-serif; text-transform: uppercase; color: inherit; background: transparent; border: 1px solid currentColor; border-radius: 0; padding: .3em .6em; width: 17em; max-width: 70%; position: relative; z-index: 1; }
+      #home #calendar-grid { display: contents; }
+      #home #home-calendar .calendar-day { font: 600 clamp(12px, 2.2vw, 30px)/1 Michroma, system-ui, sans-serif; }
+      @media (hover: hover) {
+        #home #home-calendar .calendar-day:disabled:hover { background: var(--flash-fill, var(--empty)); color: var(--row-ink, var(--home-empty-ink)); }
+        #home #home-calendar .calendar-day.home-up:disabled:hover { background: var(--flash-fill, var(--home-dim)); color: var(--row-ink, var(--home-dim-ink)); }
+      }
+      #home #home-calendar .calendar-unused:not(.home-up) { background: var(--flash-fill, var(--home-dim)); }
+      #home #home-calendar .calendar-day[aria-pressed="true"] { background: var(--cell); color: var(--home-cell-ink); }
+      #home #home-calendar .calendar-day[aria-current="date"] > span { text-decoration: underline; text-underline-offset: .2em; }
+      /* Sits in the gap just above the triangle's wide edge. */
+      #home #calendar-status { position: absolute; bottom: 100%; left: 10%; width: 80%; margin: 0; padding: 2px 0; background: var(--bg); font-size: 11px; text-align: center; text-transform: none; pointer-events: none; }
+      @media (max-width: 700px) {
+        /* Seven rows are too narrow to bleed off-screen; keep the first row of days visible. */
+        #home-calendar.home-triangle { --mobile-width: min(100vw - 8px, 104dvh); }
+      }
       #session-details { max-width: 65%; display: flex; flex-wrap: wrap; align-items: baseline; justify-content: flex-end; column-gap: 12px; row-gap: 4px; }
       #session-seed { padding: 0; min-height: 0; border-radius: 0; background: transparent; color: inherit; font: inherit; text-decoration: underline dotted; text-underline-offset: 3px; font-variant-numeric: tabular-nums; white-space: nowrap; }
       #completion #next-puzzle { width: auto; flex: 0 0 auto; padding: 8px 10px; font-weight: 650; background: var(--next-fill); color: var(--next-ink); }
@@ -1313,15 +1319,14 @@
           <button id="past-puzzles" class="home-cell home-up" style="--x:37.5%;--y:50%"><span>{{copy:home.pastPuzzles}}</span></button>
           <a class="home-cell home-credit" style="--x:37.5%;--y:75%" href="https://lovecrypt.itch.io/" target="_blank" rel="noopener noreferrer"><span><small>{{copy:ui.by}}</small> {{copy:ui.lovecrypt}}</span></a>
         </div>
-        <section id="home-calendar" class="calendar-scene" aria-labelledby="calendar-title" hidden>
-          <header class="calendar-heading">
+        <section id="home-calendar" class="home-triangle" aria-labelledby="calendar-title" hidden>
+          <header class="home-banner calendar-heading">
             <h2 id="calendar-title">{{copy:calendar.title}}</h2>
-            <label for="calendar-month">{{copy:calendar.month}}</label>
+            <label for="calendar-month" class="theme-sr-only">{{copy:calendar.month}}</label>
             <input id="calendar-month" type="month" min="2026-09" required>
           </header>
-          <div id="calendar-grid" aria-label="{{copy:calendar.days}}"></div>
+          <div id="calendar-grid" role="group" aria-label="{{copy:calendar.days}}"></div>
           <p id="calendar-status" role="status">{{copy:calendar.unassigned}}</p>
-          <div id="calendar-back-slot"></div>
         </section>
         <section id="home-endless" class="home-triangle" hidden>
           <header class="home-banner"><h2>{{copy:ui.endless-mode}}</h2></header>
