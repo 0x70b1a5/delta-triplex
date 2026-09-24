@@ -199,8 +199,8 @@ API int game_effects(double now){
 
 static void sync_state(void){
     char json[24576];int used=snprintf(json,sizeof json,
-        "{\"n\":%d,\"level\":%d,\"tutorial\":%d,\"won\":%s,\"undo\":%s,\"axis\":%d,\"row\":%d,\"hover\":[",
-        board.n,custom?-1:level,custom?-1:tutorial,won?"true":"false",history_count?"true":"false",selected_axis,selected_row);
+        "{\"n\":%d,\"level\":%d,\"tutorial\":%d,\"won\":%s,\"undo\":%s,\"history\":%d,\"axis\":%d,\"row\":%d,\"hover\":[",
+        board.n,custom?-1:level,custom?-1:tutorial,won?"true":"false",history_count?"true":"false",history_count,selected_axis,selected_row);
     for(int a=0;a<3;a++)used+=snprintf(json+used,sizeof json-used,"%s%d",a?",":"",hovered<0?-1:tile_line(&board,hovered,a));
     used+=snprintf(json+used,sizeof json-used,"],\"clues\":[");
     for(int a=0;a<3;a++){

@@ -1025,6 +1025,10 @@
         #app[data-solved="true"] #stage { inset: 36px 0 !important; }
       }
       #app[data-solved="true"] #workshop { bottom: 78px; max-width: calc(100vw - 48px); }
+      /* A shared link's How to Play button takes the footer's left slot, as completion does. */
+      @media (min-width: 701px) {
+        #app:has(#share-help:not([hidden])) #workshop { bottom: 78px; }
+      }
       #toast { bottom: max(78px, env(safe-area-inset-bottom)); }
       @media (max-width: 899px) {
         #solve-result { display: none; }

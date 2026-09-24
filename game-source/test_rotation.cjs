@@ -216,6 +216,19 @@ const { harness, source } = require("./test_rotation_harness.cjs");
   assert.equal(linked.state.level, 2); linked.close();
   h.click("undo"); assert(!h.state.won); assert.equal(axes().size, 2);
   h.click("reset"); assert.equal(w.TriRotation.stats.turns, 0); assert.equal(w.TriRotation.stats.elapsed, 0);
+  // Undoing a reset brings back the time and turns it cleared, on top of play since.
+  const beforeReset = JSON.stringify(h.state.cells.map(c => c.state));
+  h.click("undo"); h.click("undo");
+  assert.equal(w.TriRotation.stats.elapsed, 65000); assert.equal(w.TriRotation.stats.turns, 7);
+  h.click("reset"); h.advance(4000); tap(0);
+  assert.equal(w.TriRotation.stats.elapsed, 4000, "reset restarts the stopwatch");
+  h.click("reset"); h.advance(2000);
+  h.click("undo"); assert.equal(w.TriRotation.stats.elapsed, 6000, "undoing the second reset restores its time");
+  h.click("undo"); assert.equal(w.TriRotation.stats.elapsed, 6000, "undoing a stroke leaves the time alone");
+  h.click("undo"); assert.equal(w.TriRotation.stats.elapsed, 71000, "undoing the first reset restores its time");
+  assert.equal(w.TriRotation.stats.turns, 7);
+  assert.notEqual(JSON.stringify(h.state.cells.map(c => c.state)), beforeReset);
+  h.click("reset"); assert.equal(w.TriRotation.stats.elapsed, 0);
   for (let difficulty = 0; difficulty < 5; difficulty++) {
     h.click("return-home"); h.click("endless-mode");
     d.querySelector(`#difficulties button[data-difficulty="${difficulty}"]`).click();

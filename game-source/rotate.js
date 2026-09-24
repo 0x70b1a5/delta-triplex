@@ -57,6 +57,10 @@
   let elapsed = 0, turns = 0, lastTick = performance.now(), running = false;
   let finished = null, previousWon = false, geometry = null;
   let shareHelpSettled = false;
+  // Reset zeroes the stopwatch but stays undoable. Each entry holds the time and
+  // turns it cleared plus the undo depth just after it; undoing below that depth
+  // adds them back, so reset-then-undo cannot keep progress with a fresh clock.
+  let resetCarries = [];
   // axis:row -> { start, count }. start < 0 means the row was already solved, so it stays dim.
   const solvedRows = new Map();
   function syncSolvedRows(next, flashNew) {
@@ -206,8 +210,13 @@
   const baseCall = call;
   call = function (name, ...args) {
     if (["new", "replay", "reset"].includes(name)) restart = true;
-    if (["new", "replay"].includes(name)) { attempts = {}; attemptKey = ""; }
-    return baseCall(name, ...args);
+    if (["new", "replay"].includes(name)) { attempts = {}; attemptKey = ""; resetCarries = []; }
+    if (name !== "reset" || !state || state.editing) return baseCall(name, ...args);
+    clock();
+    const carry = { elapsed, turns };
+    const result = baseCall(name, ...args);
+    if (state?.history) resetCarries.push({ depth: state.history, ...carry });
+    return result;
   };
   const baseMenu = toggleMenu;
   toggleMenu = function (open) { clock(); baseMenu(open); clock(); };
@@ -231,6 +240,7 @@
       cancelGesture();
       saveAttempt(true);
       const forceFresh = restart;
+      if (key !== boardKey) resetCarries = [];
       key = boardKey; restart = false; view = homeView(); visualTurn = preview = 0; animation = null; reveal = null;
       elapsed = turns = 0; finished = null; previousWon = false;
       lastTick = performance.now();
@@ -254,6 +264,10 @@
       if (next.won && !finished) finished = { unknown: true };
       solvedRows.clear();
       shareHelpSettled = false;
+    }
+    while (resetCarries.length && !(next.history >= resetCarries.at(-1).depth)) {
+      const carry = resetCarries.pop();
+      elapsed += carry.elapsed; turns += carry.turns;
     }
     syncSolvedRows(next, !freshBoard);
     if (next.won && !next.editing && !previousWon && !finished) finished = { elapsed, turns };
