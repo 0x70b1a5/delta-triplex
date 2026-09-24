@@ -311,7 +311,8 @@
     }
     return best;
   }
-  function clueRows(angle, desktop) {
+  // board is { n, cells, clues } in engine form; the tutorial passes its own.
+  function clueRows(angle, desktop, board = state) {
     // Start-end directions of the canonical strips, through their end-cell centroids.
     const directions = [[.5, -SQRT3 / 2], [-.5, -SQRT3 / 2], [-1, 0]];
     const rotated = directions.map(d => rotatePoint(d, angle));
@@ -325,20 +326,20 @@
       if (axis === hidden) continue;
       const first = rotated[axis][edgeAxis] > 0;
       const outward = directions[axis].map(v => v * (first ? 1 : -1));
-      for (let row = 0; row < state.n; row++) {
-        const cells = state.cells.filter(c => axisRow(c, axis, state.n) === row);
+      for (let row = 0; row < board.n; row++) {
+        const cells = board.cells.filter(c => axisRow(c, axis, board.n) === row);
         cells.sort((a, b) => (2 * (axis === 0 ? b.j : b.i) + b.o) - (2 * (axis === 0 ? a.j : a.i) + a.o));
         const endpoint = first ? cells[0] : cells[cells.length - 1];
         const active = cells.filter(c => c.active);
         const echoCell = active.length ? (first ? active[0] : active[active.length - 1]) : null;
-        const echoIndex = echoCell ? state.cells.indexOf(echoCell) : -1;
-        const center = mean(corners(endpoint, state.n));
+        const echoIndex = echoCell ? board.cells.indexOf(echoCell) : -1;
+        const center = mean(corners(endpoint, board.n));
         const distance = Math.min(...normals.filter(n => dot(outward, n) > 1e-6)
           .map(n => (SQRT3 / 3 - dot(center, n)) / dot(outward, n)));
         const edge = center.map((v, a) => v + distance * outward[a]);
-        const runs = state.clues[axis][row].runs.length ? [...state.clues[axis][row].runs] : [0];
+        const runs = board.clues[axis][row].runs.length ? [...board.clues[axis][row].runs] : [0];
         if (first) runs.reverse();
-        const segment = exitSegment(endpoint, state.n, outward) || [edge, edge];
+        const segment = exitSegment(endpoint, board.n, outward) || [edge, edge];
         result.push({ axis, row, center, edge, outward, runs, segment, echoIndex });
       }
     }
@@ -363,8 +364,8 @@
     const offset = i => gap + (i * spread + .5) * pitch;
     return { pitch, gap, tail, offset, reach: count => offset(count - 1) + pitch * .5 + tail };
   }
-  function columnBands(clues, angle, font, numeralFont = font, spread) {
-    const radius = .8 * 2 / state.n;
+  function columnBands(clues, angle, font, numeralFont = font, spread, n = state.n) {
+    const radius = .8 * 2 / n;
     const shift = radius / 2;
     const corner = columnStyle === "corner";
     const rise = corner ? radius / (2 * Math.sqrt(3)) : radius * Math.sqrt(3) / 2;
@@ -398,6 +399,7 @@
           constraints.push({
             p: [item.numX, item.anchor], extra: [0, sign * offset(i)],
             min: [-half, -numeralFont / 2], max: [half, numeralFont / 2],
+            axis: item.axis, row: item.row, run: i, value,
           });
         });
       });
@@ -425,18 +427,21 @@
       max: [right ? 0 : width, top ? font : 0],
     };
   }
+  // Diagonal numerals step outward from the strip's exit, run 0 nearest the board.
+  function diagonalNumerals(clue, angle, desktop, font) {
+    const p = rotatePoint(clue.edge, angle), direction = rotatePoint(clue.outward, angle);
+    return clue.runs.map((value, i) => ({
+      p, extra: direction.map(v => v * (font + i * font * 1.5)), direction,
+      axis: clue.axis, row: clue.row, run: i, value,
+      ...clueAnchor(desktop, direction, font, value),
+    }));
+  }
   function pose(angle, desktop, font, withClues, columns, numeralFont = font, spread) {
     const outer = [vertex(0, 0, state.n), vertex(state.n, 0, state.n), vertex(0, state.n, state.n)].map(p => rotatePoint(p, angle));
     const clues = withClues ? clueRows(angle, desktop) : [];
     const constraints = outer.map(p => ({ p, extra: [0, 0], min: [0, 0], max: [0, 0] }));
     if (columns && clues.length) constraints.push(...columnBands(clues, angle, font, numeralFont, spread).constraints);
-    else for (const clue of clues) {
-      const direction = rotatePoint(clue.outward, angle);
-      clue.runs.forEach((value, i) => constraints.push({
-        p: rotatePoint(clue.edge, angle), extra: direction.map(v => v * (font + i * font * 1.5)),
-        ...clueAnchor(desktop, direction, font, value),
-      }));
-    }
+    else for (const clue of clues) constraints.push(...diagonalNumerals(clue, angle, desktop, font));
     return { clues, constraints };
   }
   let layoutCache = null;
@@ -559,12 +564,18 @@
     if (!motionEnabled || entry.start < 0) return true;
     return performance.now() - entry.start >= (entry.count - 1) * NUMERAL_STEP + NUMERAL_PULSE;
   }
-  function drawColumns(fragment, geometry, cellColor) {
+  // options lets the tutorial draw its own board: n, an id prefix for the rail
+  // gradients, and replacements for the numeral paint and resting dim.
+  function drawColumns(fragment, geometry, cellColor, options = {}) {
+    const {
+      n = state.n, idPrefix = "clue-line", restingDim = columnRestingDim,
+      numeral = (item, i) => numeralAttrs(item.axis, item.row, i, item.runs.length, cellColor, item.echoIndex),
+    } = options;
     const place = (p, extra = [0, 0]) => [
       geometry.center[0] + p[0] * geometry.scale + extra[0],
       geometry.center[1] + p[1] * geometry.scale + extra[1],
     ];
-    const { sides } = columnBands(geometry.clues, geometry.angle, geometry.font, geometry.font, geometry.spread);
+    const { sides } = columnBands(geometry.clues, geometry.angle, geometry.font, geometry.font, geometry.spread, n);
     const defs = node("defs", {});
     fragment.append(defs);
     const font = geometry.font;
@@ -578,7 +589,7 @@
           if (side.below ? y > far[1] : y < far[1]) far[1] = y;
         }
         const end = place(line.vertex);
-        const id = `clue-line-${sideName}-${line.line}`;
+        const id = `${idPrefix}-${sideName}-${line.line}`;
         const span = Math.abs(far[1] - start[1]) || 1;
         // Twice the former 0.62-pitch ramp, so the fade begins closer to the triangle.
         const solidAt = Math.min(.8, font * 1.24 / span);
@@ -589,7 +600,7 @@
           gradient.append(node("stop", { offset, "stop-color": cellColor, "stop-opacity": opacity }));
         defs.append(gradient);
         const columnIds = line.neighbors.map(item => `${item.axis}:${item.row}`);
-        const dimLine = columnIds.length >= 2 && line.neighbors.every(item => columnRestingDim(item.axis, item.row));
+        const dimLine = columnIds.length >= 2 && line.neighbors.every(item => restingDim(item.axis, item.row));
         const attrs = {
           fill: "none", stroke: `url(#${id})`, "stroke-width": Math.max(1.2, font / 11),
           "stroke-linecap": "round", "stroke-linejoin": "round", "pointer-events": "none",
@@ -628,7 +639,7 @@
             "data-axis": item.axis, "data-row": item.row, "data-run": i,
             "data-direction-x": side.O[0], "data-direction-y": side.O[1],
             "data-center-x": center[0], "data-center-y": center[1],
-            ...numeralAttrs(item.axis, item.row, i, item.runs.length, cellColor, item.echoIndex),
+            ...numeral(item, i),
           }, value));
         });
       }
@@ -695,19 +706,17 @@
       if (geometry.columns) drawColumns(fragment, geometry, colours[1] || "#ffffff");
       else for (const clue of geometry.clues) {
         const edge = geometry.toScreen(clue.edge), center = geometry.toScreen(clue.center);
-        const direction = rotatePoint(clue.outward, geometry.angle);
-        clue.runs.forEach((value, i) => {
-          const alignment = clueAnchor(geometry.desktop, direction, geometry.font, value);
+        for (const { value, run: i, extra, direction, anchor, baseline } of diagonalNumerals(clue, geometry.angle, geometry.desktop, geometry.font)) {
           fragment.append(node("text", {
-          x: edge[0] + direction[0] * (geometry.font + i * geometry.font * 1.5),
-          y: edge[1] + direction[1] * (geometry.font + i * geometry.font * 1.5),
-          "text-anchor": alignment.anchor, "dominant-baseline": alignment.baseline, "font-size": geometry.font,
-          "data-axis": clue.axis, "data-row": clue.row, "data-run": i,
-          "data-center-x": center[0], "data-center-y": center[1],
-          "data-direction-x": direction[0], "data-direction-y": direction[1],
-          ...numeralAttrs(clue.axis, clue.row, i, clue.runs.length, colours[1] || "#ffffff", clue.echoIndex),
-        }, value));
-        });
+            x: edge[0] + extra[0],
+            y: edge[1] + extra[1],
+            "text-anchor": anchor, "dominant-baseline": baseline, "font-size": geometry.font,
+            "data-axis": clue.axis, "data-row": clue.row, "data-run": i,
+            "data-center-x": center[0], "data-center-y": center[1],
+            "data-direction-x": direction[0], "data-direction-y": direction[1],
+            ...numeralAttrs(clue.axis, clue.row, i, clue.runs.length, colours[1] || "#ffffff", clue.echoIndex),
+          }, value));
+        }
       }
     }
     svg.replaceChildren(fragment);
@@ -859,6 +868,11 @@
       requestFrame();
     });
   }
+  // The same clue geometry drawn on the tutorial's demonstration triangle.
+  window.TriBoardGeometry = {
+    vertex, corners, rotatePoint, mean, axisRow, clueRows, diagonalNumerals, columnBands, drawColumns,
+    columnNumeral: COLUMN_NUMERAL, columnSpreads: COLUMN_SPREADS,
+  };
   // Read-only hooks for deterministic prototype regression tests.
   window.TriRotation = {
     formatTime, numeralStep: NUMERAL_STEP, numeralPulse: NUMERAL_PULSE, dimFlashPaint,

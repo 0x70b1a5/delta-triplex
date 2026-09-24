@@ -1168,15 +1168,23 @@
       .intro-cell.filled { fill: var(--cell); }
       .intro-cell.emphasis { stroke: var(--ink); stroke-width: 2; }
       .intro-cross { stroke: var(--cross); stroke-width: 3; fill: none; }
-      .intro-hint { fill: var(--ink); font-size: 24px; opacity: .65; }
-      .intro-hint.active { opacity: 1; font-weight: bold; }
+      .intro-numeral { fill: var(--ink); opacity: .65; }
+      .intro-hint.active .intro-numeral, .intro-numeral.active { opacity: 1; font-weight: bold; }
       .intro-halo { fill: none; stroke: var(--ink); stroke-width: 2; opacity: 0; }
+      .intro-hit { fill: transparent; stroke: none; }
       .intro-hint.active .intro-halo { opacity: 1; }
+      .intro-hint:focus { outline: none; }
+      .intro-hint:focus-visible .intro-halo { opacity: 1; stroke-dasharray: 4 4; }
+      #intro-board:focus { outline: none; }
+      #intro-board:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; border-radius: 8px; }
+      #tutorial-intro[data-page="1"] .intro-hint, #tutorial-intro[data-page="1"] .intro-numeral[data-demo-row], #tutorial-intro[data-page="2"] #intro-board { cursor: pointer; }
+      #tutorial-intro[data-page="3"] #intro-board { cursor: grab; touch-action: none; }
       @media (prefers-reduced-motion: no-preference) { .intro-hint.active .intro-halo { animation: intro-halo 1.8s ease-in-out infinite; } .intro-cell.emphasis { animation: intro-row 1.8s ease-in-out infinite; } @keyframes intro-row { 50% { opacity: .5; } } @keyframes intro-halo { 50% { stroke-width: 5; opacity: .45; } } }
       #tutorial-intro[data-paused="true"] .intro-cell, #tutorial-intro[data-paused="true"] .intro-halo { animation-play-state: paused; }
-      #intro-controls { text-align: center; max-width: 640px; min-height: 90px; }
+      #intro-controls { text-align: center; max-width: 640px; }
       #intro-step-text { min-height: 2.8em; margin: 0 0 8px; line-height: 1.4; }
-      .intro-navigation { display: flex; gap: 8px; width: min(640px,100%); justify-content: space-between; margin-top: auto; }
+      .intro-navigation, .intro-center { display: flex; gap: 8px; }
+      .intro-navigation { width: min(640px,100%); justify-content: space-between; margin-top: auto; }
       #tutorial-intro button { color: var(--ink); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px; min-height: 44px; }
       #intro-next { background: var(--cell) !important; color: var(--home-cell-ink) !important; }
     </style>
@@ -1426,15 +1434,16 @@
         <h1 id="intro-title" tabindex="-1"></h1>
         <p id="intro-description"></p>
       </div>
-      <svg id="intro-board" viewBox="-300 -65 600 525" role="img" aria-labelledby="intro-board-title"></svg>
+      <svg id="intro-board" viewBox="-300 -65 600 525" role="group" aria-labelledby="intro-board-title"></svg>
       <div id="intro-controls">
         <p id="intro-step-text" role="status"></p>
-        <button id="intro-pause">{{copy:intro.pause}}</button>
-        <button id="intro-step">{{copy:intro.step}}</button>
       </div>
       <nav class="intro-navigation" aria-label="{{copy:intro.navigation}}">
         <button id="intro-back">{{copy:intro.back}}</button>
-        <button id="intro-exit">{{copy:intro.exit}}</button>
+        <div class="intro-center">
+          <button id="intro-exit">{{copy:intro.exit}}</button>
+          <button id="intro-pause" hidden>{{copy:intro.pause}}</button>
+        </div>
         <button id="intro-next">{{copy:intro.next}}</button>
       </nav>
     </section>
