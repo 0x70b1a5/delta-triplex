@@ -6,10 +6,14 @@
   const ns = 'http://www.w3.org/2000/svg';
   const root = el('tutorial-intro'), board = el('intro-board');
   const N = 5, SCALE = 240;
+  // Solution in lesson order (rows from the tip, left to right). Chosen so the
+  // visible hints include multi-number runs, solving takes four rounds of line
+  // deduction, and one turn to the third direction is required.
+  const SOLUTION = '1011001011100011000111110';
   const cells = [];
   for (let row = 0; row < N; row++) for (let k = 0; k <= 2 * row; k++) {
     const i = Math.floor(k / 2), o = k % 2, j = row - i - o;
-    cells.push({ i, j, o, active: true, filled: i === 0 || j === 0 });
+    cells.push({ i, j, o, active: true, filled: SOLUTION[cells.length] === '1' });
   }
   // Engine conventions: row index per axis, and runs ordered along each strip.
   const axisRow = (c, axis) => axis === 0 ? c.i : axis === 1 ? c.j : N - 1 - c.i - c.j - c.o;
@@ -27,23 +31,69 @@
   const rows = [];
   for (let r = 0; r < N; r++) for (let axis = 0; axis < 2; axis++) rows.push(strips[axis][r]);
   const demo = { n: N, cells, clues: strips.map(axis => axis.map(line => ({ runs: line.runs[0] ? line.runs : [] }))) };
-  // First fill the two full rows; then cross the unknown cells in completed rows.
-  const marks = Array(25).fill(0), steps = [];
-  for (let row = 0; row < rows.length; row++) {
-    const line = rows[row];
-    const full = line.runs.length === 1 && line.runs[0] === line.ids.length;
-    const complete = line.ids.filter(id => marks[id] === 1).length === line.runs.reduce((a,b) => a+b,0);
-    if (!full && !complete) continue;
-    const changed = line.ids.filter(id => !marks[id]);
-    if (!changed.length) continue;
-    changed.forEach(id => { marks[id] = full ? 1 : 2; });
-    steps.push({ row, changed, value: full ? 1 : 2, marks: marks.slice() });
+  // Directions whose hints show after each whole turn, as on the rotation page.
+  const VISIBLE = [[0,1],[0,2],[1,2]];
+  const runsText = line => line.runs.join(' ');
+  // Every placement of a strip's runs consistent with its marks (1 filled, 2 crossed):
+  // cells filled in all of them are forced full, cells filled in none forced empty.
+  function deduce(line, marks) {
+    const size = line.ids.length, target = line.runs.join();
+    let any = 0, all = (1 << size) - 1;
+    for (let bits = 0; bits < 1 << size; bits++) {
+      const runs = []; let run = 0;
+      for (let p = 0; p <= size; p++) {
+        if (p < size && bits >> p & 1) run++;
+        else if (run) { runs.push(run); run = 0; }
+      }
+      if ((runs.length ? runs : [0]).join() !== target) continue;
+      if (line.ids.some((id, p) => marks[id] && (marks[id] === 1) !== !!(bits >> p & 1))) continue;
+      any |= bits; all &= bits;
+    }
+    const fill = [], cross = [];
+    line.ids.forEach((id, p) => {
+      if (marks[id]) return;
+      if (all >> p & 1) fill.push(id);
+      else if (!(any >> p & 1)) cross.push(id);
+    });
+    return { fill, cross };
   }
-  window.TriIntroDemo = { cells, rows, steps };
+  // How the lesson explains a strip's new marks.
+  function reason(line, before, fill, cross) {
+    const known = line.ids.filter(id => before[id]).length;
+    const done = known + fill.length + cross.length === line.ids.length;
+    if (!known && line.runs[0] === 0) return 'empty';
+    if (!known && done) return line.runs.length > 1 ? 'exact' : 'fill';
+    if (!known) return 'overlap';
+    const filled = line.ids.filter(id => before[id] === 1).length;
+    if (!fill.length && done && filled === line.runs.reduce((a,b) => a+b, 0)) return 'cross';
+    return done ? 'fit' : 'narrow';
+  }
+  // Work the strip that settles the most cells among the visible hints, preferring
+  // longer strips; when no visible hint helps, turn to reveal the next direction.
+  const marks = Array(cells.length).fill(0), steps = [];
+  let turn = 0;
+  while (marks.includes(0)) {
+    let best = null;
+    for (const axis of VISIBLE[turn % 3]) for (const line of strips[axis]) {
+      const { fill, cross } = deduce(line, marks), count = fill.length + cross.length;
+      if (count && (!best || count > best.count || (count === best.count && line.ids.length > best.line.ids.length)))
+        best = { line, fill, cross, count };
+    }
+    if (!best) {
+      if (++turn > 3) throw Error('The lesson board cannot be solved by line deduction.');
+      steps.push({ turn, marks: marks.slice() });
+      continue;
+    }
+    const { line, fill, cross } = best, why = reason(line, marks, fill, cross);
+    fill.forEach(id => { marks[id] = 1; });
+    cross.forEach(id => { marks[id] = 2; });
+    steps.push({ axis: line.axis, r: line.r, fill, cross, reason: why, turn, marks: marks.slice() });
+  }
+  window.TriIntroDemo = { cells, rows, strips, steps };
   // Match the game's 420 ms smoothstep turn, with time to read between turns.
   const TURN_MS = 420, REST_MS = 1800;
   let page = 0, beat = 0, timer = 0, paused = false, frame = 0;
-  // Rotation page: whole turns taken, the turn in flight, and a drag's live preview in degrees.
+  // Solve and rotation pages: whole turns taken, the turn in flight, and a drag's live preview in degrees.
   let turns = 0, turning = null, preview = 0, restSince = 0, gesture = null, wheelAmount = 0, wheelLast = -Infinity;
   let returnToPuzzle = false;
   function leaveIntro() {
@@ -64,21 +114,27 @@
   function schedule() {
     stop();
     if (root.hidden || document.hidden || page === 0) return;
-    if (page === 3) { if (turning || autoplaying()) frame = requestAnimationFrame(animate); return; }
+    if (page === 3 || turning) { if (turning || autoplaying()) frame = requestAnimationFrame(animate); return; }
     if (!autoplaying() || solved()) return;
-    timer = setTimeout(() => { beat = page === 1 ? (beat + 1) % rows.length : beat + 1; draw(); schedule(); }, page === 1 ? 1800 : 2400);
+    timer = setTimeout(() => { if (page === 1) beat = (beat + 1) % rows.length; else showBeat(beat + 1); draw(); schedule(); }, page === 1 ? 1800 : 2400);
   }
   function animate() {
     frame = 0;
     const now = performance.now();
     if (turning && now - turning.start >= TURN_MS) { turning = null; restSince = now; }
-    if (!turning && !gesture && autoplaying() && now - restSince >= REST_MS) turnBy(1, true);
+    if (page === 3 && !turning && !gesture && autoplaying() && now - restSince >= REST_MS) turnBy(1, true);
     else { draw(); schedule(); }
   }
   function turnDegrees(now) {
     if (!turning) return turns * 120 + preview;
     const t = Math.min(1, (now - turning.start) / TURN_MS), eased = t * t * (3 - 2 * t);
     return 120 * (turning.from + (turning.to - turning.from) * eased);
+  }
+  // The solve faces the direction its step uses, turning there with motion.
+  function showBeat(next) {
+    const target = next ? steps[next - 1].turn : 0, from = turnDegrees(performance.now()) / 120;
+    beat = next; turns = target;
+    turning = motionEnabled && Math.abs(target - from) > 1e-6 ? { from, to: target, start: performance.now() } : null;
   }
   // A player's turn takes over from autoplay; 0 settles a short drag back.
   function turnBy(delta, auto = false) {
@@ -107,8 +163,8 @@
     // The game's resting poses: desktop base-up, phone base-left. The lesson
     // rows are the two directions shown on the phone's third pose.
     const base = desktop ? 0 : 270;
-    const angle = base + (page === 3 ? turnDegrees(performance.now()) : 0);
-    const moving = page === 3 && (!!turning || preview !== 0);
+    const angle = base + (page >= 2 ? turnDegrees(performance.now()) : 0);
+    const moving = page >= 2 && (!!turning || preview !== 0);
     const font = columns ? 16 : 24, numeralFont = columns ? font * geometry.columnNumeral : font;
     const spread = geometry.columnSpreads[0];
     const toScreen = p => geometry.rotatePoint(p, angle).map(v => v * SCALE);
@@ -116,7 +172,7 @@
     const include = ([x,y], min = [0,0], max = [0,0]) => bounds.push([x+min[0], y+min[1]], [x+max[0], y+max[1]]);
     const title = svg('title', { id: 'intro-board-title' }); title.textContent = TriCopy.t('intro.diagram');
     const step = page === 2 && beat ? steps[beat - 1] : null;
-    const active = page === 1 ? rows[beat] : step ? rows[step.row] : null;
+    const active = page === 1 ? rows[beat] : step?.fill ? strips[step.axis][step.r] : null;
     const shown = page === 0 ? cells.map(c => c.filled ? 1 : 0) : step?.marks || Array(25).fill(0);
     cells.forEach((c, id) => {
       const points = geometry.corners(c, N).map(toScreen);
@@ -136,20 +192,29 @@
       return { clues, marks };
     };
     const place = m => [m.p[0] * SCALE + m.extra[0], m.p[1] * SCALE + m.extra[1]];
+    // A hint's halo encloses all of its numerals.
+    const haloOf = (clue, marks) => {
+      const own = marks.filter(m => m.value !== undefined && m.axis === clue.axis && m.row === clue.row);
+      const box = [[Infinity,Infinity],[-Infinity,-Infinity]];
+      for (const m of own) { const at = place(m); for (const a of [0,1]) { box[0][a] = Math.min(box[0][a], at[a]+m.min[a]); box[1][a] = Math.max(box[1][a], at[a]+m.max[a]); } }
+      const [cx,cy] = [0,1].map(a => (box[0][a] + box[1][a]) / 2);
+      const [rx,ry] = [0,1].map(a => Math.max(23, (box[1][a] - box[0][a]) / 2 + 8));
+      return { own, cx, cy, rx, ry };
+    };
     const rowIndex = clue => clue.axis < 2 ? clue.row * 2 + clue.axis : -1;
     const isActive = clue => !!active && clue.axis === active.axis && clue.row === active.r;
-    // Reserve every resting pose on the rotation page and every halo on the
-    // others, so turning or row emphasis never changes the scale.
-    const poses = page === 3 ? [0,120,240].map(t => base + turns * 120 + t) : page ? [angle] : [];
-    for (const pose of poses) for (const m of layoutAt(pose).marks) include(place(m), m.min, m.max);
+    // Reserve every resting pose on the turning pages and every halo on the
+    // lesson pages, so turning or row emphasis never changes the scale.
+    const poses = page >= 2 ? [0,120,240].map(t => base + turns * 120 + t) : page ? [angle] : [];
+    for (const pose of poses) {
+      const { clues, marks } = layoutAt(pose);
+      for (const m of marks) include(place(m), m.min, m.max);
+      if (page < 3) for (const clue of clues) { const { cx,cy,rx,ry } = haloOf(clue, marks); include([cx,cy], [-rx-3,-ry-3], [rx+3,ry+3]); }
+    }
     if (page > 0 && !moving) {
       const { clues, marks } = layoutAt(angle);
       for (const clue of clues) {
-        const own = marks.filter(m => m.value !== undefined && m.axis === clue.axis && m.row === clue.row);
-        const box = [[Infinity,Infinity],[-Infinity,-Infinity]];
-        for (const m of own) { const at = place(m); for (const a of [0,1]) { box[0][a] = Math.min(box[0][a], at[a]+m.min[a]); box[1][a] = Math.max(box[1][a], at[a]+m.max[a]); } }
-        const [cx,cy] = [0,1].map(a => (box[0][a] + box[1][a]) / 2);
-        const [rx,ry] = [0,1].map(a => Math.max(23, (box[1][a] - box[0][a]) / 2 + 8));
+        const { own, cx, cy, rx, ry } = haloOf(clue, marks);
         const index = rowIndex(clue);
         const group = svg('g', { 'data-axis': clue.axis, 'data-row': clue.row, class: isActive(clue) ? 'intro-hint active' : 'intro-hint' });
         if (index >= 0) group.dataset.demoRow = index;
@@ -160,7 +225,6 @@
         }
         svg('ellipse', { cx,cy,rx:rx+6,ry:ry+6,class:'intro-hit' },group);
         svg('ellipse', { cx,cy,rx,ry,class:'intro-halo' },group);
-        if (page < 3) include([cx,cy], [-rx-3,-ry-3], [rx+3,ry+3]);
         if (!columns) for (const m of own) {
           const [x,y] = place(m);
           const text = svg('text', { x,y,'text-anchor':m.anchor,'dominant-baseline':m.baseline,'font-size':font,class:'intro-numeral' },group);
@@ -178,11 +242,18 @@
     if (focusedRow !== undefined) board.querySelector(`g[data-demo-row="${focusedRow}"]`)?.focus({ preventScroll: true });
     const activeClue = active && geometry.clueRows(angle, desktop, demo).find(isActive);
     el('intro-step-text').textContent = page === 1 ? TriCopy.t('intro.row', { row: active.r + 1, direction: direction(activeClue, angle) }) :
-      page === 3 ? TriCopy.t('intro.rotation') : page === 2 ? (step ? TriCopy.t(step.value === 1 ? 'intro.fill' : 'intro.cross', { count: rows[step.row].runs[0] }) : TriCopy.t('intro.blank')) : '';
+      page === 3 ? TriCopy.t('intro.rotation') : page === 2 ? stepText(step) : '';
     // The one extra control beside Home: pause while something plays, replay a finished solve.
     const pause = el('intro-pause');
     pause.hidden = page === 0 || (!motionEnabled && !solved());
     pause.textContent = TriCopy.t(solved() ? 'intro.replay' : paused ? 'intro.play' : 'intro.pause');
+  }
+  function stepText(step) {
+    if (!step) return TriCopy.t('intro.blank');
+    if (!step.fill) return TriCopy.t('intro.turn');
+    const line = strips[step.axis][step.r];
+    const count = step.reason === 'cross' ? line.runs.reduce((a,b) => a+b, 0) : line.ids.length;
+    return TriCopy.t(`intro.${step.reason}`, { runs: runsText(line), count });
   }
   function showPage() {
     stop();
@@ -202,8 +273,8 @@
   function selectRow(index) { beat = index; paused = true; draw(); schedule(); }
   // Tapping the solve steps it by hand; tapping the finished board replays it.
   function stepSolve() {
-    if (solved()) { beat = 0; paused = false; }
-    else { beat++; paused = true; }
+    if (solved()) { showBeat(0); paused = false; }
+    else { showBeat(beat + 1); paused = true; }
     draw(); schedule();
   }
   window.triCloseIntro = () => { stop(); root.hidden = true; };
@@ -224,7 +295,7 @@
   el('intro-back').onclick = () => { if (page) { page--; showPage(); } else leaveIntro(); };
   el('intro-exit').onclick = () => leaveIntro();
   el('intro-pause').onclick = () => {
-    if (solved()) { beat = 0; paused = false; }
+    if (solved()) { showBeat(0); paused = false; }
     else { paused = !paused; restSince = performance.now(); }
     draw(); schedule();
   };

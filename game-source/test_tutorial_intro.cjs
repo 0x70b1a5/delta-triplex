@@ -58,9 +58,22 @@ h.click('intro-next');
 assert(Array.from(d.querySelectorAll('[data-demo-cell]')).every(n=>n.dataset.mark==='0'));
 // Independently enumerate every possible row pattern. Each demonstrated mark must
 // hold in every pattern consistent with its clues and previously known marks.
+const { steps, strips } = w.TriIntroDemo;
+assert([0,1].every(axis => strips[axis][0].ids.length === 9 && strips[axis][0].runs.length > 1), 'the long visible strips need deduction');
+const worked = steps.filter(step => step.fill);
+assert(worked.some(step => step.reason === 'overlap'), 'the solve shows an overlap deduction');
+assert(worked.some(step => strips[step.axis][step.r].runs.length > 1 && step.axis < 2), 'the solve works multi-number hints');
+assert(worked.some(step => step.axis === 2 && strips[2][step.r].runs.length > 1), 'the solve works a multi-number hint in the third direction');
+assert.equal(steps.filter(step => !step.fill).length, 1, 'the solve turns once');
 const known=Array(25).fill(0);
-w.TriIntroDemo.steps.forEach((step, index) => {
-  const row=w.TriIntroDemo.rows[step.row], candidates=[];
+steps.forEach((step, index) => {
+  if (!step.fill) {
+    fire(get('intro-board'), 'keydown', { key:'Enter' });
+    assert(axes().has('2'), 'turning reveals the third set of hints');
+    assert(get('intro-step-text').textContent.startsWith('No visible hint'));
+    return;
+  }
+  const row=strips[step.axis][step.r], candidates=[];
   for(let bits=0;bits<2**row.ids.length;bits++) {
     const pattern=Array.from(row.ids,(_,i)=>(bits>>i)&1), runs=[]; let count=0;
     for(const fill of [...pattern,0]) { if(fill)count++;else if(count){runs.push(count);count=0;} }
@@ -70,20 +83,24 @@ w.TriIntroDemo.steps.forEach((step, index) => {
     candidates.push(pattern);
   }
   assert(candidates.length);
-  for(const id of step.changed) {
-    assert(candidates.every(p=>p[row.ids.indexOf(id)]===(step.value===1?1:0)), 'only logically forced marks');
-    known[id]=step.value;
+  for(const [ids,value] of [[step.fill,1],[step.cross,2]]) for(const id of ids) {
+    assert(candidates.every(p=>p[row.ids.indexOf(id)]===(value===1?1:0)), 'only logically forced marks');
+    known[id]=value;
   }
   // Tapping anywhere on the triangle steps the solve; so does Enter on the board.
   if (index % 2) tap(d.querySelector('[data-demo-cell="12"]'));
   else fire(get('intro-board'), 'keydown', { key:'Enter' });
   for(let id=0;id<25;id++) assert.equal(d.querySelector(`[data-demo-cell="${id}"]`).dataset.mark,known[id]);
+  assert(axes().has(String(step.axis)), 'each worked hint is on screen');
+  assert.equal(d.querySelector('.intro-hint.active')?.dataset.axis, String(step.axis));
+  assert(get('intro-step-text').textContent.length > 20);
 });
 assert(known.every(Boolean));
 assert(known.every((v,id)=>(v===1)===w.TriIntroDemo.cells[id].filled));
 assert(!get('intro-pause').hidden && get('intro-pause').textContent === 'Replay', 'a finished solve offers a replay');
 h.click('intro-pause');
 assert(Array.from(d.querySelectorAll('[data-demo-cell]')).every(n=>n.dataset.mark==='0'), 'replay returns to the empty triangle');
+assert.deepEqual(axes(),new Set(['0','1']), 'replay faces the starting direction');
 h.click('intro-next');
 assert.equal(get('tutorial-intro').dataset.page,'3');
 assert.deepEqual(axes(),new Set(['0','1']));
@@ -148,7 +165,16 @@ assert.equal(ag('intro-pause').textContent, 'Play', 'choosing a hint pauses the 
 runTimers(); assert.equal(activeRow(),'6');
 a.click('intro-pause'); runTimers(); assert.equal(activeRow(),'7', 'play resumes from the chosen row');
 a.click('intro-next');
-for (let i = 0; i < 20; i++) runTimers();
+const solveBox = ag('intro-board').getAttribute('viewBox');
+let sawTurn = false;
+for (let i = 0; i < 30; i++) {
+  runTimers();
+  // A turn in the solve animates, hiding hints until it settles.
+  if (a.d.querySelectorAll('#intro-board .intro-hint').length === 0) sawTurn = true;
+  for (let f = 0; f < 40; f++) a.frame(16);
+  assert.equal(ag('intro-board').getAttribute('viewBox'), solveBox, 'the solve keeps one scale while turning');
+}
+assert(sawTurn, 'the solve animates its turn');
 assert.equal(ag('intro-pause').textContent, 'Replay', 'the solve plays once and stops');
 assert.equal(a.timers.size, 0);
 a.click('intro-next');
