@@ -167,12 +167,9 @@
     if (!attemptKey || (!force && performance.now() - lastSaved < 1000)) return;
     attempts[attemptKey] = { elapsed, turns, view, finished };
     try { localStorage.setItem("tri-rotate-attempts-v1", JSON.stringify(attempts)); } catch {}
-    if (attemptKey.startsWith("endless/")) {
-      window.triSaveEndlessProgress?.(attemptKey.slice("endless/".length), {
-        elapsed, turns, view, finished,
-        marks: state?.cells?.map(cell => cell.state).join(""),
-      });
-    }
+    const progress = { elapsed, turns, view, finished, marks: state?.cells?.map(cell => cell.state).join("") };
+    if (attemptKey.startsWith("endless/")) window.triSaveEndlessProgress?.(attemptKey.slice("endless/".length), progress);
+    if (attemptKey.startsWith("daily/")) window.triSaveDailyProgress?.(attemptKey.slice("daily/".length), progress);
     lastSaved = performance.now();
   }
   let wheelAmount = 0, wheelLast = -Infinity, wheelCooldownUntil = -Infinity;
@@ -247,10 +244,13 @@
       // Built-in progress survives reload/navigation; its stopwatch must, too.
       // Custom imports and editor trials start fresh. Endless attempts resume with the address.
       const endlessCode = next.custom && window.triEndlessRun ? (window.triActiveSeedCode || "") : "";
+      const dailyDate = next.custom && !next.editing && !endlessCode ? (window.triActiveDaily || "") : "";
       attemptKey = !next.custom
         ? `${next.tutorial}/${next.level}/${next.solution.join("")}`
-        : endlessCode ? `endless/${endlessCode}` : "";
-      const savedEndless = !forceFresh && endlessCode ? window.triReadEndlessProgress?.(endlessCode) : null;
+        : endlessCode ? `endless/${endlessCode}` : dailyDate ? `daily/${dailyDate}` : "";
+      const savedEndless = forceFresh ? null
+        : endlessCode ? window.triReadEndlessProgress?.(endlessCode)
+        : dailyDate ? window.triReadDailyProgress?.(dailyDate) : null;
       const saved = savedEndless
         ? { elapsed: Number(savedEndless.elapsed), turns: Number(savedEndless.turns), view: Number(savedEndless.view), finished: savedEndless.finished }
         : !forceFresh && attemptKey && attempts[attemptKey];
@@ -282,6 +282,7 @@
     if (!next.won) finished = null;
     previousWon = next.won;
     saveAttempt(true);
+    if (attemptKey.startsWith("daily/") && finished && !finished.unknown) window.triDailyFinished?.(attemptKey.slice("daily/".length), finished);
     controls.hidden = next.won && !next.editing;
     el("app").dataset.solved = String(next.won && !next.editing);
     el("share-result").disabled = !!finished?.unknown;
@@ -851,6 +852,8 @@
   svg.addEventListener("lostpointercapture", e => release(e, true));
 
   function brag() {
+    const daily = attemptKey.startsWith("daily/") && window.triDailyBrag?.(attemptKey.slice("daily/".length), finished);
+    if (daily) return daily;
     const text = TriCopy.t("share.result", { time: formatTime(finished.elapsed), count: finished.turns });
     const url = state.custom ? TriShare.url(currentPuzzle)
       : (state.tutorial >= 0 ? TriShare.url({ size: state.n, solution: state.solution }) : `${TriShare.base}#level=${state.level}`);

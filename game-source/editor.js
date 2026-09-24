@@ -107,6 +107,7 @@ let currentPuzzle = null,
   authorSession = false,
   sharedArrival = false;
 window.triAuthorSession = false;
+window.triActiveDaily = "";
 
 const settings = document.createElement("section");
 settings.id = "editor-settings";
@@ -132,14 +133,17 @@ function saveDraft() {
     localStorage.setItem("tri-rotate-editor-v1", JSON.stringify(draft));
   } catch {}
 }
-function loadCustom(puzzle, editing, ownsDraft, endlessRun = null, fromLink = false) {
+// daily is the puzzle's date (YYYY-MM-DD) when it is a daily puzzle.
+function loadCustom(puzzle, editing, ownsDraft, endlessRun = null, fromLink = false, daily = "") {
   if (!appReady) return toast(TriCopy.t("errors.loading"));
   if (!validPuzzle(puzzle)) return toast(TriCopy.t("editor.invalid-puzzle-data"));
   window.triCancelGeneration?.();
   window.triEndlessRun = endlessRun;
+  window.triActiveDaily = daily;
   currentPuzzle = normalizePuzzle(puzzle);
   window.triActiveSeedCode = TriShare.seedCode(currentPuzzle.seed, currentPuzzle.difficulty) || "";
-  const resumed = endlessRun && window.triReadEndlessProgress?.(window.triActiveSeedCode);
+  const resumed = endlessRun ? window.triReadEndlessProgress?.(window.triActiveSeedCode)
+    : daily ? window.triReadDailyProgress?.(daily) : null;
   if (endlessRun && window.triActiveSeedCode && !resumed)
     window.triStoreEndlessRun?.(endlessRun, window.triActiveSeedCode);
   const marks = resumed?.marks;
@@ -295,6 +299,10 @@ window.triInitializeCustom = () => {
         TriCopy.t("errors.seedLink");
       el("load-error").hidden = false;
     }
+    return;
+  }
+  if (params.has("daily")) {
+    window.triOpenDaily(params.get("daily"), { fromLink: true });
     return;
   }
   const code = params.get("p");

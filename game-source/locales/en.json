@@ -261,5 +261,64 @@
   "intro.up-right": "up and right",
   "intro.down-left": "down and left",
   "intro.down-right": "down and right",
-  "home.settings": "Settings"
+  "home.settings": "Settings",
+  "calendar.loading": "Loading the daily puzzle…",
+  "calendar.offline": "Daily puzzles need a connection. Try again when you're online.",
+  "calendar.pick": "Pick a day to play its puzzle.",
+  "calendar.puzzleDay": "{date} · {name}",
+  "calendar.solvedDay": "{date} · {name} · Solved",
+  "calendar.todayMissing": "Today's puzzle isn't out yet. Try a past one.",
+  "daily.bar": {
+    "one": "{range}: {count} solver",
+    "other": "{range}: {count} solvers"
+  },
+  "daily.close": "Close",
+  "daily.failed": "Stats are unavailable right now.",
+  "daily.first": "You're the first to solve it!",
+  "daily.help": "Today's puzzle. Your first solve counts toward the daily stats.",
+  "daily.loadingStats": "Counting your solve…",
+  "daily.median": "Median {time}",
+  "daily.pastHelp": "A daily puzzle. Your first solve counts toward its stats.",
+  "daily.pending": "Your result will be counted once you're back online.",
+  "daily.rotations": "Rotations",
+  "daily.sharePlain": {
+    "one": "Solved in {time} · {count} rotation",
+    "other": "Solved in {time} · {count} rotations"
+  },
+  "daily.shareStats": {
+    "one": "Solved in {time} (top {timeTop}%) · {count} rotation (par {par})",
+    "other": "Solved in {time} (top {timeTop}%) · {count} rotations (par {par})"
+  },
+  "daily.shareTitle": "Delta Triplex {date} · “{name}”",
+  "daily.solvers": {
+    "one": "{count} solver so far",
+    "other": "{count} solvers so far"
+  },
+  "daily.stats": "Stats",
+  "daily.statsTitle": "Daily results",
+  "daily.time": "Time",
+  "daily.timeLine": "{time} · top {top}%",
+  "daily.title": "{date} · {name}",
+  "daily.turnsLine": {
+    "one": "{count} rotation · par {par} · top {top}%",
+    "other": "{count} rotations · par {par} · top {top}%"
+  },
+  "daily.you": "You",
+  "sync.confirm": "Switch this device to that code? Results solved here under the current code stay with it.",
+  "sync.copied": "Sync code copied.",
+  "sync.copy": "Copy code",
+  "sync.done": {
+    "one": "Synced · {count} solved daily",
+    "other": "Synced · {count} solved dailies"
+  },
+  "sync.enter": "Code from another device",
+  "sync.help": "No account needed. Enter this code on another device to share your daily results. Keep it private: it is your player identity.",
+  "sync.hide": "Hide",
+  "sync.invalid": "That isn't a valid sync code.",
+  "sync.none": "You get a code when you first play a daily.",
+  "sync.offline": "Couldn't reach the server. Try again when you're online.",
+  "sync.show": "Show my code",
+  "sync.title": "Daily stats sync",
+  "sync.unknown": "Code saved. No solves recorded for it yet.",
+  "sync.use": "Use code"
 }

@@ -16,7 +16,8 @@ assert.equal(create.style.getPropertyValue('--y'), '50%');
 const homeStyle = d.getElementById('home').style;
 assert.equal(homeStyle.getPropertyValue('--home-dim'), palette.mix(homeStyle.getPropertyValue('--bg'), homeStyle.getPropertyValue('--empty'), .25));
 const initial = JSON.stringify(h.state);
-h.click('today-puzzle');
+// Today's Puzzle plays the daily (test_daily.cjs); the calendar opened on today is its fallback.
+w.triOpenCalendar(true);
 assert.equal(d.getElementById('home').dataset.view, 'calendar');
 const picker = d.getElementById('calendar-month'), grid = d.getElementById('calendar-grid');
 assert.equal(picker.type, 'month'); assert.equal(picker.min, '2026-09'); assert.equal(picker.max, '2026-09');

@@ -114,6 +114,8 @@ window.triFlowState = function (next, previous) {
   if (!next.custom) window.triEndlessRun = null;
   if (next.custom && window.triEndlessRun && window.triActiveSeedCode)
     window.triSetEndlessPlace?.(window.triActiveSeedCode);
+  else if (next.custom && !next.editing && window.triActiveDaily)
+    window.triSetPlace?.("#daily=" + window.triActiveDaily);
   else window.triSetEndlessPlace?.("");
   el("editor-test").hidden = !!window.triEndlessRun || !window.triAuthorSession;
   if (next.custom && window.triEndlessRun) {
@@ -141,7 +143,7 @@ window.triFlowState = function (next, previous) {
   if (solved && sameBoard && !previous.won) call("celebrate");
   if (!solved) call("clear_celebration");
 };
-el("today-puzzle").onclick = () => window.triOpenCalendar(true);
+el("today-puzzle").onclick = () => window.triPlayToday();
 el("past-puzzles").onclick = () => window.triOpenCalendar(false);
 el("how-to-play").onclick = () => {
   if (!appReady) return toast(TriCopy.t("errors.loading"));

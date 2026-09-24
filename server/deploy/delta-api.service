@@ -1,0 +1,21 @@
+[Unit]
+Description=Delta Triplex daily puzzle API
+After=network.target
+
+[Service]
+# System Node 24 (NodeSource apt). deploy.sh installs api.mjs and dailies.json in /opt/delta-api.
+ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning /opt/delta-api/api.mjs
+Environment=PORT=8787 HOST=127.0.0.1
+Environment=DELTA_DB=/var/lib/delta/delta.sqlite DELTA_DAILIES=/opt/delta-api/dailies.json
+# A throwaway user that can only write its own state directory.
+DynamicUser=yes
+StateDirectory=delta
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

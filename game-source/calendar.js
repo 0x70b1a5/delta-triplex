@@ -1,5 +1,5 @@
 "use strict";
-// Display-only daily archive. No date is mapped to a generated puzzle yet.
+// Daily archive. daily.js knows which dates have puzzles and opens them.
 (() => {
   const scene = el("home-calendar"), picker = el("calendar-month"), grid = el("calendar-grid");
   // Seven rows fit 35 day cells, enough for any month.
@@ -46,10 +46,16 @@
         const label = document.createElement("span"); label.textContent = day;
         cell.append(label);
         cell.disabled = key > today;
-        cell.setAttribute("aria-label", TriCopy.t(cell.disabled ? "calendar.future" : "calendar.day", { date: dateLabel(date) }));
+        const daily = cell.disabled ? null : window.triDailyStatus?.(key);
+        if (daily) cell.dataset.daily = daily.solved ? "solved" : daily.started ? "started" : "open";
+        else if (!cell.disabled && window.triDailyListLoaded?.()) cell.dataset.daily = "none";
+        cell.setAttribute("aria-label", cell.disabled ? TriCopy.t("calendar.future", { date: dateLabel(date) })
+          : daily ? TriCopy.t(daily.solved ? "calendar.solvedDay" : "calendar.puzzleDay", { date: dateLabel(date), name: daily.name })
+          : TriCopy.t("calendar.day", { date: dateLabel(date) }));
+        if (daily) cell.title = daily.name;
         cell.setAttribute("aria-pressed", String(key === selected));
         if (key === today) cell.setAttribute("aria-current", "date");
-        cell.onclick = () => select(date);
+        cell.onclick = () => daily ? window.triOpenDaily(key) : select(date);
       } else {
         cell = document.createElement("i");
         cell.setAttribute("aria-hidden", "true");
@@ -64,8 +70,9 @@
     if (!selected.startsWith(month + "-")) selected = "";
     el("calendar-status").textContent = selected
       ? TriCopy.t("calendar.selection", { date: dateLabel(new Date(year, number - 1, Number(selected.slice(-2)), 12)) })
-      : TriCopy.t("calendar.unassigned");
+      : TriCopy.t(grid.querySelector("[data-daily]") ? "calendar.pick" : "calendar.unassigned");
   }
+  window.triCalendarRefresh = () => { if (!el("home-calendar").hidden) render(); };
   picker.addEventListener("change", render);
   // The zoom transition starts from whichever home cell opened the calendar,
   // and focuses today's date or the month picker once it settles.

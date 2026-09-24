@@ -13,7 +13,7 @@ const historyId =
 let depth = historyHost.history.state?.[historyKey]?.depth || 0;
 let pending = false,
   applying = false,
-  endlessPlace = "",
+  place = "",
   publishedHash = "",
   traversedHref = "";
 function replaceHash(hash) {
@@ -27,7 +27,7 @@ function replaceHash(hash) {
 function publishPlace() {
   if (pending || applying) return;
   window.triReattachEndless?.();
-  const desired = endlessPlace && el("home").hidden ? "#seed=" + endlessPlace : "";
+  const desired = place && el("home").hidden ? place : "";
   if (desired) {
     if (historyHost.location.hash !== desired) replaceHash(desired);
     else publishedHash = desired;
@@ -36,11 +36,13 @@ function publishPlace() {
   // Only remove an address this page wrote. Shared links keep their own hash.
   if (publishedHash && historyHost.location.hash === publishedHash) replaceHash("");
 }
-window.triClearEndlessPlace = function () { endlessPlace = ""; };
-window.triSetEndlessPlace = function (code) {
-  endlessPlace = code || "";
+// The address of the puzzle in play: #seed= for Endless, #daily= for dailies.
+window.triClearEndlessPlace = function () { place = ""; };
+window.triSetPlace = function (hash) {
+  place = hash || "";
   publishPlace();
 };
+window.triSetEndlessPlace = code => window.triSetPlace(code ? "#seed=" + code : "");
 window.triPublishPlace = publishPlace;
 window.triConsumeTraversal = function (href) {
   const own = href === traversedHref;

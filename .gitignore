@@ -52,3 +52,8 @@ next-env.d.ts
 
 # Local Emscripten and raylib build tools
 /.build/
+
+# Daily API: local databases and design previews
+/server/*.sqlite*
+/server/preview/
+/server/__pycache__/

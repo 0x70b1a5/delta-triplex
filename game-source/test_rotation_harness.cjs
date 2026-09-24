@@ -27,6 +27,8 @@ function harness(html, url = "https://tri.test/", storage = {}, options = {}) {
     };
   }
   if (!options.firstGame) w.localStorage.setItem('delta-triplex-theme-welcome', '1');
+  // The daily API; without it the game behaves as if offline.
+  if (options.fetch) w.fetch = options.fetch;
   w.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
   w.HTMLDialogElement.prototype.close = function () { this.open = false; };
   for (const [key, value] of Object.entries(storage))
