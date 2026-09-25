@@ -136,6 +136,15 @@ for (const key of Object.keys(soundLevels)) {
     try { localStorage.setItem("delta-triplex-sound", JSON.stringify(soundLevels)); } catch {}
   });
 }
+// Opt-in: cross the rest of a line once its clue is met (engine applies it).
+let autoCross = false;
+try { autoCross = localStorage.getItem("delta-triplex-auto-cross") === "1"; } catch {}
+el("auto-cross").checked = autoCross;
+el("auto-cross").addEventListener("change", () => {
+  autoCross = el("auto-cross").checked;
+  try { localStorage.setItem("delta-triplex-auto-cross", autoCross ? "1" : "0"); } catch {}
+  call("auto_cross", autoCross ? 1 : 0);
+});
 function fit() {
   // The rules engine uses a stable coordinate system; SVG owns the responsive view.
   renderWidth = 900; renderHeight = 760;
@@ -244,6 +253,7 @@ function makeGrid(e) {
         state.orientation || 0
       ]),
       (el("app").dataset.custom = String(!!state.custom)),
+      (el("solving-settings").hidden = !!state.editing),
       window.triCustomState?.(state),
       window.triFlowState?.(state, t),
       window.triRotateState?.(state, t),
@@ -380,6 +390,7 @@ let sizeObserver;
   (window.triReady = function () {
     ((appReady = !0),
       call("motion", motionEnabled ? 1 : 0),
+      call("auto_cross", autoCross ? 1 : 0),
       scheduleShine(),
       (el("status").hidden = !0),
       fit(),

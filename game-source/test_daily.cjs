@@ -117,6 +117,11 @@ const storageOf = h => Object.fromEntries(Array.from({ length: h.w.localStorage.
   assert(stats.includes('00:42 · top 50%'), stats);
   assert(stats.includes('0 rotations · par 2 · top 50%'), stats);
   assert.equal(d.querySelectorAll('#daily-stats .daily-bar-you').length, 2, 'both charts mark your bin');
+  const charts = [...d.querySelectorAll('#daily-stats .daily-chart')];
+  const texts = (chart, cls) => [...chart.querySelectorAll('.' + cls)].map(node => node.textContent);
+  assert.deepEqual(texts(charts[0], 'daily-chart-title'), ['Solvers', 'Solve time'], 'time chart axes are titled');
+  assert.deepEqual(texts(charts[1], 'daily-chart-title'), ['Solvers', 'Rotations to solve'], 'rotation chart axes are titled');
+  assert.deepEqual(texts(charts[1], 'daily-chart-tick'), ['1', '0', '0', '3'], 'peak count, zero, and the lowest and highest rotations');
   let shared;
   w.navigator.share = async data => { shared = data; };
   h.click('share-result'); await tick();

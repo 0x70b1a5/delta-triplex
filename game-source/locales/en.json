@@ -175,7 +175,10 @@
   "ui.click-fill-drag-paint": "click: fill · drag: paint",
   "ui.close-menu": "Close menu",
   "ui.clues-in-three-directions": "Clues in three directions",
+  "ui.autoCross": "Auto-cross solved lines",
+  "ui.autoCrossHelp": "Crosses the remaining cells of any line whose clue is met. Clues are matched by pattern only, so a run filled in the wrong place spreads its mistake.",
   "ui.clueStyle": "Phone clues",
+  "ui.solving": "Solving",
   "ui.clueStyle.corner": "Corner",
   "ui.clueStyle.curve": "Curve",
   "ui.continue": "Continue",
@@ -274,6 +277,9 @@
   "calendar.puzzleDay": "{date} · {name}",
   "calendar.solvedDay": "{date} · {name} · Solved",
   "calendar.todayMissing": "Today's puzzle isn't out yet. Try a past one.",
+  "daily.axisRotations": "Rotations to solve",
+  "daily.axisSolvers": "Solvers",
+  "daily.axisTime": "Solve time",
   "daily.bar": {
     "one": "{range}: {count} solver",
     "other": "{range}: {count} solvers"

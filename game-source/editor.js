@@ -176,7 +176,8 @@ function syncVisitorControls(next) {
 window.triCustomState = (next) => {
   const active = !!next.custom;
   workshop.hidden = !active;
-  settings.hidden = !active || !!homeMenuState;
+  // Puzzle settings (name, size, export) only apply while editing.
+  settings.hidden = !active || !next.editing || !!homeMenuState;
   syncVisitorControls(next);
   if (!active || !currentPuzzle) {
     el("reset").title = TriCopy.t("ui.reset-r-undo-restores-it");

@@ -219,32 +219,43 @@
     return edges.length - 2;
   }
   // One series: every bin in the filled-cell colour at a light tint, the
-  // player's bin at full strength with a "You" label underneath.
-  function histogram({ edges, counts }, mine, range, label) {
-    const width = 240, height = 64, base = 48, top = 6;
+  // player's bin at full strength with a "You" label above it. Both axes are
+  // titled; the x axis marks its outer edges and the y axis its peak count.
+  function histogram({ edges, counts }, mine, { range, tick, xTitle, label }) {
+    const left = 34, width = 240, top = 18, base = 58, height = 90;
     const svg = svgNode("svg", { viewBox: `0 0 ${width} ${height}`, class: "daily-chart", role: "img", "aria-label": label });
-    const slot = width / counts.length, bar = Math.min(24, slot - 2), max = Math.max(...counts);
+    const slot = (width - left) / counts.length, bar = Math.min(24, slot - 2), max = Math.max(...counts);
     const you = binOf(edges, mine);
-    svg.append(svgNode("line", { x1: 0, x2: width, y1: base + .5, y2: base + .5, class: "daily-chart-axis" }));
+    const text = (content, attrs) => { const node = svgNode("text", attrs); node.textContent = content; return node; };
+    svg.append(
+      svgNode("line", { x1: left, x2: width, y1: base + .5, y2: base + .5, class: "daily-chart-axis" }),
+      svgNode("line", { x1: left - .5, x2: left - .5, y1: top, y2: base + .5, class: "daily-chart-axis" }),
+      text(String(max), { x: left - 4, y: top + 4, "text-anchor": "end", class: "daily-chart-tick" }),
+      text("0", { x: left - 4, y: base + 3, "text-anchor": "end", class: "daily-chart-tick" }),
+      text(TriCopy.t("daily.axisSolvers"), { x: 0, y: 0, "text-anchor": "middle", class: "daily-chart-title",
+        transform: `translate(9 ${(top + base) / 2}) rotate(-90)` }),
+      text(xTitle, { x: left + (width - left) / 2, y: height - 3, "text-anchor": "middle", class: "daily-chart-title" }));
+    // A single-value histogram (everyone tied) has matching edges: one centred tick.
+    const first = edges[0], last = edges[edges.length - 1];
+    if (first === last) svg.append(text(tick(first, false), { x: left + (width - left) / 2, y: base + 13, "text-anchor": "middle", class: "daily-chart-tick" }));
+    else svg.append(
+      text(tick(first, false), { x: left, y: base + 13, "text-anchor": "start", class: "daily-chart-tick" }),
+      text(tick(last, true), { x: width, y: base + 13, "text-anchor": "end", class: "daily-chart-tick" }));
     counts.forEach((count, i) => {
-      const x = i * slot + (slot - bar) / 2;
+      const x = left + i * slot + (slot - bar) / 2;
       const h = count ? Math.max(3, (base - top) * count / max) : 0;
       const group = svgNode("g", { class: i === you ? "daily-bar daily-bar-you" : "daily-bar" });
       const title = svgNode("title", {});
       title.textContent = TriCopy.t("daily.bar", { range: range(edges[i], edges[i + 1]), count });
       // Hit target spans the whole slot so thin or empty bins still show a tooltip.
-      group.append(title, svgNode("rect", { x: i * slot, y: 0, width: slot, height: base, fill: "transparent" }));
+      group.append(title, svgNode("rect", { x: left + i * slot, y: 0, width: slot, height: base, fill: "transparent" }));
       if (h) {
         const r = Math.min(4, bar / 2, h);
         group.append(svgNode("path", {
           d: `M${x} ${base}V${base - h + r}Q${x} ${base - h} ${x + r} ${base - h}H${x + bar - r}Q${x + bar} ${base - h} ${x + bar} ${base - h + r}V${base}Z`,
         }));
       }
-      if (i === you) {
-        const text = svgNode("text", { x: x + bar / 2, y: height - 2, "text-anchor": "middle" });
-        text.textContent = TriCopy.t("daily.you");
-        group.append(text);
-      }
+      if (i === you) group.append(text(TriCopy.t("daily.you"), { x: x + bar / 2, y: base - h - 4, "text-anchor": "middle" }));
       svg.append(group);
     });
     return svg;
@@ -279,11 +290,15 @@
       time.className = turns.className = "daily-stat";
       time.append(line(TriCopy.t("daily.time"), "daily-stat-label"),
         line(TriCopy.t("daily.timeLine", { time: formatTime(you.elapsedMs), top: you.timeTop }), "daily-stat-value"),
-        histogram(stats.time.histogram, you.elapsedMs, (a, b) => `${formatTime(a)}–${formatTime(b)}`, TriCopy.t("daily.time")),
+        histogram(stats.time.histogram, you.elapsedMs, { range: (a, b) => `${formatTime(a)}–${formatTime(b)}`,
+          tick: formatTime, xTitle: TriCopy.t("daily.axisTime"), label: TriCopy.t("daily.time") }),
         line(TriCopy.t("daily.median", { time: formatTime(stats.time.median) }), "daily-stat-foot"));
       turns.append(line(TriCopy.t("daily.rotations"), "daily-stat-label"),
         line(TriCopy.t("daily.turnsLine", { count: you.turns, par: stats.turns.par, top: you.turnsTop }), "daily-stat-value"),
-        histogram(stats.turns.histogram, you.turns, (a, b) => b - a <= 1 ? String(a) : `${a}–${b - 1}`, TriCopy.t("daily.rotations")));
+        histogram(stats.turns.histogram, you.turns, { range: (a, b) => b - a <= 1 ? String(a) : `${a}–${b - 1}`,
+          // Rotation bins end exclusively, so the last edge is one past the highest count.
+          tick: (value, end) => String(end ? Math.max(0, value - 1) : value),
+          xTitle: TriCopy.t("daily.axisRotations"), label: TriCopy.t("daily.rotations") }));
       body.push(time, turns, line(TriCopy.t("daily.solvers", { count: stats.solvers }), "daily-stat-foot"));
     }
     const share = el("share-result").cloneNode(true);

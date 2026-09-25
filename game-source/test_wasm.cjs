@@ -7,3 +7,23 @@ const half=Math.min((900-96)/2,(760-144)/Math.sqrt(3)),d=half/state.n,h=half*Mat
 function tap(tool=1){x.game_clear_effects();x.game_down(px,py,tool);x.game_up();return !!x.game_effects(10000)}
 assert.equal(value(),0);assert(tap());assert.equal(value(),1);assert(!tap());assert.equal(value(),2);assert(!tap());assert.equal(value(),0);assert(!tap(2));assert.equal(value(),2);assert(!tap(2));assert.equal(value(),0);assert(tap());x.game_undo();assert.equal(value(),0);x.game_motion(0);assert(!tap());assert.equal(value(),1);
 console.log('PASS: actual compiled WASM tap cycle, fill-only ripple, right-click cross/clear, undo, reduced motion.');
+// Auto-cross: off by default; when on, a stroke that meets a line's clue crosses
+// that line's unknown cells, and one undo reverts the stroke with its crosses.
+{
+  // Size 2 with the tip and far corner filled: filling the tip alone meets its row's clue.
+  const bytes=s=>{const p=x.malloc(s.length+1);new Uint8Array(x.memory.buffer).set([...Buffer.from(s),0],p);return p};
+  x.game_motion(1);x.game_custom(2,0,bytes('1001'),0);
+  const d2=half/2,tipY=(760-h)/2+h-d2*Math.sqrt(3)*2/3,tip=()=>{x.game_down(px,tipY,1);x.game_up()};
+  const line=(c,a)=>a===0?c.i:a===1?c.j:state.n-1-c.i-c.j-c.o;
+  const unresolved=()=>state.cells.some(c=>c.active&&c.state===0&&[0,1,2].some(a=>state.clues[a][line(c,a)].match));
+  tip();assert.equal(state.cells[0].state,1);assert(!state.cells.some(c=>c.state===2),'auto-cross stays off by default');
+  x.game_undo();x.game_auto_cross(1);
+  assert(!unresolved(),'enabling crosses any line already met');
+  x.game_undo();assert(state.cells.every(c=>c.state===0),'enabling is one undoable step');
+  tip();assert.equal(state.cells[0].state,1);assert(!unresolved(),'a stroke meeting a clue crosses the rest of its line');
+  assert(!state.won&&state.cells.some(c=>c.state===2));
+  x.game_undo();assert.equal(state.cells[0].state,0);assert.equal(state.cells.filter(c=>c.state===2).length,0,'undo removes the stroke with its crosses');
+  x.game_editing(1);x.game_auto_cross(1);assert(!state.cells.some(c=>c.state===2),'the editor never auto-crosses');
+  x.game_auto_cross(0);x.game_skip();
+}
+console.log('PASS: opt-in auto-cross of met lines, undone with its stroke, applied on enable, never while editing.');

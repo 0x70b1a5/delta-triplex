@@ -383,7 +383,33 @@ API void game_move(float x,float y){
     }
     int t=hit(p);if(changed||t!=hovered){hovered=t;refresh_editor_solution();sync_state();}
 }
-API void game_up(void){if(stroke){stroke=false;persist();}}
+// Opt-in: once a line's clue is met, cross its remaining unknown cells. Applied
+// when a stroke ends so a drag never crosses cells it is about to paint, and so
+// the stroke's snapshot undoes its crosses too. Matching is by run pattern only,
+// so a clue met in the wrong place propagates that mistake.
+static bool auto_cross=false;
+static bool apply_auto_cross(void){
+    if(!auto_cross||editing||won||(!custom&&tutorial>=0))return false;
+    bool changed=false;
+    for(int a=0;a<3;a++)for(int r=0;r<board.n;r++){
+        Line *l=&board.lines[a][r];if(!line_matches(&board,l))continue;
+        for(int p=0;p<l->count;p++){Tile *t=&board.tiles[l->tile[p]];if(t->active&&t->state==0){t->state=2;changed=true;}}
+    }
+    return changed;
+}
+API void game_up(void){if(stroke){stroke=false;if(apply_auto_cross())sync_state();persist();}}
+API void game_auto_cross(int enabled){
+    auto_cross=enabled!=0;
+    if(stroke)return;
+    // Turning it on crosses already-met lines as one undoable step.
+    int before[MAX_TILES],after[MAX_TILES];
+    for(int t=0;t<board.count;t++)before[t]=board.tiles[t].state;
+    if(!apply_auto_cross())return;
+    for(int t=0;t<board.count;t++){after[t]=board.tiles[t].state;board.tiles[t].state=before[t];}
+    snapshot();
+    for(int t=0;t<board.count;t++)board.tiles[t].state=after[t];
+    persist();sync_state();
+}
 API void game_select(int a,int r){if(a>=0&&a<3&&r>=0&&r<board.n){selected_axis=a;selected_row=r;shine=false;sync_state();}}
 API void game_undo(void){
     game_up();if(!history_count)return;

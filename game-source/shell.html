@@ -692,6 +692,37 @@
         min-height: 32px;
         padding: 6px 9px;
       }
+      #auto-cross-help { margin: -4px 0 0; }
+      input[role="switch"] {
+        appearance: none;
+        flex: none;
+        position: relative;
+        width: 38px;
+        height: 22px;
+        margin: 0 0 0 12px;
+        border-radius: 11px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      input[role="switch"]::before {
+        content: "";
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: var(--muted);
+        transition: transform 0.15s, background 0.15s;
+      }
+      input[role="switch"]:checked { background: var(--cell); border-color: var(--cell); }
+      input[role="switch"]:checked::before { transform: translateX(16px); background: var(--home-cell-ink, var(--bg)); }
+      input[role="switch"]:focus-visible { outline: 2px solid var(--mint); outline-offset: 2px; }
+      @media (prefers-reduced-motion: reduce) {
+        input[role="switch"], input[role="switch"]::before { transition: none; }
+      }
       #puzzle-menu label[for="clue-style"][hidden] { display: none; }
       @media (min-width: 900px) {
         #puzzle-menu label[for="clue-style"] { display: none; }
@@ -1147,6 +1178,8 @@
       .daily-bar:hover path { opacity: .7; }
       .daily-bar-you:hover path { opacity: 1; }
       .daily-bar text { fill: var(--ink); font-size: 11px; font-family: system-ui, sans-serif; }
+      .daily-chart-tick, .daily-chart-title { fill: var(--muted); font-size: 10px; font-family: system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+      .daily-chart-title { font-size: 10.5px; }
       .daily-stats-share { margin-top: 14px; display: inline-flex; align-items: center; gap: 7px; }
       .daily-stats-share svg { width: 20px; height: 20px; flex-shrink: 0; }
       .daily-stats-share .mobile-share-suffix { display: none; }
@@ -1345,6 +1378,13 @@
           <button id="clear-colour-cell" class="colour-die" aria-label="{{copy:ui.clear-chosen-filled-cells-colour}}" title="{{copy:ui.use-theme-colour}}" hidden>×</button>
         </span>
       </label>
+      <section id="solving-settings" aria-labelledby="solving-title">
+        <h3 id="solving-title">{{copy:ui.solving}}</h3>
+        <label for="auto-cross">{{copy:ui.autoCross}}
+          <input id="auto-cross" type="checkbox" role="switch" aria-describedby="auto-cross-help">
+        </label>
+        <p id="auto-cross-help" class="editor-note">{{copy:ui.autoCrossHelp}}</p>
+      </section>
       <section class="sound-controls" aria-labelledby="sound-title">
         <h3 id="sound-title">{{copy:sound.title}}</h3>
         <label for="sound-master"><span>{{copy:sound.master}}</span><input id="sound-master" type="range" min="0" max="100" step="1" value="100"><output id="sound-master-value" for="sound-master">100%</output></label>
