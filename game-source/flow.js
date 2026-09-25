@@ -258,7 +258,7 @@ el("puzzle-file").onchange = async () => {
     if (
       !validPuzzle(puzzle) ||
       (puzzle.format && puzzle.format !== "tri-logic") ||
-      (puzzle.version && puzzle.version !== 2) ||
+      (puzzle.version && ![2, 3].includes(puzzle.version)) ||
       (puzzle.cellOrder && puzzle.cellOrder !== "north-row-major")
     )
       throw Error(
