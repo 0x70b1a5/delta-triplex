@@ -161,6 +161,29 @@ int main(void){
  game_down(winning_point.x,winning_point.y,1);game_up();assert(won);
  for(int t=0;t<board.count;t++)assert(board.tiles[t].state!=2);
  game_undo();assert(!won&&board.tiles[1].state==2&&board.tiles[0].state==0);
+ // Auto crosses revert once no line through them matches; hand crosses stay.
+ assert(game_custom(4,0,"1010011010011001",0));game_auto_cross(1);srand(7);int reverts=0;
+ for(int step=0;step<400&&!won;step++){
+  int t=rand()%board.count,prior[MAX_TILES];bool prior_auto[MAX_TILES];
+  for(int i=0;i<board.count;i++){prior[i]=board.tiles[i].state;prior_auto[i]=auto_x[i];}
+  Vector2 q=center(t);game_down(q.x,q.y,rand()%2+1);game_up();if(won)break;
+  for(int i=0;i<board.count;i++){
+   if(i!=t&&prior[i]==2&&!prior_auto[i])assert(board.tiles[i].state==2&&!auto_x[i]);
+   if(i!=t&&prior_auto[i]&&board.tiles[i].state==0)reverts++;
+   if(auto_x[i]){
+    assert(board.tiles[i].state==2);bool held=false;
+    for(int ax=0;ax<3;ax++)held|=line_matches(&board,&board.lines[ax][tile_line(&board,i,ax)]);
+    assert(held);
+   }
+  }
+  for(int ax=0;ax<3;ax++)for(int r=0;r<board.n;r++)if(line_matches(&board,&board.lines[ax][r]))
+   for(int k=0;k<board.lines[ax][r].count;k++)assert(board.tiles[board.lines[ax][r].tile[k]].state!=0);
+  if(step%5==0){
+   game_undo();
+   for(int i=0;i<board.count;i++)assert(board.tiles[i].state==prior[i]&&auto_x[i]==prior_auto[i]);
+  }
+ }
+ assert(reverts>0);game_auto_cross(0);
  // The rotation and scale pivot is the triangle centroid in every size/view.
  for(int n=2;n<=10;n++){
   memset(asymmetric,'0',n*n);asymmetric[n*n]=0;
