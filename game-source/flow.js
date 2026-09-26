@@ -1,56 +1,58 @@
 "use strict";
 // Navigation observes the same engine state for stock, imported and trial puzzles.
 const endlessDifficulties = [TriCopy.t("ui.easy"), TriCopy.t("ui.medium"), TriCopy.t("ui.hard"), TriCopy.t("ui.impossible"), TriCopy.t("ui.sprout")];
-const ENDLESS_PROGRESS = "tri-rotate-endless-v1";
-let generationId = 0;
+// Endless puzzles are numbered per difficulty (TriShare.endlessKey, e.g. "hard-12").
+// tri-endless-v2 keeps each one's progress and first solve, and the number last
+// opened in each difficulty. daily.js submits the solves and reads their stats.
+const ENDLESS_STORE = "tri-endless-v2";
 window.triEndlessRun = null;
+window.triActiveEndless = "";
 window.triActiveSeedCode = "";
-function readEndless() {
-  try {
-    const data = JSON.parse(localStorage.getItem(ENDLESS_PROGRESS));
-    if (!data || typeof data.code !== "string") return null;
-    return data;
-  } catch { return null; }
-}
-function writeEndless(patch) {
-  const next = { ...(readEndless() || {}), ...patch };
-  try { localStorage.setItem(ENDLESS_PROGRESS, JSON.stringify(next)); } catch {}
-}
-function endlessRecent(value) {
-  return Array.isArray(value) ? value.filter(item => typeof item === "string").slice(-32) : [];
-}
-window.triReadEndlessProgress = function (code) {
-  const data = readEndless();
-  return data && data.code === code ? data : null;
+window.TriEndless = {
+  read() {
+    try {
+      const data = JSON.parse(localStorage.getItem(ENDLESS_STORE));
+      if (data && typeof data === "object" && data.puzzles && typeof data.puzzles === "object")
+        return { ...data, current: data.current && typeof data.current === "object" ? data.current : {} };
+    } catch {}
+    return { current: {}, puzzles: {} };
+  },
+  write(data) {
+    try { localStorage.setItem(ENDLESS_STORE, JSON.stringify(data)); } catch {}
+  },
+  record(key) { return this.read().puzzles[key] || null; },
+  update(key, patch) {
+    const data = this.read();
+    data.puzzles[key] = { ...(data.puzzles[key] || {}), ...patch };
+    this.write(data);
+    return data.puzzles[key];
+  },
+  // Solved puzzles per difficulty ID.
+  solvedCounts() {
+    const counts = [0, 0, 0, 0, 0];
+    for (const record of Object.values(this.read().puzzles))
+      if (record?.solve && counts[record.difficulty] !== undefined) counts[record.difficulty]++;
+    return counts;
+  },
+  // The lowest unsolved number from `from`; null once a finite difficulty is done.
+  nextUnsolved(difficulty, from) {
+    const { puzzles } = this.read(), count = Module.ccall("game_endless_count", "number", ["number"], [difficulty]);
+    let number = Math.max(1, from);
+    while (puzzles[TriShare.endlessKey(difficulty, number)]?.solve) number++;
+    return count && number > count ? null : number;
+  },
 };
-window.triStoreEndlessRun = function (run, code) {
-  writeEndless({
-    code,
-    difficulty: run.difficulty,
-    number: run.number,
-    recent: endlessRecent(run.recent),
-    marks: "",
-    elapsed: 0,
-    turns: 0,
-    view: 0,
-    finished: null,
-  });
-};
-window.triSaveEndlessProgress = function (code, progress) {
-  const data = readEndless();
-  if (!data || data.code !== code || !progress) return;
-  const marks = typeof progress.marks === "string" && /^[012]*$/.test(progress.marks) ? progress.marks : data.marks;
-  writeEndless({
-    marks,
+window.triReadEndlessProgress = key => window.TriEndless.record(key);
+window.triSaveEndlessProgress = function (key, progress) {
+  if (!window.TriEndless.record(key) || !progress) return;
+  const marks = typeof progress.marks === "string" && /^[012]*$/.test(progress.marks) ? { marks: progress.marks } : {};
+  window.TriEndless.update(key, {
+    ...marks,
     elapsed: progress.elapsed,
     turns: progress.turns,
     view: progress.view,
     finished: progress.finished ?? null,
   });
-};
-window.triEndlessRunFromSave = function (saved) {
-  const number = Number.isInteger(saved.number) && saved.number > 0 ? saved.number : 1;
-  return { difficulty: saved.difficulty, number, recent: endlessRecent(saved.recent) };
 };
 function placeHash() {
   try {
@@ -58,17 +60,14 @@ function placeHash() {
   } catch {}
   return location.hash;
 }
+// Browser Forward back onto a numbered puzzle resumes it as Endless.
 window.triReattachEndless = function () {
   if (window.triEndlessRun || window.triAuthorSession || !el("home").hidden || !state?.custom || state.editing) return;
-  const code = window.triActiveSeedCode || "";
-  if (!code || placeHash() !== "#seed=" + code) return;
-  const saved = window.triReadEndlessProgress(code);
-  if (!Number.isInteger(saved?.difficulty) || saved.difficulty < 0 || saved.difficulty > 4) return;
-  window.triEndlessRun = window.triEndlessRunFromSave(saved);
+  const key = window.triActiveEndless || "";
+  if (!key || placeHash() !== "#endless=" + key) return;
+  window.triEndlessRun = TriShare.parseEndless(key);
 };
 window.triCancelGeneration = function () {
-  generationId++;
-  el("difficulties").removeAttribute("aria-busy");
   el("next-puzzle").disabled = false;
   el("next-puzzle").setAttribute("aria-label", TriCopy.t("ui.next-puzzle"));
 };
@@ -80,8 +79,9 @@ window.triShowHome = function (view = "main") {
   window.triHomePrepare?.(view);
   window.triCancelGeneration();
   window.triEndlessRun = null;
-  window.triClearEndlessPlace?.();
+  window.triClearPlace?.();
   el("endless-note").textContent = "";
+  if (view === "endless") syncEndlessMenu();
   call("up");
   call("clear_effects");
   window.triMenuOpen = true;
@@ -112,11 +112,11 @@ window.triShowPlay = function () {
 };
 window.triFlowState = function (next, previous) {
   if (!next.custom) window.triEndlessRun = null;
-  if (next.custom && window.triEndlessRun && window.triActiveSeedCode)
-    window.triSetEndlessPlace?.(window.triActiveSeedCode);
+  if (next.custom && window.triEndlessRun && window.triActiveEndless)
+    window.triSetPlace?.("#endless=" + window.triActiveEndless);
   else if (next.custom && !next.editing && window.triActiveDaily)
     window.triSetPlace?.("#daily=" + window.triActiveDaily);
-  else window.triSetEndlessPlace?.("");
+  else window.triSetPlace?.("");
   el("editor-test").hidden = !!window.triEndlessRun || !window.triAuthorSession;
   if (next.custom && window.triEndlessRun) {
     const run = window.triEndlessRun;
@@ -182,7 +182,8 @@ el("load-code-form").addEventListener("submit", event => {
     if (!appReady) throw Error(TriCopy.t("errors.loading"));
     const puzzle = TriShare.fromText(el("puzzle-code").value);
     window.triClosePuzzleLoader();
-    loadCustom(puzzle, false, false);
+    if (puzzle.endless) startEndless(puzzle.difficulty, puzzle.number);
+    else loadCustom(puzzle, false, false);
   } catch (error) {
     el("load-code-error").textContent = error.message;
     el("load-code-error").hidden = false;
@@ -194,59 +195,76 @@ el("load-json-file").onclick = () => {
   el("puzzle-file").value = "";
   el("puzzle-file").click();
 };
-// Each attempt is bounded, and yielding between batches keeps navigation responsive.
-async function startEndless(difficulty, number = 1, recent = []) {
+// Opens Endless puzzle `number`, by default the one this difficulty was last
+// on, or the next unsolved one after it.
+function startEndless(difficulty, number, fromLink = false) {
   if (!appReady) return toast(TriCopy.t("errors.loading"));
   window.triCancelGeneration();
-  const job = generationId;
-  el("difficulties").setAttribute("aria-busy", "true");
-  el("endless-note").textContent =
-    TriCopy.t("endless.creating", { difficulty: TriCopy.t("difficulty." + difficulty + ".sentence") });
-  el("next-puzzle").disabled = true;
-  el("next-puzzle").setAttribute("aria-label", TriCopy.t("flow.creating-puzzle"));
-  try {
-    for (let attempt = 0; attempt < 2000; attempt++) {
-      if (attempt % 4 === 0)
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      if (job !== generationId) return;
-      const seed = window.crypto.getRandomValues(new Uint32Array(1))[0];
-      const json = Module.ccall(
-        "game_generate",
-        "string",
-        ["number", "number"],
-        [difficulty, seed],
-      );
-      if (!json) continue;
-      const puzzle = JSON.parse(json),
-        signature = puzzle.solution.join("");
-      if (recent.includes(signature)) continue;
-      puzzle.seed = seed;
-      puzzle.difficulty = difficulty;
-      puzzle.name = TriCopy.t("endless.name", { difficulty: endlessDifficulties[difficulty], number });
-      loadCustom(puzzle, false, false, {
-        difficulty,
-        number,
-        recent: [...recent.slice(-31), signature],
-      });
-      return;
-    }
-    throw Error(TriCopy.t("errors.generationTimeout"));
-  } catch (error) {
-    if (job !== generationId) return;
-    el("endless-note").textContent = error.message;
-    toast(error.message);
-  } finally {
-    if (job === generationId) window.triCancelGeneration();
+  const data = window.TriEndless.read();
+  if (number === undefined) number = window.TriEndless.nextUnsolved(difficulty, Number(data.current[difficulty]) || 1);
+  const puzzle = number && TriShare.endlessPuzzle(difficulty, number);
+  const name = TriCopy.t("difficulty." + difficulty + ".sentence");
+  if (!puzzle) {
+    window.triShowHome("endless");
+    el("endless-note").textContent = TriCopy.t("endless.complete", { difficulty: name });
+    return;
   }
+  data.current[difficulty] = number;
+  window.TriEndless.write(data);
+  loadCustom(puzzle, false, false, { difficulty, number }, fromLink);
 }
+window.triStartEndless = startEndless;
+const difficultyDetails = new Map();
 [...el("difficulties").children].forEach(button => {
   const difficulty = Number(button.dataset.difficulty);
   const detail = document.createElement("small");
   button.title = TriCopy.t("difficulty." + difficulty + ".description");
-  detail.textContent = TriCopy.t("difficulty.cells", { count: [16, 36, 64, 100, 9][difficulty] });
   button.append(detail);
+  difficultyDetails.set(difficulty, detail);
   button.onclick = () => startEndless(difficulty);
 });
+// Menu order, which is also the order solved counts are listed in.
+const endlessOrder = [4, 0, 1, 2, 3];
+function syncEndlessMenu() {
+  const counts = window.TriEndless.solvedCounts();
+  for (const [difficulty, detail] of difficultyDetails) {
+    const cells = TriCopy.t("difficulty.cells", { count: [16, 36, 64, 100, 9][difficulty] });
+    detail.textContent = counts[difficulty] ? TriCopy.t("endless.cellsSolved", { cells, count: counts[difficulty] }) : cells;
+  }
+}
+syncEndlessMenu();
+// Solved counts per difficulty, leaving out difficulties with none.
+const recordDialog = el("endless-record");
+window.triOpenEndlessRecord = () => {
+  const counts = window.TriEndless.solvedCounts();
+  const rows = endlessOrder.filter(difficulty => counts[difficulty]).map(difficulty => {
+    const row = document.createElement("li");
+    const label = document.createElement("span"), value = document.createElement("strong");
+    label.textContent = endlessDifficulties[difficulty];
+    value.textContent = String(counts[difficulty]);
+    row.append(label, value);
+    return row;
+  });
+  const total = counts.reduce((a, b) => a + b, 0);
+  el("endless-record-list").replaceChildren(...rows);
+  el("endless-record-list").hidden = !rows.length;
+  el("endless-record-total").textContent = total
+    ? TriCopy.t("endless.recordTotal", { count: total }) : TriCopy.t("endless.recordNone");
+  el("app").inert = true;
+  if (!recordDialog.open) recordDialog.showModal();
+  el("endless-record-close").focus();
+  window.triSyncHistory?.();
+};
+window.triCloseEndlessRecord = () => {
+  if (!recordDialog.open) return;
+  recordDialog.close();
+  el("app").inert = !!window.triMenuOpen || el("theme-welcome").open;
+  el("endless-stats")?.focus({ preventScroll: true });
+  window.triSyncHistory?.();
+};
+el("endless-stats").onclick = window.triOpenEndlessRecord;
+el("endless-record-close").onclick = window.triCloseEndlessRecord;
+recordDialog.addEventListener("cancel", event => { event.preventDefault(); window.triCloseEndlessRecord(); });
 el("puzzle-file").onchange = async () => {
   const file = el("puzzle-file").files?.[0];
   if (!file) return;
@@ -279,7 +297,7 @@ el("next-puzzle").onclick = () => {
   if (state.custom) {
     if (window.triEndlessRun) {
       const run = window.triEndlessRun;
-      startEndless(run.difficulty, run.number + 1, run.recent);
+      startEndless(run.difficulty, window.TriEndless.nextUnsolved(run.difficulty, run.number + 1));
     } else if (window.triAuthorSession) call("editing", 1);
     else window.triShowHome();
   } else if (state.tutorial >= 0 && state.tutorial < 2) call("next");

@@ -90,7 +90,19 @@ function normalizePuzzle(value) {
     value.difficulty <= 4
       ? { seed: value.seed, difficulty: value.difficulty }
       : {}),
+    ...endlessIdentity(value),
   };
+}
+// Keeps a numbered Endless identity only while the board still is that puzzle.
+function endlessIdentity(value) {
+  if (typeof value.endless !== "string") return {};
+  try {
+    const { difficulty, number } = TriShare.parseEndless(value.endless);
+    const puzzle = TriShare.endlessPuzzle(difficulty, number);
+    if (puzzle && puzzle.solution.join("") === value.solution.join(""))
+      return { endless: puzzle.endless, difficulty, number };
+  } catch {}
+  return {};
 }
 let draft;
 try {
@@ -133,7 +145,18 @@ function saveDraft() {
     localStorage.setItem("tri-rotate-editor-v1", JSON.stringify(draft));
   } catch {}
 }
-// daily is the puzzle's date (YYYY-MM-DD) when it is a daily puzzle.
+// The solution as engine marks, in game_custom's tile order.
+function solvedMarks(puzzle) {
+  const n = puzzle.size;
+  let marks = "";
+  for (let i = 0; i < n; i++) for (let j = 0; j < n - i; j++) for (let o = 0; o < 2; o++) {
+    const r = i + j + o;
+    if (r < n) marks += puzzle.solution[r * r + 2 * i + o] ? "1" : "0";
+  }
+  return marks;
+}
+// daily is the puzzle's date (YYYY-MM-DD) when it is a daily puzzle; endlessRun
+// is { difficulty, number } for a numbered Endless puzzle.
 function loadCustom(puzzle, editing, ownsDraft, endlessRun = null, fromLink = false, daily = "") {
   if (!appReady) return toast(TriCopy.t("errors.loading"));
   if (!validPuzzle(puzzle)) return toast(TriCopy.t("editor.invalid-puzzle-data"));
@@ -142,17 +165,19 @@ function loadCustom(puzzle, editing, ownsDraft, endlessRun = null, fromLink = fa
   window.triActiveDaily = daily;
   currentPuzzle = normalizePuzzle(puzzle);
   window.triActiveSeedCode = TriShare.seedCode(currentPuzzle.seed, currentPuzzle.difficulty) || "";
-  const resumed = endlessRun ? window.triReadEndlessProgress?.(window.triActiveSeedCode)
+  window.triActiveEndless = endlessRun ? TriShare.endlessKey(endlessRun.difficulty, endlessRun.number) : "";
+  const resumed = endlessRun ? window.triReadEndlessProgress?.(window.triActiveEndless)
     : daily ? window.triReadDailyProgress?.(daily) : null;
-  if (endlessRun && window.triActiveSeedCode && !resumed)
-    window.triStoreEndlessRun?.(endlessRun, window.triActiveSeedCode);
-  const marks = resumed?.marks;
+  if (endlessRun && !resumed)
+    window.TriEndless.update(window.triActiveEndless, { difficulty: endlessRun.difficulty, number: endlessRun.number });
+  // A solved puzzle reopens solved; Reset starts a replay.
+  const marks = resumed?.solve ? solvedMarks(currentPuzzle) : resumed?.marks;
   const resumeMarks = typeof marks === "string" && marks.length === currentPuzzle.size * currentPuzzle.size && /^[012]+$/.test(marks) ? marks : "";
   Module.ccall("game_resume_marks", null, ["string"], [resumeMarks]);
   window.triShowPlay?.();
   authorSession = !!ownsDraft;
   window.triAuthorSession = authorSession;
-  sharedArrival = !!fromLink && !authorSession && !endlessRun;
+  sharedArrival = !!fromLink && !authorSession;
   const ok = Module.ccall(
     "game_custom",
     "number",
@@ -191,6 +216,8 @@ window.triCustomState = (next) => {
   if (authorSession) {
     delete currentPuzzle.seed;
     delete currentPuzzle.difficulty;
+    delete currentPuzzle.endless;
+    delete currentPuzzle.number;
     draft = normalizePuzzle(currentPuzzle);
     saveDraft();
   }
@@ -286,14 +313,23 @@ window.triInitializeCustom = () => {
     } else { window.triShowHome(); toast(TriCopy.t("editor.invalid-level-link")); }
     return;
   }
+  if (params.has("endless")) {
+    try {
+      const { difficulty, number } = TriShare.parseEndless(params.get("endless"));
+      if (!TriShare.endlessPuzzle(difficulty, number)) throw Error();
+      // Returning to your own puzzle's address is not a shared arrival.
+      const own = !!window.TriEndless.record(TriShare.endlessKey(difficulty, number));
+      window.triStartEndless(difficulty, number, !own);
+    } catch {
+      window.triShowHome?.();
+      el("load-error").textContent = TriCopy.t("share.invalid-endless-link");
+      el("load-error").hidden = false;
+    }
+    return;
+  }
   if (params.has("seed")) {
     try {
-      const puzzle = TriShare.seedPuzzle(params.get("seed"));
-      const code = TriShare.seedCode(puzzle.seed, puzzle.difficulty);
-      const saved = code ? window.triReadEndlessProgress?.(code) : null;
-      if (saved && saved.difficulty === puzzle.difficulty)
-        loadCustom(puzzle, false, false, window.triEndlessRunFromSave(saved), false);
-      else loadCustom(puzzle, false, false, null, true);
+      loadCustom(TriShare.seedPuzzle(params.get("seed")), false, false, null, true);
     } catch {
       window.triShowHome?.();
       el("load-error").textContent =

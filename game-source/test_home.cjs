@@ -92,7 +92,8 @@ for (const reducedMotion of [false, true]) {
   const levels = d.getElementById('home-endless');
   assert.equal(+levels.dataset.rows, 6, 'additional levels add enough complete rows');
   const positions = [...levels.querySelectorAll('button')].map(b => b.style.getPropertyValue('--x') + '/' + b.style.getPropertyValue('--y'));
-  assert.equal(new Set(positions).size, 13, 'every level and back button has its own cell');
+  assert.equal(new Set(positions).size, 14, 'every level, Solves and Back button has its own cell');
+  assert(d.getElementById('endless-stats').classList.contains('home-up'), 'Solves sits in an upward cell');
   h.close();
 }
 console.log('PASS: submenu zoom endpoints/midpoint/reverse, input guard, back tips, wave flashes, row growth and reduced motion.');

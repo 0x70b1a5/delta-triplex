@@ -36,13 +36,12 @@ function publishPlace() {
   // Only remove an address this page wrote. Shared links keep their own hash.
   if (publishedHash && historyHost.location.hash === publishedHash) replaceHash("");
 }
-// The address of the puzzle in play: #seed= for Endless, #daily= for dailies.
-window.triClearEndlessPlace = function () { place = ""; };
+// The address of the puzzle in play: #endless= for Endless, #daily= for dailies.
+window.triClearPlace = function () { place = ""; };
 window.triSetPlace = function (hash) {
   place = hash || "";
   publishPlace();
 };
-window.triSetEndlessPlace = code => window.triSetPlace(code ? "#seed=" + code : "");
 window.triPublishPlace = publishPlace;
 window.triConsumeTraversal = function (href) {
   const own = href === traversedHref;
@@ -52,7 +51,7 @@ window.triConsumeTraversal = function (href) {
 function uiDepth() {
   const playing = !el("home").hidden ? 0 : 1;
   const section = !el("home-back").hidden && !el("home").hidden;
-  const dialog = el("load-dialog").open || el("theme-welcome").open || !el("puzzle-menu").hidden || !el("memory-panel").hidden;
+  const dialog = el("load-dialog").open || el("endless-record").open || el("theme-welcome").open || !el("puzzle-menu").hidden || !el("memory-panel").hidden;
   return (playing || section ? 1 : 0) + (dialog ? 1 : 0);
 }
 function record(value) {
@@ -77,7 +76,7 @@ window.triSyncHistory = function () {
 };
 function handleHistoryPop(event) {
   const entry = event.state?.[historyKey];
-  // Moving between our own entries can also change the hash (#seed= is only
+  // Moving between our own entries can also change the hash (#endless= is only
   // written on the play entry). Remember it so the hashchange that follows
   // is not mistaken for a newly opened link.
   traversedHref = entry?.id === historyId ? historyHost.location.href : "";
@@ -92,6 +91,7 @@ function handleHistoryPop(event) {
   try {
     if (uiDepth() > depth) {
       window.triClosePuzzleLoader?.();
+      window.triCloseEndlessRecord?.();
       window.triCloseThemeWelcome?.();
       if (!el("puzzle-menu").hidden) toggleMenu(false);
       if (!el("memory-panel").hidden) memoryToggle(false);

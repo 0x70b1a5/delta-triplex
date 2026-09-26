@@ -4,7 +4,7 @@ The game stays a static file. This directory adds a small API (`api.mjs`, Node 2
 
 ## Players
 
-There are no accounts. The first time someone plays a daily, their browser makes a random 25-character code and keeps it in `localStorage` (`tri-daily-v1`). Every solve is sent with that code. The database stores only its SHA-256. Settings → Daily stats sync shows the code; typing it on another device makes that device the same player. Dailies solved only on the new device are then added to the code.
+There are no accounts. The first time someone plays a daily, their browser makes a random 25-character code and keeps it in `localStorage` (`tri-daily-v1`). Every solve is sent with that code. The database stores only its SHA-256. Settings → Stats sync shows the code; typing it on another device makes that device the same player. Daily and Endless puzzles solved only on the new device are then added to the code.
 
 ## Dailies
 
@@ -26,9 +26,15 @@ The API loads `dailies.json` at startup. A date is released once it is today any
 | `GET /api/daily/YYYY-MM-DD` | | `{date, name, code}` or 404 |
 | `POST /api/solve` | `{secret, date, elapsedMs, turns, filled}` | stats; `filled` must equal the solution; only the first solve counts |
 | `POST /api/stats` | `{date, secret?}` | stats, with `you` when that player solved it |
-| `POST /api/me` | `{secret}` | that player's solves, for sync |
+| `POST /api/me` | `{secret}` | that player's daily and Endless solves, for sync |
+| `POST /api/endless/solve` | `{secret, difficulty, number, elapsedMs, turns, filled}` | Endless stats; only the first solve counts |
+| `POST /api/endless/stats` | `{difficulty, number, secret?}` | Endless stats, with `you` when that player solved it |
 
-Stats: solver count, time median and log-scale histogram, rotation par (median) and histogram, and for the player their "top X%" (the share of solvers at least as good, rounded up).
+Stats: solver count, time median and log-scale histogram, rotation par (median) and histogram, and for the player their "top X%" (the share of solvers at least as good, rounded up). Endless stats add `overall`, the same summary over every solve of that difficulty, with the player's solve of this number ranked in it.
+
+## Endless
+
+Endless puzzles are numbered per difficulty and generated in the browser, so the server cannot rebuild a board. Instead, the first accepted solve of a number pins its board (`endless_puzzles`), and later solves of that number must match it. Numbers start at 1; Sprout ends at 414 and Easy at 52,532 (`ENDLESS_COUNTS`, matching `endless_count` in `game-source/src/generator.c`).
 
 ## Run and test
 

@@ -243,16 +243,18 @@
       lastTick = performance.now();
       // Built-in progress survives reload/navigation; its stopwatch must, too.
       // Custom imports and editor trials start fresh. Endless attempts resume with the address.
-      const endlessCode = next.custom && window.triEndlessRun ? (window.triActiveSeedCode || "") : "";
-      const dailyDate = next.custom && !next.editing && !endlessCode ? (window.triActiveDaily || "") : "";
+      const endlessKey = next.custom && window.triEndlessRun ? (window.triActiveEndless || "") : "";
+      const dailyDate = next.custom && !next.editing && !endlessKey ? (window.triActiveDaily || "") : "";
       attemptKey = !next.custom
         ? `${next.tutorial}/${next.level}/${next.solution.join("")}`
-        : endlessCode ? `endless/${endlessCode}` : dailyDate ? `daily/${dailyDate}` : "";
-      const savedEndless = forceFresh ? null
-        : endlessCode ? window.triReadEndlessProgress?.(endlessCode)
+        : endlessKey ? `endless/${endlessKey}` : dailyDate ? `daily/${dailyDate}` : "";
+      const record = forceFresh ? null
+        : endlessKey ? window.triReadEndlessProgress?.(endlessKey)
         : dailyDate ? window.triReadDailyProgress?.(dailyDate) : null;
-      const saved = savedEndless
-        ? { elapsed: Number(savedEndless.elapsed), turns: Number(savedEndless.turns), view: Number(savedEndless.view), finished: savedEndless.finished }
+      // A solved puzzle reopens solved (editor.js), showing the solve that counted.
+      const saved = record?.solve
+        ? { elapsed: Number(record.solve.elapsed), turns: Number(record.solve.turns), finished: { elapsed: Number(record.solve.elapsed), turns: Number(record.solve.turns) } }
+        : record ? { elapsed: Number(record.elapsed ?? 0), turns: Number(record.turns ?? 0), view: Number(record.view), finished: record.finished }
         : !forceFresh && attemptKey && attempts[attemptKey];
       if (saved && Number.isFinite(saved.elapsed) && saved.elapsed >= 0 && Number.isInteger(saved.turns) && saved.turns >= 0) {
         elapsed = saved.elapsed; turns = saved.turns;
@@ -283,6 +285,7 @@
     previousWon = next.won;
     saveAttempt(true);
     if (attemptKey.startsWith("daily/") && finished && !finished.unknown) window.triDailyFinished?.(attemptKey.slice("daily/".length), finished);
+    if (attemptKey.startsWith("endless/") && finished && !finished.unknown) window.triEndlessFinished?.(attemptKey.slice("endless/".length), finished);
     controls.hidden = next.won && !next.editing;
     el("app").dataset.solved = String(next.won && !next.editing);
     el("share-result").disabled = !!finished?.unknown;
@@ -854,6 +857,8 @@
   function brag() {
     const daily = attemptKey.startsWith("daily/") && window.triDailyBrag?.(attemptKey.slice("daily/".length), finished);
     if (daily) return daily;
+    const endless = attemptKey.startsWith("endless/") && window.triEndlessBrag?.(attemptKey.slice("endless/".length), finished);
+    if (endless) return endless;
     const text = TriCopy.t("share.result", { time: formatTime(finished.elapsed), count: finished.turns });
     const url = state.custom ? TriShare.url(currentPuzzle)
       : (state.tutorial >= 0 ? TriShare.url({ size: state.n, solution: state.solution }) : `${TriShare.base}#level=${state.level}`);

@@ -52,6 +52,25 @@ export function openDatabase(path = DB_PATH) {
       solved_at TEXT NOT NULL DEFAULT (datetime('now')),
       PRIMARY KEY (date, player_id)
     );
+    -- Endless puzzles are numbered per difficulty and generated in the browser.
+    -- The first solve of a number pins its board; later solves must match it.
+    CREATE TABLE IF NOT EXISTS endless_puzzles (
+      difficulty INTEGER NOT NULL,
+      number INTEGER NOT NULL,
+      solution TEXT NOT NULL,
+      PRIMARY KEY (difficulty, number)
+    );
+    CREATE TABLE IF NOT EXISTS endless_solves (
+      difficulty INTEGER NOT NULL,
+      number INTEGER NOT NULL,
+      player_id INTEGER NOT NULL REFERENCES players(id),
+      elapsed_ms INTEGER NOT NULL,
+      turns INTEGER NOT NULL,
+      solved_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (difficulty, number, player_id),
+      FOREIGN KEY (difficulty, number) REFERENCES endless_puzzles(difficulty, number)
+    );
+    CREATE INDEX IF NOT EXISTS endless_solves_by_player ON endless_solves(player_id);
   `);
   return db;
 }
@@ -130,15 +149,14 @@ function histogram(values, log, maxBins) {
   return { edges, counts };
 }
 
-export function stats(db, date, playerId = null) {
-  const rows = db.prepare("SELECT player_id, elapsed_ms, turns FROM solves WHERE date = ?").all(date);
-  const result = { date, solvers: rows.length };
+// Solver count, medians and histograms, ranking `mine` (a solve row) among `rows`.
+function summarize(rows, mine) {
+  const result = { solvers: rows.length };
   if (!rows.length) return result;
   const times = rows.map(r => r.elapsed_ms).sort((a, b) => a - b);
   const turns = rows.map(r => r.turns).sort((a, b) => a - b);
   result.time = { median: median(times), histogram: histogram(times, true, 12) };
   result.turns = { par: median(turns), histogram: histogram(turns, false, 12) };
-  const mine = rows.find(r => r.player_id === playerId);
   if (mine) {
     result.you = {
       elapsedMs: mine.elapsed_ms, turns: mine.turns,
@@ -146,6 +164,28 @@ export function stats(db, date, playerId = null) {
     };
   }
   return result;
+}
+
+export function stats(db, date, playerId = null) {
+  const rows = db.prepare("SELECT player_id, elapsed_ms, turns FROM solves WHERE date = ?").all(date);
+  return { date, ...summarize(rows, rows.find(r => r.player_id === playerId)) };
+}
+
+// Endless: Easy 0, Medium 1, Hard 2, Impossible 3, Sprout 4. Sprout and Easy are
+// finite (generator.c endless_count); the rest are unbounded.
+export const ENDLESS_SIZES = [4, 6, 8, 10, 3];
+export const ENDLESS_COUNTS = [52532, 0, 0, 0, 414];
+export function endlessNumberValid(difficulty, number) {
+  return Number.isInteger(difficulty) && difficulty >= 0 && difficulty < ENDLESS_SIZES.length &&
+    Number.isInteger(number) && number >= 1 && number <= (ENDLESS_COUNTS[difficulty] || 0x7fffffff);
+}
+// One puzzle's field, plus the whole difficulty so a solve nobody else has
+// played yet still has something to be measured against.
+export function endlessStats(db, difficulty, number, playerId = null) {
+  const rows = db.prepare("SELECT player_id, elapsed_ms, turns FROM endless_solves WHERE difficulty = ? AND number = ?").all(difficulty, number);
+  const all = db.prepare("SELECT elapsed_ms, turns FROM endless_solves WHERE difficulty = ?").all(difficulty);
+  const mine = rows.find(r => r.player_id === playerId);
+  return { difficulty, number, ...summarize(rows, mine), overall: summarize(all, mine) };
 }
 
 function player(db, secret, create) {
@@ -189,13 +229,38 @@ export function handler(db, { now = () => Date.now() } = {}) {
       const id = SECRET.test(body.secret) ? player(db, body.secret, false) : null;
       return stats(db, body.date, id);
     },
-    // Everything a synced device needs to rebuild its calendar.
+    // Everything a synced device needs to rebuild its calendar and Endless record.
     "POST /api/me": body => {
       need(SECRET.test(body.secret), "Invalid player code");
       const id = player(db, body.secret, false);
       const solves = id === null ? [] : db.prepare(
         "SELECT date, elapsed_ms AS elapsedMs, turns FROM solves WHERE player_id = ? ORDER BY date").all(id);
-      return { known: id !== null, solves };
+      const endless = id === null ? [] : db.prepare(`SELECT difficulty, number, elapsed_ms AS elapsedMs, turns
+        FROM endless_solves WHERE player_id = ? ORDER BY difficulty, number`).all(id);
+      return { known: id !== null, solves, endless };
+    },
+    "POST /api/endless": (body, action) => {
+      const { difficulty, number } = body;
+      need(endlessNumberValid(difficulty, number), "No such Endless puzzle", 404);
+      if (action === "stats") {
+        const id = SECRET.test(body.secret) ? player(db, body.secret, false) : null;
+        return endlessStats(db, difficulty, number, id);
+      }
+      need(action === "solve", "Not found", 404);
+      // Idempotent like /api/solve: only the first solve of a number counts.
+      const { secret, elapsedMs, turns, filled } = body;
+      need(SECRET.test(secret), "Invalid player code");
+      need(Number.isInteger(elapsedMs) && elapsedMs >= 0 && elapsedMs <= 7 * 864e5, "Invalid time");
+      need(Number.isInteger(turns) && turns >= 0 && turns <= 1e5, "Invalid rotation count");
+      const cells = ENDLESS_SIZES[difficulty] ** 2;
+      need(typeof filled === "string" && filled.length === cells && /^[01]+$/.test(filled), "Invalid board");
+      db.prepare("INSERT OR IGNORE INTO endless_puzzles (difficulty, number, solution) VALUES (?, ?, ?)").run(difficulty, number, filled);
+      const pinned = db.prepare("SELECT solution FROM endless_puzzles WHERE difficulty = ? AND number = ?").get(difficulty, number);
+      need(filled === pinned.solution, "That board is not this puzzle's solution", 422);
+      const id = player(db, secret, true);
+      db.prepare("INSERT OR IGNORE INTO endless_solves (difficulty, number, player_id, elapsed_ms, turns) VALUES (?, ?, ?, ?, ?)")
+        .run(difficulty, number, id, elapsedMs, turns);
+      return endlessStats(db, difficulty, number, id);
     },
   };
   return async (request, response) => {

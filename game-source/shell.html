@@ -1167,6 +1167,7 @@
       .daily-stats-heading button { min-height: 32px; padding: 4px 10px; }
       .daily-stats-name { color: var(--muted); font-size: 13px; margin-top: 2px !important; }
       .daily-stat { margin-top: 14px; }
+      .daily-stats-section { margin: 18px 0 0; padding-top: 12px; border-top: 1px solid var(--border); font-size: 13px; }
       .daily-stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; }
       .daily-stat-value { font-size: 17px; font-weight: 650; margin-top: 2px !important; }
       .daily-stat-foot, .daily-stats-note { font-size: 12px; color: var(--muted); margin-top: 6px !important; }
@@ -1202,6 +1203,12 @@
       @media (max-width: 360px) { #completion #next-puzzle { width: auto; flex-basis: auto; } #session-bar { left: 16px; right: 16px; } }
       #load-dialog { box-sizing: border-box; width: min(440px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 22px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg); color: var(--ink); }
       #load-dialog::backdrop { background: #0009; }
+      #endless-record { box-sizing: border-box; width: min(320px, calc(100vw - 32px)); padding: 14px 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--ink); }
+      #endless-record::backdrop { background: #0009; }
+      #endless-record-list { list-style: none; margin: 12px 0 0; padding: 0; }
+      #endless-record-list li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 15px; }
+      #endless-record-list strong { font-variant-numeric: tabular-nums; }
+      #endless-record-total { margin: 10px 0 0; color: var(--muted); font-size: 13px; }
       #load-dialog h2 { margin: 0; font-size: 22px; }
       #load-dialog p { color: var(--muted); font-size: 13px; line-height: 1.5; }
       #load-dialog label { display: block; margin-bottom: 8px; font-size: 13px; }
@@ -1422,6 +1429,7 @@
           <div class="home-actions" id="difficulties">
             <button data-difficulty="4">{{copy:ui.sprout}}</button><button data-difficulty="0">{{copy:ui.easy}}</button><button data-difficulty="1">{{copy:ui.medium}}</button><button data-difficulty="2">{{copy:ui.hard}}</button><button data-difficulty="3">{{copy:ui.impossible}}</button>
           </div>
+          <button id="endless-stats" class="home-cell home-up" aria-haspopup="dialog">{{copy:endless.record}}</button>
           <p id="endless-note" role="status">
             {{copy:endless.intro}}
           </p>
@@ -1492,6 +1500,14 @@
           <button id="load-cancel" type="button">{{copy:load.cancel}}</button>
         </div>
       </form>
+    </dialog>
+    <dialog id="endless-record" aria-labelledby="endless-record-title">
+      <div class="daily-stats-heading">
+        <h2 id="endless-record-title">{{copy:endless.recordTitle}}</h2>
+        <button id="endless-record-close" type="button">{{copy:daily.close}}</button>
+      </div>
+      <ul id="endless-record-list"></ul>
+      <p id="endless-record-total"></p>
     </dialog>
     <dialog id="theme-welcome" aria-labelledby="theme-welcome-title" aria-describedby="theme-welcome-help">
       <form method="dialog">

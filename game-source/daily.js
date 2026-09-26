@@ -1,8 +1,9 @@
 "use strict";
-// Daily puzzles, first-solve statistics and the device sync code.
+// Daily puzzles, first-solve statistics (daily and Endless) and the device sync code.
 // server/api.mjs releases each date's puzzle and ranks first solves. This
-// browser keeps its own progress and results (tri-daily-v1), so the calendar,
-// replays and the Today's Puzzle spark work without a connection.
+// browser keeps its own progress and results (tri-daily-v1; Endless in flow.js's
+// tri-endless-v2), so the calendar, replays and the Today's Puzzle spark work
+// without a connection.
 (() => {
   const STORE = "tri-daily-v1";
   const ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -142,7 +143,7 @@
       updateDay(date, { solve: { elapsed: Math.round(finished.elapsed), turns: finished.turns, filled: filledBits(state) } });
       // Let the picture's reveal play before the results cover part of it.
       setTimeout(() => {
-        if (activeDaily() === date && state?.won) { statsOpen = true; renderStats(); }
+        if (subject()?.id === "daily/" + date && state?.won) { statsOpen = true; renderStats(); }
       }, STATS_DELAY);
       syncSpark();
     }
@@ -152,14 +153,14 @@
   const inflight = new Set();
   async function submit(date) {
     const record = day(date);
-    if (!record?.solve || record.submitted || inflight.has(date)) return;
+    if (!record?.solve || record.submitted || inflight.has("daily/" + date)) return;
     const secret = playerCode(true);
     if (!record.solve.filled) {
       // Solves learned from a sync code are already on the server.
       updateDay(date, { submitted: true });
       return refreshStats(date);
     }
-    inflight.add(date);
+    inflight.add("daily/" + date);
     try {
       const stats = await request("solve", {
         secret, date, elapsedMs: record.solve.elapsed, turns: record.solve.turns, filled: record.solve.filled,
@@ -169,7 +170,7 @@
       // A refused board or date will never succeed; stop retrying it.
       if (error.status >= 400 && error.status < 500) updateDay(date, { submitted: true, stats: null });
     } finally {
-      inflight.delete(date);
+      inflight.delete("daily/" + date);
       renderStats();
     }
   }
@@ -184,6 +185,52 @@
   }
   function retryPending() {
     for (const [date, record] of Object.entries(read().days)) if (record.solve && !record.submitted) submit(date);
+    for (const [key, record] of Object.entries(window.TriEndless.read().puzzles))
+      if (record.solve && !record.submitted) submitEndless(key);
+  }
+
+  // ---- Endless solves --------------------------------------------------------
+  // Only the first solve of each number counts, as with dailies. The stats open
+  // from the completion row rather than by themselves, so Next stays one tap away.
+  const endlessRecord = key => window.TriEndless.record(key);
+  window.triEndlessFinished = (key, finished) => {
+    const record = endlessRecord(key);
+    if (!record) return;
+    if (!record.solve)
+      window.TriEndless.update(key, { solve: { elapsed: Math.round(finished.elapsed), turns: finished.turns, filled: filledBits(state) } });
+    submitEndless(key);
+    renderStats();
+  };
+  async function submitEndless(key) {
+    const record = endlessRecord(key), id = "endless/" + key;
+    if (!record?.solve || record.submitted || inflight.has(id)) return;
+    const secret = playerCode(true);
+    if (!record.solve.filled) {
+      window.TriEndless.update(key, { submitted: true });
+      return refreshEndlessStats(key);
+    }
+    inflight.add(id);
+    try {
+      const stats = await request("endless/solve", {
+        secret, difficulty: record.difficulty, number: record.number,
+        elapsedMs: record.solve.elapsed, turns: record.solve.turns, filled: record.solve.filled,
+      });
+      window.TriEndless.update(key, { submitted: true, stats });
+    } catch (error) {
+      if (error.status >= 400 && error.status < 500) window.TriEndless.update(key, { submitted: true, stats: null });
+    } finally {
+      inflight.delete(id);
+      renderStats();
+    }
+  }
+  async function refreshEndlessStats(key) {
+    const record = endlessRecord(key);
+    if (!record?.solve || !record.submitted) return;
+    try {
+      const stats = await request("endless/stats", { difficulty: record.difficulty, number: record.number, secret: playerCode() || undefined });
+      window.TriEndless.update(key, { stats });
+      renderStats();
+    } catch {}
   }
 
   // ---- Stats popover ---------------------------------------------------------
@@ -261,45 +308,71 @@
     return svg;
   }
   const activeDaily = () => state?.custom && !state.editing && window.triActiveDaily ? window.triActiveDaily : "";
+  // The puzzle whose results the Stats panel shows: a daily or a numbered Endless puzzle.
+  function subject() {
+    if (!state?.custom || state.editing) return null;
+    const date = activeDaily();
+    if (date) {
+      const record = day(date);
+      return record && { id: "daily/" + date, record, titleKey: "daily.statsTitle",
+        name: TriCopy.t("daily.title", { date: dateLabel(date), name: record.name }) };
+    }
+    const key = window.triEndlessRun && window.triActiveEndless;
+    const record = key ? endlessRecord(key) : null;
+    return record && { id: "endless/" + key, record, titleKey: "endless.statsTitle", difficulty: endlessDifficulties[record.difficulty],
+      name: TriCopy.t("endless.title", { difficulty: endlessDifficulties[record.difficulty], number: record.number }) };
+  }
+  const line = (text, className = "") => { const p = document.createElement("p"); p.textContent = text; p.className = className; return p; };
+  // Time and rotation standings for one field of solvers.
+  function statBlocks(stats, you) {
+    const time = document.createElement("div"), turns = document.createElement("div");
+    time.className = turns.className = "daily-stat";
+    time.append(line(TriCopy.t("daily.time"), "daily-stat-label"),
+      line(TriCopy.t("daily.timeLine", { time: formatTime(you.elapsedMs), top: you.timeTop }), "daily-stat-value"),
+      histogram(stats.time.histogram, you.elapsedMs, { range: (a, b) => `${formatTime(a)}–${formatTime(b)}`,
+        tick: formatTime, xTitle: TriCopy.t("daily.axisTime"), label: TriCopy.t("daily.time") }),
+      line(TriCopy.t("daily.median", { time: formatTime(stats.time.median) }), "daily-stat-foot"));
+    turns.append(line(TriCopy.t("daily.rotations"), "daily-stat-label"),
+      line(TriCopy.t("daily.turnsLine", { count: you.turns, par: stats.turns.par, top: you.turnsTop }), "daily-stat-value"),
+      histogram(stats.turns.histogram, you.turns, { range: (a, b) => b - a <= 1 ? String(a) : `${a}–${b - 1}`,
+        // Rotation bins end exclusively, so the last edge is one past the highest count.
+        tick: (value, end) => String(end ? Math.max(0, value - 1) : value),
+        xTitle: TriCopy.t("daily.axisRotations"), label: TriCopy.t("daily.rotations") }));
+    return [time, turns, line(TriCopy.t("daily.solvers", { count: stats.solvers }), "daily-stat-foot")];
+  }
+  function section(text) {
+    const heading = document.createElement("h3");
+    heading.className = "daily-stats-section";
+    heading.textContent = text;
+    return heading;
+  }
   function renderStats() {
-    const date = activeDaily(), record = date ? day(date) : null;
+    const current = subject(), record = current?.record;
     const available = !!(record?.solve && state?.won && !window.triMenuOpen);
     toggle.hidden = !available;
     toggle.setAttribute("aria-expanded", String(available && statsOpen));
     panel.hidden = !(available && statsOpen);
     if (panel.hidden) { renderedKey = ""; return; }
     // Engine state changes (hover, effects) arrive constantly; rebuild only on new content.
-    const key = JSON.stringify([date, record.stats, record.submitted, inflight.has(date), TriCopy.locale]);
+    const key = JSON.stringify([current.id, record.stats, record.submitted, inflight.has(current.id), TriCopy.locale]);
     if (key === renderedKey) return;
     renderedKey = key;
     const stats = record.stats, you = stats?.you;
     const heading = document.createElement("div");
     heading.className = "daily-stats-heading";
-    heading.innerHTML = `<h2 id="daily-stats-title">${TriCopy.html("daily.statsTitle")}</h2><button id="daily-stats-close" type="button">${TriCopy.html("daily.close")}</button>`;
-    const name = document.createElement("p");
-    name.className = "daily-stats-name";
-    name.textContent = TriCopy.t("daily.title", { date: dateLabel(date), name: record.name });
-    const body = [heading, name];
-    const line = (text, className = "") => { const p = document.createElement("p"); p.textContent = text; p.className = className; return p; };
+    heading.innerHTML = `<h2 id="daily-stats-title">${TriCopy.html(current.titleKey)}</h2><button id="daily-stats-close" type="button">${TriCopy.html("daily.close")}</button>`;
+    const body = [heading, line(current.name, "daily-stats-name")];
     if (!you) {
-      body.push(line(TriCopy.t(record.submitted ? "daily.failed" : inflight.has(date) ? "daily.loadingStats" : "daily.pending"), "daily-stats-note"));
-    } else if (stats.solvers < 2) {
-      body.push(line(TriCopy.t("daily.first"), "daily-stats-note"));
+      body.push(line(TriCopy.t(record.submitted ? "daily.failed" : inflight.has(current.id) ? "daily.loadingStats" : "daily.pending"), "daily-stats-note"));
+    } else if (current.difficulty === undefined) {
+      if (stats.solvers < 2) body.push(line(TriCopy.t("daily.first"), "daily-stats-note"));
+      else body.push(...statBlocks(stats, you));
     } else {
-      const time = document.createElement("div"), turns = document.createElement("div");
-      time.className = turns.className = "daily-stat";
-      time.append(line(TriCopy.t("daily.time"), "daily-stat-label"),
-        line(TriCopy.t("daily.timeLine", { time: formatTime(you.elapsedMs), top: you.timeTop }), "daily-stat-value"),
-        histogram(stats.time.histogram, you.elapsedMs, { range: (a, b) => `${formatTime(a)}–${formatTime(b)}`,
-          tick: formatTime, xTitle: TriCopy.t("daily.axisTime"), label: TriCopy.t("daily.time") }),
-        line(TriCopy.t("daily.median", { time: formatTime(stats.time.median) }), "daily-stat-foot"));
-      turns.append(line(TriCopy.t("daily.rotations"), "daily-stat-label"),
-        line(TriCopy.t("daily.turnsLine", { count: you.turns, par: stats.turns.par, top: you.turnsTop }), "daily-stat-value"),
-        histogram(stats.turns.histogram, you.turns, { range: (a, b) => b - a <= 1 ? String(a) : `${a}–${b - 1}`,
-          // Rotation bins end exclusively, so the last edge is one past the highest count.
-          tick: (value, end) => String(end ? Math.max(0, value - 1) : value),
-          xTitle: TriCopy.t("daily.axisRotations"), label: TriCopy.t("daily.rotations") }));
-      body.push(time, turns, line(TriCopy.t("daily.solvers", { count: stats.solvers }), "daily-stat-foot"));
+      // Few people share any one Endless puzzle, so the whole difficulty follows it.
+      if (stats.solvers < 2) body.push(line(TriCopy.t("endless.firstHere"), "daily-stats-note"));
+      else body.push(section(TriCopy.t("endless.thisPuzzle")), ...statBlocks(stats, you));
+      if (stats.overall?.solvers > 1 && stats.overall.you)
+        body.push(section(TriCopy.t("endless.allOf", { difficulty: current.difficulty })), ...statBlocks(stats.overall, stats.overall.you));
     }
     const share = el("share-result").cloneNode(true);
     share.removeAttribute("id");
@@ -321,11 +394,31 @@
       : TriCopy.t("daily.sharePlain", { time: formatTime(solve.elapsed), count: solve.turns });
     return { title: TriCopy.t("app.name"), text: `${title}\n${detail}`, url: `${TriShare.base}#daily=${date}` };
   };
+  window.triEndlessBrag = (key, finished) => {
+    const record = endlessRecord(key);
+    if (!record) return null;
+    const solve = record.solve || { elapsed: finished.elapsed, turns: finished.turns }, stats = record.stats;
+    const difficulty = endlessDifficulties[record.difficulty], you = stats?.you, overall = stats?.overall;
+    const title = TriCopy.t("endless.shareTitle", { difficulty, number: record.number });
+    const detail = you && stats.solvers > 1
+      ? TriCopy.t("daily.shareStats", { time: formatTime(you.elapsedMs), timeTop: you.timeTop, count: you.turns, par: stats.turns.par })
+      : overall?.you && overall.solvers > 1
+        ? TriCopy.t("endless.shareOverall", { time: formatTime(overall.you.elapsedMs), timeTop: overall.you.timeTop, difficulty, count: overall.you.turns })
+        : TriCopy.t("daily.sharePlain", { time: formatTime(solve.elapsed), count: solve.turns });
+    return { title: TriCopy.t("app.name"), text: `${title}\n${detail}`, url: `${TriShare.base}#endless=${key}` };
+  };
 
   // Titles, stats visibility and the spark follow every state change.
   const baseFlow = window.triFlowState;
+  let shownSubject = "";
   window.triFlowState = (next, previous) => {
     baseFlow(next, previous);
+    // Reopening a solved Endless puzzle brings its standings up to date.
+    const current = subject();
+    if (current?.id !== shownSubject) {
+      shownSubject = current?.id || "";
+      if (current?.id.startsWith("endless/")) { statsOpen = false; refreshEndlessStats(current.id.slice("endless/".length)); }
+    }
     const date = activeDaily();
     if (date && day(date)) {
       el("workshop-title").textContent = TriCopy.t("daily.title", { date: dateLabel(date), name: day(date).name });
@@ -374,7 +467,9 @@
     const code = normalizeCode(el("sync-input").value);
     if (!SECRET.test(code)) return syncStatus(TriCopy.t("sync.invalid"));
     const current = playerCode();
-    if (current && current !== code && Object.values(read().days).some(record => record.solve) && !confirm(TriCopy.t("sync.confirm"))) return;
+    const solvedHere = Object.values(read().days).some(record => record.solve)
+      || Object.values(window.TriEndless.read().puzzles).some(record => record.solve);
+    if (current && current !== code && solvedHere && !confirm(TriCopy.t("sync.confirm"))) return;
     let me;
     try { me = await request("me", { secret: code }); } catch { return syncStatus(TriCopy.t("sync.offline")); }
     const data = read();
@@ -388,15 +483,27 @@
     for (const [date, solve] of remote)
       data.days[date] = { ...(data.days[date] || {}), solve: { elapsed: solve.elapsedMs, turns: solve.turns }, submitted: true };
     write(data);
+    const store = window.TriEndless.read();
+    const remoteEndless = new Map((me.endless || []).map(solve => [TriShare.endlessKey(solve.difficulty, solve.number), solve]));
+    for (const [key, record] of Object.entries(store.puzzles)) {
+      delete record.stats;
+      if (record.solve && !remoteEndless.has(key)) record.submitted = false;
+    }
+    for (const [key, solve] of remoteEndless)
+      store.puzzles[key] = { ...(store.puzzles[key] || {}), difficulty: solve.difficulty, number: solve.number,
+        solve: { elapsed: solve.elapsedMs, turns: solve.turns }, submitted: true };
+    window.TriEndless.write(store);
     el("sync-input").value = "";
     el("sync-code").hidden = true;
     el("sync-show").textContent = TriCopy.t("sync.show");
-    syncStatus(me.known ? TriCopy.t("sync.done", { count: me.solves.length }) : TriCopy.t("sync.unknown"));
+    syncStatus(me.known ? TriCopy.t("sync.done", { count: me.solves.length + remoteEndless.size }) : TriCopy.t("sync.unknown"));
     retryPending();
     window.triCalendarRefresh?.();
     syncSpark();
     const date = activeDaily();
     if (date) refreshStats(date);
+    const shown = subject();
+    if (shown?.id.startsWith("endless/")) refreshEndlessStats(shown.id.slice("endless/".length));
   });
 
   // ---- Today's Puzzle spark --------------------------------------------------

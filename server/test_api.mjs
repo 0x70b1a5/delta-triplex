@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { openDatabase, loadDailies, handler, decode, releasedThrough } from "./api.mjs";
+import { openDatabase, loadDailies, handler, decode, releasedThrough, ENDLESS_COUNTS } from "./api.mjs";
 
 // A 3-row board: the tip and the whole base row filled.
 const CODE = encode(3, "100011111".split("").map(Number));
@@ -84,10 +84,10 @@ test("solves are checked, counted once, and ranked", () => withServer("2026-09-2
 }));
 
 test("a sync code recovers that player's solves", () => withServer("2026-09-24T12:00:00Z", async api => {
-  assert.deepEqual((await api("/api/me", { secret: secret("E") })).body, { known: false, solves: [] });
+  assert.deepEqual((await api("/api/me", { secret: secret("E") })).body, { known: false, solves: [], endless: [] });
   await api("/api/solve", { secret: secret("E"), date: "2026-09-23", elapsedMs: 5000, turns: 3, filled: SOLUTION });
   const me = await api("/api/me", { secret: secret("E") });
-  assert.deepEqual(me.body, { known: true, solves: [{ date: "2026-09-23", elapsedMs: 5000, turns: 3 }] });
+  assert.deepEqual(me.body, { known: true, solves: [{ date: "2026-09-23", elapsedMs: 5000, turns: 3 }], endless: [] });
   assert.equal((await api("/api/me", { secret: "short" })).status, 400);
 }));
 
@@ -106,3 +106,35 @@ test("solved puzzles are frozen; unsolved ones can move or go", () => {
   assert.equal(loadDailies(db, []).length, 1, "a solved puzzle survives being dropped");
   assert.deepEqual(db.prepare("SELECT date FROM dailies").all().map(r => r.date), ["2026-09-24"]);
 });
+
+test("endless solves pin each board, count once, and rank within the puzzle and difficulty", () => withServer("2026-09-24T12:00:00Z", async api => {
+  const HARD = "1".repeat(32) + "0".repeat(32), OTHER = "0".repeat(32) + "1".repeat(32);
+  const solve = (who, number, elapsedMs, turns, filled = HARD, difficulty = 2) =>
+    api("/api/endless/solve", { secret: secret(who), difficulty, number, elapsedMs, turns, filled });
+  assert.equal((await solve("A", 0, 1000, 1)).status, 404, "numbers start at 1");
+  assert.equal((await solve("A", 415, 1000, 1, "1".repeat(9), 4)).status, 404, "Sprout ends at 414");
+  assert.equal(ENDLESS_COUNTS[4], 414);
+  assert.equal((await solve("A", 1, 1000, 1, "1".repeat(9))).status, 400, "the board must fit the difficulty");
+  assert.equal((await api("/api/endless/nope", { difficulty: 2, number: 1 })).status, 404);
+
+  let r = await solve("A", 1, 60000, 4);
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body.you, { elapsedMs: 60000, turns: 4, timeTop: 100, turnsTop: 100 });
+  assert.equal(r.body.overall.solvers, 1);
+  assert.equal((await solve("B", 1, 1000, 1, OTHER)).status, 422, "a different board for the same number is refused");
+  r = await solve("A", 1, 1000, 0);
+  assert.equal(r.body.you.elapsedMs, 60000, "the first solve stands");
+
+  await solve("B", 1, 30000, 2);
+  await solve("C", 2, 10000, 1, OTHER);
+  await solve("D", 3, 90000, 9, OTHER);
+  r = await api("/api/endless/stats", { difficulty: 2, number: 1, secret: secret("A") });
+  assert.equal(r.body.solvers, 2);
+  assert.equal(r.body.you.timeTop, 100, "slower of two on this puzzle");
+  assert.equal(r.body.overall.solvers, 4, "every Hard solve");
+  assert.equal(r.body.overall.you.timeTop, 75, "third fastest of four Hard solves");
+  assert.equal((await api("/api/endless/stats", { difficulty: 2, number: 1 })).body.you, undefined);
+
+  const me = await api("/api/me", { secret: secret("A") });
+  assert.deepEqual(me.body.endless, [{ difficulty: 2, number: 1, elapsedMs: 60000, turns: 4 }]);
+}));

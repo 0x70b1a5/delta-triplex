@@ -58,6 +58,7 @@
           if (col < rows - row - 1) {
             const up = scene.id === "home-main" && col === 0
               ? row === rows - 2 ? el("create-puzzle") : row === 1 ? el("home-settings") : document.createElement("i")
+              : scene.id === "home-endless" && col === 0 && row === rows - 2 ? el("endless-stats")
               : document.createElement("i");
             if (!up.matches("button")) { up.className = "home-filler home-up"; up.setAttribute("aria-hidden", "true"); }
             scene.append(up); cell(up, x + .5 / rows, row / rows, row);

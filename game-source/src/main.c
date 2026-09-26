@@ -475,15 +475,27 @@ API void game_orientation(int direction){
 API void game_leave_custom(void){if(custom){game_up();load_board();}}
 API void game_level(int l){if(l<0||l>=PUZZLE_COUNT)return;game_up();persist();custom=false;editing=false;intro_done=true;tutorial=-1;level=l;load_board();persist();}
 // Generation works in isolation: rejected attempts never replace the active board.
-API const char *game_generate(int difficulty,unsigned int seed){
-    static char json[1024];Board candidate;Deduction rating;
-    if(!puzzle_generate(difficulty,seed,&candidate,&rating))return "";
+static const char *puzzle_json(const Board *candidate,const Deduction *rating,int number){
+    static char json[1024];
     int solution[MAX_TILES]={0};
-    for(int t=0;t<candidate.count;t++)solution[canonical_id(candidate.tiles[t])]=candidate.tiles[t].solution;
-    int used=snprintf(json,sizeof json,"{\"format\":\"tri-logic\",\"version\":2,\"cellOrder\":\"north-row-major\",\"size\":%d,\"rounds\":%d,\"solution\":[",candidate.n,rating.rounds);
-    for(int t=0;t<candidate.count;t++)used+=snprintf(json+used,sizeof json-used,"%s%d",t?",":"",solution[t]);
+    for(int t=0;t<candidate->count;t++)solution[canonical_id(candidate->tiles[t])]=candidate->tiles[t].solution;
+    int used=snprintf(json,sizeof json,"{\"format\":\"tri-logic\",\"version\":2,\"cellOrder\":\"north-row-major\",\"size\":%d,\"rounds\":%d,",candidate->n,rating->rounds);
+    if(number>0)used+=snprintf(json+used,sizeof json-used,"\"number\":%d,",number);
+    used+=snprintf(json+used,sizeof json-used,"\"solution\":[");
+    for(int t=0;t<candidate->count;t++)used+=snprintf(json+used,sizeof json-used,"%s%d",t?",":"",solution[t]);
     snprintf(json+used,sizeof json-used,"]}");return json;
 }
+API const char *game_generate(int difficulty,unsigned int seed){
+    Board candidate;Deduction rating;
+    if(!puzzle_generate(difficulty,seed,&candidate,&rating))return "";
+    return puzzle_json(&candidate,&rating,0);
+}
+API const char *game_endless(int difficulty,int number){
+    Board candidate;Deduction rating;
+    if(!endless_puzzle(difficulty,number,&candidate,&rating))return "";
+    return puzzle_json(&candidate,&rating,number);
+}
+API int game_endless_count(int difficulty){return endless_count(difficulty);}
 API void game_new(void){
     game_up();memset(saved,0,sizeof saved);custom=false;editing=false;
     intro_done=true;tutorial=-1;level=0;load_board();persist();

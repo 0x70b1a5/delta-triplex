@@ -142,7 +142,7 @@ const storageOf = h => Object.fromEntries(Array.from({ length: h.w.localStorage.
   other.d.getElementById('sync-input').value = player.toLowerCase().match(/.{5}/g).join(' ');
   other.d.getElementById('sync-form').dispatchEvent(new other.w.Event('submit', { cancelable: true }));
   await until(() => other.d.getElementById('sync-status').textContent.startsWith('Synced'), 'sync');
-  assert.equal(other.d.getElementById('sync-status').textContent, 'Synced · 1 solved daily');
+  assert.equal(other.d.getElementById('sync-status').textContent, 'Synced · 1 solved puzzle');
   other.click('past-puzzles');
   await until(() => other.d.querySelector('#calendar-grid [data-day="20"]').dataset.daily === 'solved', 'synced calendar');
   other.d.getElementById('sync-input').value = 'not a code';

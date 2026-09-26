@@ -95,18 +95,58 @@ window.TriShare = {
       difficulty: level,
     };
   },
+  // Numbered Endless puzzles are the same for everyone: "hard-12" is Hard #12.
+  // Slugs are protocol values in difficulty-ID order, never translated.
+  endlessSlugs: ["easy", "medium", "hard", "impossible", "sprout"],
+  endlessKey(difficulty, number) {
+    if (!this.endlessSlugs[difficulty] || !Number.isInteger(number) || number < 1) return "";
+    return this.endlessSlugs[difficulty] + "-" + number;
+  },
+  // Accepts "hard-12", "Hard 12", "hard #12" or "hard12".
+  parseEndless(text) {
+    const match = /^([a-z]+)[-\s#]*(\d{1,10})$/i.exec(String(text).trim());
+    const difficulty = match ? this.endlessSlugs.indexOf(match[1].toLowerCase()) : -1;
+    const number = match ? Number(match[2]) : 0;
+    if (difficulty < 0 || !Number.isSafeInteger(number) || number < 1 || number > 0x7fffffff) throw Error(TriCopy.t("share.invalid-endless-link"));
+    return { difficulty, number };
+  },
+  // null when a finite difficulty (Sprout, Easy) has no puzzle that far.
+  endlessPuzzle(difficulty, number) {
+    const json = Module.ccall("game_endless", "string", ["number", "number"], [difficulty, number]);
+    if (!json) return null;
+    return {
+      ...JSON.parse(json),
+      name: TriCopy.t("endless.name", { difficulty: TriCopy.t(["ui.easy", "ui.medium", "ui.hard", "ui.impossible", "ui.sprout"][difficulty]), number }),
+      difficulty,
+      number,
+      endless: this.endlessKey(difficulty, number),
+    };
+  },
+  endlessFromText(text) {
+    const { difficulty, number } = this.parseEndless(text);
+    const puzzle = this.endlessPuzzle(difficulty, number);
+    if (!puzzle) throw Error(TriCopy.t("share.invalid-endless-link"));
+    return puzzle;
+  },
   fromText(text) {
     const input = text.trim();
     if (!input) throw Error(TriCopy.t("share.invalid-seed-link"));
-    if (!input.includes("://") && !input.startsWith("#")) return this.seedPuzzle(input);
+    if (!input.includes("://") && !input.startsWith("#")) {
+      // A difficulty name wins: "easy123" is also valid Base32, but means Easy #123.
+      let numbered = null;
+      try { numbered = this.parseEndless(input); } catch {}
+      return numbered ? this.endlessFromText(input) : this.seedPuzzle(input);
+    }
     const url = new URL(input, this.base);
     if (!["https:", "http:"].includes(url.protocol)) throw Error(TriCopy.t("share.invalid-puzzle-link"));
     const params = new URLSearchParams(url.hash.slice(1));
+    if (params.has("endless")) return this.endlessFromText(params.get("endless"));
     if (params.has("seed")) return this.seedPuzzle(params.get("seed"));
     if (params.has("p")) return this.decode(params.get("p"));
     throw Error(TriCopy.t("share.invalid-puzzle-link"));
   },
   url(puzzle) {
+    if (puzzle.endless) return this.base + "#endless=" + puzzle.endless;
     const code = this.seedCode(puzzle.seed, puzzle.difficulty);
     if (code) return this.base + "#seed=" + code;
     return this.base + "#p=" + this.encode(puzzle);

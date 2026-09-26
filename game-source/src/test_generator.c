@@ -41,5 +41,25 @@ int main(void){
         }
         assert(accepted==100);
     }
+    // Endless numbering: fixed, and never repeating a board.
+    assert(endless_count(4)==414&&endless_count(0)==52532);
+    assert(endless_count(1)==0&&endless_count(2)==0&&endless_count(3)==0);
+    for(int d=0;d<5;d++){
+        Board b,again;Deduction rating;
+        assert(!endless_puzzle(d,0,&b,NULL)&&!endless_puzzle(d,-1,&b,NULL));
+        int limit=d==4?414:d==0?3000:d==3?40:200;
+        static char seen[60000][101];
+        for(int number=1;number<=limit;number++){
+            assert(endless_puzzle(d,number,&b,&rating));
+            assert((b.n==(int[]){4,6,8,10,3}[d]));assert(rating.solved);
+            assert((rating.rounds>=(int[]){2,3,5,7,1}[d]));
+            assert(endless_puzzle(d,number,&again,NULL)&&!memcmp(&b,&again,sizeof b));
+            for(int t=0;t<b.count;t++)seen[number-1][t]='0'+b.tiles[t].solution;
+            seen[number-1][b.count]=0;
+            for(int earlier=0;earlier<number-1;earlier++)assert(strcmp(seen[earlier],seen[number-1]));
+        }
+    }
+    {Board b;assert(!endless_puzzle(4,415,&b,NULL)&&!endless_puzzle(0,52533,&b,NULL)&&endless_puzzle(0,52532,&b,NULL));}
+    puts("PASS: fixed Endless numbering: every Sprout board once, distinct Easy boards, reproducible larger sizes.");
     puts("PASS: exhaustive small-board uniqueness certificates and 100 reproducible, solvable generated puzzles per difficulty.");
 }

@@ -1,8 +1,8 @@
 const assert = require('assert');
 const { harness, source } = require('./test_rotation_harness.cjs');
 // Return home from an Endless puzzle and pick another difficulty before the
-// browser delivers the history move. That move also clears the #seed hash;
-// its late hashchange must not cancel the new generation.
+// browser delivers the history move. That move also clears the #endless hash;
+// its late arrival must not close the puzzle that just opened.
 (async () => {
   const h = harness(source);
   const { d, w } = h;
@@ -11,17 +11,15 @@ const { harness, source } = require('./test_rotation_harness.cjs');
   h.click('endless-mode');
   d.querySelector('#difficulties button[data-difficulty="0"]').click();
   await h.settle(() => h.state.custom && w.triEndlessRun?.difficulty === 0);
-  assert(w.location.hash.startsWith('#seed='), 'playing Endless publishes its seed');
-  for (const difficulty of [1, 3]) {
+  assert.equal(w.location.hash, '#endless=easy-1', 'playing Endless publishes its number');
+  for (const [difficulty, slug] of [[1, 'medium'], [3, 'impossible']]) {
     h.click('return-home'); h.click('endless-mode');
     d.querySelector(`#difficulties button[data-difficulty="${difficulty}"]`).click();
-    // Generation yields on the harness clock, so it is still pending while
-    // jsdom's real-time history traversal lands.
-    assert.equal(d.getElementById('difficulties').getAttribute('aria-busy'), 'true');
+    assert(home.hidden, 'the numbered puzzle opens at once');
+    // jsdom's real-time history traversal lands after the puzzle opened.
     await new Promise(resolve => setTimeout(resolve, 30));
-    assert(!home.hidden && home.dataset.view === 'endless', 'the stale history move leaves the Endless menu alone');
-    await h.settle(() => h.state.custom && w.triEndlessRun?.difficulty === difficulty);
-    assert(home.hidden, 'the new puzzle opens');
+    assert(home.hidden && w.triEndlessRun?.difficulty === difficulty, 'the stale history move leaves the new puzzle alone');
+    assert.equal(w.location.hash, `#endless=${slug}-1`);
   }
   // A link opened by hand still works while on the menu.
   h.click('return-home');
@@ -30,5 +28,5 @@ const { harness, source } = require('./test_rotation_harness.cjs');
   await new Promise(resolve => setTimeout(resolve, 30));
   assert.equal(h.state.level, 1); assert(home.hidden);
   h.close();
-  console.log('PASS: fast clicks past a pending Back, hash cleanup ignored, typed links still open.');
+  console.log('PASS: fast clicks past a pending Back, stale hash cleanup ignored, typed links still open.');
 })().catch(error => { console.error(error); process.exit(1); });
