@@ -214,22 +214,31 @@ function startEndless(difficulty, number, fromLink = false) {
   loadCustom(puzzle, false, false, { difficulty, number }, fromLink);
 }
 window.triStartEndless = startEndless;
-const difficultyDetails = new Map();
+const difficultyBadges = new Map();
 [...el("difficulties").children].forEach(button => {
   const difficulty = Number(button.dataset.difficulty);
   const detail = document.createElement("small");
   button.title = TriCopy.t("difficulty." + difficulty + ".description");
-  button.append(detail);
-  difficultyDetails.set(difficulty, detail);
+  detail.textContent = TriCopy.t("difficulty.cells", { count: [16, 36, 64, 100, 9][difficulty] });
+  // Solved count: a filled point-down triangle under the cell count.
+  const badge = document.createElement("b"), count = document.createElement("span"), spoken = document.createElement("span");
+  badge.className = "solve-badge";
+  count.setAttribute("aria-hidden", "true");
+  spoken.className = "theme-sr-only";
+  badge.append(count, spoken);
+  button.append(detail, badge);
+  difficultyBadges.set(difficulty, { badge, count, spoken });
   button.onclick = () => startEndless(difficulty);
 });
 // Menu order, which is also the order solved counts are listed in.
 const endlessOrder = [4, 0, 1, 2, 3];
 function syncEndlessMenu() {
   const counts = window.TriEndless.solvedCounts();
-  for (const [difficulty, detail] of difficultyDetails) {
-    const cells = TriCopy.t("difficulty.cells", { count: [16, 36, 64, 100, 9][difficulty] });
-    detail.textContent = counts[difficulty] ? TriCopy.t("endless.cellsSolved", { cells, count: counts[difficulty] }) : cells;
+  for (const [difficulty, { badge, count, spoken }] of difficultyBadges) {
+    badge.hidden = !counts[difficulty];
+    badge.dataset.digits = String(Math.min(4, String(counts[difficulty]).length));
+    count.textContent = String(counts[difficulty]);
+    spoken.textContent = TriCopy.t("endless.solvedCount", { count: counts[difficulty] });
   }
 }
 syncEndlessMenu();

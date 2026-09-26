@@ -60,7 +60,8 @@ const submitForm = (h, id) => h.d.getElementById(id).dispatchEvent(new h.w.Event
       filled: w.TriShare.endlessPuzzle(4, number).solution.join('') }) });
 
   h.click('endless-mode');
-  assert.equal(d.querySelector('[data-difficulty="4"] small').textContent, '9 cells', 'no solved count before a solve');
+  assert.equal(d.querySelector('[data-difficulty="4"] small').textContent, '9 cells');
+  assert(d.querySelector('[data-difficulty="4"] .solve-badge').hidden, 'no badge before a solve');
   d.querySelector('[data-difficulty="4"]').click();
   await until(() => h.state.custom && w.triEndlessRun?.number === 1, 'Sprout #1 opens');
   assert.equal(d.getElementById('workshop-title').textContent, 'Sprout · Puzzle 1');
@@ -98,8 +99,12 @@ const submitForm = (h, id) => h.d.getElementById(id).dispatchEvent(new h.w.Event
 
   // The menu and the Solves dialog count solves, leaving out empty difficulties.
   h.click('return-home'); h.click('endless-mode');
-  assert.equal(d.querySelector('[data-difficulty="4"] small').textContent, '9 cells · 1 solved');
-  assert.equal(d.querySelector('[data-difficulty="0"] small').textContent, '16 cells');
+  const badge = d.querySelector('[data-difficulty="4"] .solve-badge');
+  assert.equal(d.querySelector('[data-difficulty="4"] small').textContent, '9 cells', 'the cell count keeps its own line');
+  assert(!badge.hidden);
+  assert.equal(badge.querySelector('[aria-hidden]').textContent, '1');
+  assert.equal(badge.querySelector('.theme-sr-only').textContent, '1 solved');
+  assert(d.querySelector('[data-difficulty="0"] .solve-badge').hidden, 'difficulties with no solves have no badge');
   h.click('endless-stats');
   const record = d.getElementById('endless-record');
   assert(record.open);

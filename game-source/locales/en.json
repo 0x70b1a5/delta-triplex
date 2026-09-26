@@ -67,7 +67,6 @@
   "editor.try": "Try",
   "editor.tryingTitle": "Trying · {name}",
   "endless.allOf": "All {difficulty} puzzles",
-  "endless.cellsSolved": "{cells} · {count} solved",
   "endless.complete": "You've solved every {difficulty} puzzle!",
   "endless.firstHere": "You're the first to solve this one.",
   "endless.help": "Endless Mode · {count} cells. Your first solve counts toward its stats.",
@@ -85,6 +84,10 @@
     "other": "Solved in {time} (top {timeTop}% of {difficulty}) · {count} rotations"
   },
   "endless.shareTitle": "Delta Triplex · {difficulty} #{number}",
+  "endless.solvedCount": {
+    "one": "{count} solved",
+    "other": "{count} solved"
+  },
   "endless.statsTitle": "Endless results",
   "endless.thisPuzzle": "This puzzle",
   "endless.title": "{difficulty} · Puzzle {number}",
