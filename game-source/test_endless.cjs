@@ -81,7 +81,7 @@ const submitForm = (h, id) => h.d.getElementById(id).dispatchEvent(new h.w.Event
   assert.equal(panel.querySelector('h2').textContent, 'Endless results');
   assert.equal(panel.querySelector('.daily-stats-name').textContent, 'Sprout · Puzzle 1');
   const sections = [...panel.querySelectorAll('.daily-stats-section')].map(node => node.textContent);
-  assert.deepEqual(sections, ['This puzzle', 'All Sprout puzzles']);
+  assert.deepEqual(sections, ['2 solvers so far', 'All Sprout puzzles · 3 solves']);
   assert(panel.textContent.includes('top 100%'), 'slower of two on this puzzle');
   assert.equal(panel.querySelectorAll('.daily-chart').length, 4, 'time and rotation charts for each field');
   let shared;

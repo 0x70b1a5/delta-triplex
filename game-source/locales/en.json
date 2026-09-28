@@ -66,7 +66,10 @@
   "editor.the-puzzle-could-not-be-loaded": "The puzzle could not be loaded.",
   "editor.try": "Try",
   "editor.tryingTitle": "Trying · {name}",
-  "endless.allOf": "All {difficulty} puzzles",
+  "endless.allOf": {
+    "one": "All {difficulty} puzzles · {count} solve",
+    "other": "All {difficulty} puzzles · {count} solves"
+  },
   "endless.complete": "You've solved every {difficulty} puzzle!",
   "endless.firstHere": "You're the first to solve this one.",
   "endless.help": "Endless Mode · {count} cells. Your first solve counts toward its stats.",
@@ -89,7 +92,6 @@
     "other": "{count} solved"
   },
   "endless.statsTitle": "Endless results",
-  "endless.thisPuzzle": "This puzzle",
   "endless.title": "{difficulty} · Puzzle {number}",
   "errors.fileJson": "This file is not valid JSON. Choose an exported puzzle JSON file.",
   "errors.fileSize": "Please choose a puzzle JSON file smaller than 64 KB.",

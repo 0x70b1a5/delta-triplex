@@ -1172,10 +1172,11 @@
       #daily-stats p { margin: 0; }
       .daily-stats-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
       .daily-stats-heading h2 { font-size: 15px; margin: 0; }
+      .daily-stats-titles { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; row-gap: 2px; min-width: 0; }
       .daily-stats-heading button { min-height: 32px; padding: 4px 10px; }
-      .daily-stats-name { color: var(--muted); font-size: 13px; margin-top: 2px !important; }
+      .daily-stats-name { color: var(--muted); font-size: 13px; }
       .daily-stat { margin-top: 14px; }
-      .daily-stats-section { margin: 18px 0 0; padding-top: 12px; border-top: 1px solid var(--border); font-size: 13px; }
+      .daily-stats-section { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--border); font-size: 15px; font-weight: 650; }
       .daily-stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; }
       .daily-stat-value { font-size: 17px; font-weight: 650; margin-top: 2px !important; }
       .daily-stat-foot, .daily-stats-note { font-size: 12px; color: var(--muted); margin-top: 6px !important; }
@@ -1187,6 +1188,8 @@
       .daily-bar:hover path { opacity: .7; }
       .daily-bar-you:hover path { opacity: 1; }
       .daily-bar text { fill: var(--ink); font-size: 11px; font-family: system-ui, sans-serif; }
+      .daily-chart-marker { stroke: var(--ink); stroke-width: 1; stroke-dasharray: 3 2; opacity: .55; pointer-events: none; }
+      .daily-chart-marker-label { fill: var(--ink); font-size: 10px; font-family: system-ui, sans-serif; font-variant-numeric: tabular-nums; pointer-events: none; }
       .daily-chart-tick, .daily-chart-title { fill: var(--muted); font-size: 10px; font-family: system-ui, sans-serif; font-variant-numeric: tabular-nums; }
       .daily-chart-title { font-size: 10.5px; }
       .daily-stats-share { margin-top: 14px; display: inline-flex; align-items: center; gap: 7px; }

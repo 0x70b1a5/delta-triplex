@@ -268,7 +268,8 @@
   // One series: every bin in the filled-cell colour at a light tint, the
   // player's bin at full strength with a "You" label above it. Both axes are
   // titled; the x axis marks its outer edges and the y axis its peak count.
-  function histogram({ edges, counts }, mine, { range, tick, xTitle, label }) {
+  // An optional `marker` ({ value, label, log }) draws a labelled dashed line.
+  function histogram({ edges, counts }, mine, { range, tick, xTitle, label, marker }) {
     const left = 34, width = 240, top = 18, base = 58, height = 90;
     const svg = svgNode("svg", { viewBox: `0 0 ${width} ${height}`, class: "daily-chart", role: "img", "aria-label": label });
     const slot = (width - left) / counts.length, bar = Math.min(24, slot - 2), max = Math.max(...counts);
@@ -305,6 +306,22 @@
       if (i === you) group.append(text(TriCopy.t("daily.you"), { x: x + bar / 2, y: base - h - 4, "text-anchor": "middle" }));
       svg.append(group);
     });
+    if (marker) {
+      // Placed within its bin on the bin's own scale (log for time); a
+      // single-value histogram puts it in the middle with everyone.
+      const i = binOf(edges, marker.value), lo = edges[i], hi = edges[i + 1];
+      const scale = marker.log ? Math.log : v => v;
+      const within = hi > lo ? Math.min(1, Math.max(0, (scale(Math.max(1, marker.value)) - scale(Math.max(1, lo))) / (scale(hi) - scale(Math.max(1, lo))))) : .5;
+      const x = left + (i + within) * slot, y = 4;
+      // The label sits beside the line, on whichever side keeps clear of the
+      // "You" label and the chart's right edge.
+      const labelWidth = marker.label.length * 5.2, youX = you >= 0 ? left + (you + .5) * slot : null;
+      let side = x + 3 + labelWidth <= width ? 1 : -1;
+      if (youX !== null && Math.abs(youX - x) < labelWidth / 2 + 14) side = youX > x ? -1 : 1;
+      svg.append(
+        svgNode("line", { x1: x, x2: x, y1: y - 6, y2: base, class: "daily-chart-marker" }),
+        text(marker.label, { x: x + side * 3, y, "text-anchor": side > 0 ? "start" : "end", class: "daily-chart-marker-label" }));
+    }
     return svg;
   }
   const activeDaily = () => state?.custom && !state.editing && window.triActiveDaily ? window.triActiveDaily : "";
@@ -327,18 +344,19 @@
   function statBlocks(stats, you) {
     const time = document.createElement("div"), turns = document.createElement("div");
     time.className = turns.className = "daily-stat";
+    const median = TriCopy.t("daily.median", { time: formatTime(stats.time.median) });
     time.append(line(TriCopy.t("daily.time"), "daily-stat-label"),
       line(TriCopy.t("daily.timeLine", { time: formatTime(you.elapsedMs), top: you.timeTop }), "daily-stat-value"),
       histogram(stats.time.histogram, you.elapsedMs, { range: (a, b) => `${formatTime(a)}–${formatTime(b)}`,
-        tick: formatTime, xTitle: TriCopy.t("daily.axisTime"), label: TriCopy.t("daily.time") }),
-      line(TriCopy.t("daily.median", { time: formatTime(stats.time.median) }), "daily-stat-foot"));
+        tick: formatTime, xTitle: TriCopy.t("daily.axisTime"), label: `${TriCopy.t("daily.time")} · ${median}`,
+        marker: { value: stats.time.median, label: median, log: true } }));
     turns.append(line(TriCopy.t("daily.rotations"), "daily-stat-label"),
       line(TriCopy.t("daily.turnsLine", { count: you.turns, par: stats.turns.par, top: you.turnsTop }), "daily-stat-value"),
       histogram(stats.turns.histogram, you.turns, { range: (a, b) => b - a <= 1 ? String(a) : `${a}–${b - 1}`,
         // Rotation bins end exclusively, so the last edge is one past the highest count.
         tick: (value, end) => String(end ? Math.max(0, value - 1) : value),
         xTitle: TriCopy.t("daily.axisRotations"), label: TriCopy.t("daily.rotations") }));
-    return [time, turns, line(TriCopy.t("daily.solvers", { count: stats.solvers }), "daily-stat-foot")];
+    return [time, turns];
   }
   function section(text) {
     const heading = document.createElement("h3");
@@ -360,19 +378,22 @@
     const stats = record.stats, you = stats?.you;
     const heading = document.createElement("div");
     heading.className = "daily-stats-heading";
-    heading.innerHTML = `<h2 id="daily-stats-title">${TriCopy.html(current.titleKey)}</h2><button id="daily-stats-close" type="button">${TriCopy.html("daily.close")}</button>`;
-    const body = [heading, line(current.name, "daily-stats-name")];
+    heading.innerHTML = `<div class="daily-stats-titles"><h2 id="daily-stats-title">${TriCopy.html(current.titleKey)}</h2>`
+      + `<span class="daily-stats-name"></span></div><button id="daily-stats-close" type="button">${TriCopy.html("daily.close")}</button>`;
+    heading.querySelector(".daily-stats-name").textContent = current.name;
+    const body = [heading];
+    const solvers = () => section(TriCopy.t("daily.solvers", { count: stats.solvers }));
     if (!you) {
       body.push(line(TriCopy.t(record.submitted ? "daily.failed" : inflight.has(current.id) ? "daily.loadingStats" : "daily.pending"), "daily-stats-note"));
     } else if (current.difficulty === undefined) {
       if (stats.solvers < 2) body.push(line(TriCopy.t("daily.first"), "daily-stats-note"));
-      else body.push(...statBlocks(stats, you));
+      else body.push(solvers(), ...statBlocks(stats, you));
     } else {
       // Few people share any one Endless puzzle, so the whole difficulty follows it.
       if (stats.solvers < 2) body.push(line(TriCopy.t("endless.firstHere"), "daily-stats-note"));
-      else body.push(section(TriCopy.t("endless.thisPuzzle")), ...statBlocks(stats, you));
+      else body.push(solvers(), ...statBlocks(stats, you));
       if (stats.overall?.solvers > 1 && stats.overall.you)
-        body.push(section(TriCopy.t("endless.allOf", { difficulty: current.difficulty })), ...statBlocks(stats.overall, stats.overall.you));
+        body.push(section(TriCopy.t("endless.allOf", { difficulty: current.difficulty, count: stats.overall.solvers })), ...statBlocks(stats.overall, stats.overall.you));
     }
     const share = el("share-result").cloneNode(true);
     share.removeAttribute("id");

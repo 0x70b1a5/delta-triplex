@@ -121,6 +121,9 @@ const storageOf = h => Object.fromEntries(Array.from({ length: h.w.localStorage.
   const texts = (chart, cls) => [...chart.querySelectorAll('.' + cls)].map(node => node.textContent);
   assert.deepEqual(texts(charts[0], 'daily-chart-title'), ['Solvers', 'Solve time'], 'time chart axes are titled');
   assert.deepEqual(texts(charts[1], 'daily-chart-title'), ['Solvers', 'Rotations to solve'], 'rotation chart axes are titled');
+  assert.equal(d.querySelector('#daily-stats .daily-stats-section').textContent, '2 solvers so far', 'solver count heads the results');
+  assert.deepEqual(texts(charts[0], 'daily-chart-marker-label'), ['Median 01:06'], 'time chart marks the median');
+  assert.equal(charts[1].querySelector('.daily-chart-marker'), null, 'rotation chart has no marker');
   assert.deepEqual(texts(charts[1], 'daily-chart-tick'), ['1', '0', '0', '3'], 'peak count, zero, and the lowest and highest rotations');
   let shared;
   w.navigator.share = async data => { shared = data; };
