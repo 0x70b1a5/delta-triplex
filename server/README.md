@@ -65,8 +65,22 @@ deltatriplex.com {
     }
 }
 
-www.deltatriplex.com, delta.theologi.ca {
+www.deltatriplex.com {
     redir https://deltatriplex.com{uri} permanent
+}
+
+delta.theologi.ca {
+    # One-off handoff: /move carries this origin's localStorage to the new domain
+    # (server/move.html → game-source/import.js). Everything else redirects.
+    handle /move {
+        root * /srv/delta-move
+        rewrite * /move.html
+        header Cache-Control no-store
+        file_server
+    }
+    handle {
+        redir https://deltatriplex.com{uri} permanent
+    }
 }
 ```
 

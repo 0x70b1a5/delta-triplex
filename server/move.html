@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Delta Triplex has moved</title>
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #171717; color: #eee; font: 16px/1.5 system-ui, sans-serif; text-align: center; padding: 0 16px; }
+  a { color: #9cf; }
+</style>
+</head>
+<body>
+<p>Moving your progress to <a id="go" href="https://deltatriplex.com/">deltatriplex.com</a>…</p>
+<script>
+// Served at delta.theologi.ca/move (see server/README.md). Carries this origin's
+// saved progress and settings to the new domain; game-source/import.js merges it.
+(() => {
+  const target = "https://deltatriplex.com/";
+  const data = {};
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (/^(tri-|delta-triplex-)/.test(key)) data[key] = localStorage.getItem(key);
+    }
+  } catch {}
+  if (!Object.keys(data).length) return location.replace(target);
+  const bytes = new TextEncoder().encode(JSON.stringify(data));
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  const url = target + "#import=" + btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  document.getElementById("go").href = url;
+  location.replace(url);
+})();
+</script>
+</body>
+</html>
