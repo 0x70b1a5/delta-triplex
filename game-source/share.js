@@ -78,7 +78,7 @@ window.TriShare = {
     return puzzle;
   },
   // Replace this origin when the public release has an address.
-  base: "https://delta.theologi.ca/",
+  base: "https://deltatriplex.com/",
   seedPuzzle(code) {
     const { seed: number, difficulty: level } = this.parseSeedCode(code);
     const json = Module.ccall(

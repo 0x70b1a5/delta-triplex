@@ -88,7 +88,7 @@ const submitForm = (h, id) => h.d.getElementById(id).dispatchEvent(new h.w.Event
   Object.defineProperty(w.navigator, 'share', { configurable: true, value: async data => { shared = data; } });
   h.click('share-result'); await tick();
   assert(shared.text.startsWith('Delta Triplex · Sprout #1\n'), shared.text);
-  assert.equal(shared.url, 'https://delta.theologi.ca/#endless=sprout-1');
+  assert.equal(shared.url, 'https://deltatriplex.com/#endless=sprout-1');
   panel.querySelector('#daily-stats-close').click();
 
   // Next skips to the lowest unsolved number; B's solve of #2 doesn't count here.

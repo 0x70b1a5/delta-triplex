@@ -126,7 +126,7 @@ const storageOf = h => Object.fromEntries(Array.from({ length: h.w.localStorage.
   w.navigator.share = async data => { shared = data; };
   h.click('share-result'); await tick();
   assert.equal(shared.text, 'Delta Triplex Sep 20 · “Mouse”\nSolved in 00:42 (top 50%) · 0 rotations (par 2)');
-  assert.equal(shared.url, 'https://delta.theologi.ca/#daily=2026-09-20');
+  assert.equal(shared.url, 'https://deltatriplex.com/#daily=2026-09-20');
   const saved = storageOf(h), player = JSON.parse(saved['tri-daily-v1']).player;
   h.close();
 

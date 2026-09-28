@@ -54,7 +54,7 @@ cp dist/static/index.html /srv/delta/index.html
 The service uses the system Node (`/usr/bin/node`, NodeSource apt, 22.13 or newer), runs as a throwaway systemd user and keeps its database in `/var/lib/delta/delta.sqlite`. Caddy proxies `/api/*` to it:
 
 ```
-delta.theologi.ca {
+deltatriplex.com {
     encode zstd gzip
     handle /api/* {
         reverse_proxy 127.0.0.1:8787
@@ -63,6 +63,10 @@ delta.theologi.ca {
         root * /srv/delta
         file_server
     }
+}
+
+www.deltatriplex.com, delta.theologi.ca {
+    redir https://deltatriplex.com{uri} permanent
 }
 ```
 

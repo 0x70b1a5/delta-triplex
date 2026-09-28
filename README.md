@@ -24,6 +24,6 @@ The script rebuilds the supplied raylib directory for the web. Run `./build.sh -
 python3 -m http.server 8000 --directory dist/static
 ```
 
-Open `http://localhost:8000`. The share URL is `https://delta.theologi.ca/`, configured in `game-source/share.js`. Rebuild after changing it. Use HTTPS in production for clipboard and native sharing support where available.
+Open `http://localhost:8000`. The share URL is `https://deltatriplex.com/`, configured in `game-source/share.js`. Rebuild after changing it. Use HTTPS in production for clipboard and native sharing support where available.
 
 Source, controls and test instructions are documented in [game-source/README.md](game-source/README.md). The React wrapper remains available through the existing Sites build/publish workflow, but is not required for static hosting.

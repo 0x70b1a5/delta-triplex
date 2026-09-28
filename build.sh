@@ -16,7 +16,7 @@ Optional environment variables:
   DELTA_EMSDK  Existing emsdk directory (otherwise EMSDK or .build/emsdk-4.0.16)
   RAYLIB       Existing raylib 5.5 directory (otherwise .build/raylib-5.5)
 
-Deploy the contents of dist/static/. Share links use https://delta.theologi.ca/.
+Deploy the contents of dist/static/. Share links use https://deltatriplex.com/.
 HELP
     exit 0
   fi

@@ -35,7 +35,7 @@ Run `./build.sh` to rebuild from source and produce `dist/static/index.html` for
 
 Run `npm --prefix game-source test` after installing its dev dependency. Native checks are `make -C game-source test test-generator` and `make -C game-source test-game RAYLIB=/path/to/raylib` (macOS or GNU linker).
 
-The share origin is `https://delta.theologi.ca/`. Puzzles carry an `orientation` (0–2 clockwise 120° turns): the view they open at and the view their solve spin lands on. Seed codes are unchanged; generated puzzles use 0.
+The share origin is `https://deltatriplex.com/`. Puzzles carry an `orientation` (0–2 clockwise 120° turns): the view they open at and the view their solve spin lands on. Seed codes are unchanged; generated puzzles use 0.
 
 ## Local comparison archive
 

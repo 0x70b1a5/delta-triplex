@@ -206,12 +206,12 @@ const { harness, source } = require("./test_rotation_harness.cjs");
   await new Promise(resolve => setImmediate(resolve));
   assert(!d.getElementById("result-copy").hidden);
   assert(d.getElementById("result-text").value.includes("01:05 / 7 rotations"));
-  assert(d.getElementById("result-text").value.includes("https://delta.theologi.ca/#level=0"));
+  assert(d.getElementById("result-text").value.includes("https://deltatriplex.com/#level=0"));
   let shared;
   w.navigator.share = async data => { shared = data; };
   h.click("share-result"); await Promise.resolve();
   assert.equal(shared.text, "Delta Triplex — Solved: 01:05 / 7 rotations");
-  assert.equal(shared.url, "https://delta.theologi.ca/#level=0");
+  assert.equal(shared.url, "https://deltatriplex.com/#level=0");
   const linked = harness(source, "https://tri.test/#level=2");
   assert.equal(linked.state.level, 2); linked.close();
   h.click("undo"); assert(!h.state.won); assert.equal(axes().size, 2);
@@ -336,7 +336,7 @@ const { harness, source } = require("./test_rotation_harness.cjs");
   // ten runs. Short phones tighten the spacing only as far as needed.
   for (const [pattern, expected] of [[i => i % 2, [1.5, 2, 3]], [i => (i >> 1) % 2, [3, 3, 3]]]) {
     const url = w.TriShare.url({ format: "tri-logic", version: 2, cellOrder: "north-row-major", size: 10,
-      solution: Array.from({ length: 100 }, (_, i) => pattern(i)) }).replace("https://delta.theologi.ca/", "https://tri.test/");
+      solution: Array.from({ length: 100 }, (_, i) => pattern(i)) }).replace("https://deltatriplex.com/", "https://tri.test/");
     const dense = harness(source, url), denseBoard = dense.d.getElementById("rotate-board");
     [[320, 360], [390, 480], [390, 760]].forEach(([width, height], index) => {
       dense.resize(width, height);
