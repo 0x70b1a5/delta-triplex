@@ -47,7 +47,7 @@ const submitForm = (h, id) => h.d.getElementById(id).dispatchEvent(new h.w.Event
   const calls = [];
   const fetch = async (url, init = {}) => {
     calls.push({ url, body: init.body ? JSON.parse(init.body) : null });
-    return globalThis.fetch(url.replace('https://tri.test', origin), init);
+    return globalThis.fetch(url.replace('https://deltatriplex.com', origin), init);
   };
   const called = path => calls.filter(call => call.url.endsWith('/api/' + path));
 

@@ -9,8 +9,18 @@
   const ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
   const SECRET = /^[0-9A-HJKMNP-TV-Z]{25}$/;
   const DATE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
-  // Same origin when served; an offline copy of the game asks the public site.
-  const API = (/^https?:$/.test(location.protocol) ? location.origin + "/" : TriShare.base) + "api/";
+  // Same origin on the public site and local servers. Everywhere else (portal
+  // iframes such as itch.io or Newgrounds, offline copies) asks the public site.
+  const sameOrigin = location.origin === new URL(TriShare.base).origin
+    || /^http:$/.test(location.protocol) && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+  const API = (sameOrigin ? location.origin + "/" : TriShare.base) + "api/";
+  // Newgrounds asks games that call outside servers to say so at the start and
+  // offer an opt-out, so there (any "ground" host) nothing is sent until the
+  // player has seen the notice. Everywhere else online features are always on.
+  const ONLINE = "delta-triplex-online";
+  const askOnline = /ground/.test(location.hostname);
+  const onlineChoice = () => { try { return localStorage.getItem(ONLINE); } catch { return null; } };
+  const onlineAllowed = () => !askOnline || onlineChoice() === "on";
 
   function read() {
     try {
@@ -52,6 +62,7 @@
   const TIMEOUT = 15e3;
   const requestError = (reason, status = 0, detail = "") => Object.assign(Error(detail || reason), { reason, status, detail });
   async function request(path, body) {
+    if (!onlineAllowed()) throw requestError("disabled");
     if (typeof fetch !== "function") throw requestError("offline");
     let timer;
     const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(requestError("timeout")), TIMEOUT); });
@@ -84,6 +95,7 @@
     syncSpark();
   }
   window.triDailyListLoaded = () => !!released;
+  window.triOnlineOff = () => !onlineAllowed();
   window.triDailyStatus = key => {
     const record = day(key), name = released?.get(key) ?? record?.name;
     if (!name) return null;
@@ -103,7 +115,8 @@
       if (!el("home").hidden && !el("home-calendar").hidden) el("calendar-status").textContent = TriCopy.t("calendar.loading");
       try { entry = await request("daily/" + date); } catch (error) {
         if (job !== opening) return;
-        const message = error.reason !== "http" ? TriCopy.t("calendar.offline")
+        const message = error.reason === "disabled" ? TriCopy.t("online.off")
+          : error.reason !== "http" ? TriCopy.t("calendar.offline")
           : isToday ? TriCopy.t("calendar.todayMissing")
           : TriCopy.t("calendar.selection", { date: dateLabel(date) });
         // A link or Today's Puzzle lands on the calendar so the player has somewhere to go.
@@ -189,6 +202,8 @@
   const inflight = new Set();
   const trouble = new Map(); // id -> { error, attempt, timer }
   function retryLater(id, error) {
+    // Switched off by the player: waiting on it until they turn it back on.
+    if (error.reason === "disabled") return settle(id, error);
     const entry = trouble.get(id) || { attempt: 0, timer: 0 };
     clearTimeout(entry.timer);
     entry.error = error;
@@ -260,10 +275,11 @@
     for (const [key, record] of Object.entries(window.TriEndless.read().puzzles))
       if (record.solve && !record.submitted) submit("endless/" + key);
   }
-  window.addEventListener("online", () => {
+  function reconnect() {
     for (const [id, entry] of trouble) { clearTimeout(entry.timer); trouble.set(id, { ...entry, attempt: 0, timer: 0 }); load(id); }
     retryPending();
-  });
+  }
+  window.addEventListener("online", reconnect);
 
   // ---- Endless solves --------------------------------------------------------
   // Only the first solve of each number counts, as with dailies. The stats open
@@ -409,6 +425,7 @@
     return heading;
   }
   function describeError(error) {
+    if (error.reason === "disabled") return TriCopy.t("online.off");
     if (error.reason === "timeout") return TriCopy.t("daily.error.timeout", { seconds: TIMEOUT / 1000 });
     if (error.reason === "offline") return TriCopy.t(navigator.onLine === false ? "daily.error.noConnection" : "daily.error.offline");
     if (error.reason === "badReply") return TriCopy.t("daily.error.badReply");
@@ -543,6 +560,41 @@
     <form id="sync-form"><label for="sync-input">${TriCopy.html("sync.enter")}</label><span class="sync-entry"><input id="sync-input" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX"><button type="submit">${TriCopy.html("sync.use")}</button></span></form>
     <p id="sync-status" role="status"></p>`;
   el("menu-tools").previousElementSibling.before(sync);
+
+  // ---- Online notice (Newgrounds only) -----------------------------------------
+  const notice = el("online-notice");
+  function setOnline(on) {
+    const was = onlineAllowed();
+    try { localStorage.setItem(ONLINE, on ? "on" : "off"); } catch {}
+    el("online-switch").checked = el("online-notice-switch").checked = on;
+    if (on && !was) { refreshList(true); reconnect(); }
+    renderStats();
+    window.triCalendarRefresh?.();
+  }
+  if (askOnline) {
+    const toggle = document.createElement("label");
+    toggle.htmlFor = "online-switch";
+    toggle.innerHTML = `${TriCopy.html("online.switch")} <input id="online-switch" type="checkbox" role="switch" aria-describedby="online-help">`;
+    const help = Object.assign(document.createElement("p"), { id: "online-help", className: "editor-note", textContent: TriCopy.t("online.help") });
+    sync.querySelector("h3").after(toggle, help);
+    el("online-switch").checked = onlineChoice() !== "off";
+    el("online-switch").onchange = event => setOnline(event.target.checked);
+  }
+  window.triCloseOnlineNotice = () => {
+    if (!notice.open) return;
+    notice.close();
+    setOnline(el("online-notice-switch").checked);
+    el("app").inert = !!window.triMenuOpen || el("theme-welcome").open;
+    window.triSyncHistory?.();
+  };
+  el("online-notice-continue").onclick = window.triCloseOnlineNotice;
+  notice.addEventListener("cancel", event => { event.preventDefault(); window.triCloseOnlineNotice(); });
+  if (askOnline && !onlineChoice()) {
+    el("app").inert = true;
+    notice.showModal();
+    el("online-notice-continue").focus();
+    window.triSyncHistory?.();
+  }
   const syncStatus = message => { el("sync-status").textContent = message; };
   el("sync-show").onclick = () => {
     const output = el("sync-code"), code = playerCode();

@@ -1,0 +1,136 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Delta Triplex cover</title>
+<!-- Store cover art. Render with render-cover.cjs; ?w=&h= set the canvas size. -->
+<style>
+  @font-face { font-family: Michroma; src: url(../game-source/fonts/Michroma.ttf); }
+  html, body { margin: 0; background: #000; overflow: hidden; }
+  svg { display: block; }
+  text { font-family: Michroma, sans-serif; }
+</style>
+<svg id="art" xmlns="http://www.w3.org/2000/svg"></svg>
+<script>
+{
+const params = new URLSearchParams(location.search);
+const W = +params.get("w") || 630, H = +params.get("h") || 500;
+const svg = document.getElementById("art");
+svg.setAttribute("width", W); svg.setAttribute("height", H);
+svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+const NS = "http://www.w3.org/2000/svg";
+const add = (tag, attrs, parent = svg) => {
+  const node = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+  parent.append(node); return node;
+};
+const poly = points => points.map(p => p.join(",")).join(" ");
+
+// Point-down triangle of ROWS rows; the top BANNER rows form the title band,
+// the rest is a 6-row puzzle, matching the home screen's proportions.
+const ROWS = 8, BANNER = 2, N = ROWS - BANNER;
+const side = Math.min(W * .92, (H - 4) / .866);
+const s = side / ROWS, h = s * Math.sqrt(3) / 2;
+const top = Math.max(4, (H - side * .866) / 2), cx = W / 2;
+const X0 = cx - side / 2;
+
+// Faint background lattice aligned with the triangle.
+const grid = add("g", { stroke: "#1f1f1f", "stroke-width": 1 });
+for (let y = top - Math.ceil(top / h) * h; y < H + h; y += h) add("line", { x1: 0, y1: y, x2: W, y2: y }, grid);
+const span = H / h * s;
+for (let k = -Math.ceil((span + W) / s); k < Math.ceil((span + W) / s); k++) {
+  const x = X0 + k * s;
+  add("line", { x1: x, y1: top, x2: x + (H - top) / h * s / 2 * 1, y2: H }, grid);
+  add("line", { x1: x, y1: top, x2: x - (top + 1) / h * s / 2, y2: -1 }, grid);
+  add("line", { x1: x, y1: top, x2: x - (H - top) / h * s / 2, y2: H }, grid);
+  add("line", { x1: x, y1: top, x2: x + (top + 1) / h * s / 2, y2: -1 }, grid);
+}
+
+// Banner.
+const bannerBottom = top + BANNER * h;
+add("polygon", { points: poly([[X0, top], [X0 + side, top], [X0 + side - BANNER * s / 2, bannerBottom], [X0 + BANNER * s / 2, bannerBottom]]), fill: "#fff" });
+const title = add("text", { x: cx, y: 0, "text-anchor": "middle", "font-weight": 700, fill: "#000", "letter-spacing": "0.02em" });
+title.textContent = "DELTA TRIPLEX";
+
+// Puzzle cells. Down cells (r, c) for c < N - r; up cells for c < N - r - 1.
+const px = X0 + BANNER * s / 2, py = bannerBottom;
+const cells = [];
+for (let r = 0; r < N; r++) {
+  const xr = px + r * s / 2, y = py + r * h;
+  for (let c = 0; c < N - r; c++) {
+    cells.push({ r, c, up: false, pts: [[xr + c * s, y], [xr + (c + 1) * s, y], [xr + c * s + s / 2, y + h]],
+      a: c, b: N - 1 - r - c, cy: y + h / 3, cx: xr + c * s + s / 2 });
+    if (c < N - r - 1) cells.push({ r, c, up: true, pts: [[xr + (c + 1) * s, y], [xr + c * s + s / 2, y + h], [xr + (c + 1) * s + s / 2, y + h]],
+      a: c, b: N - 2 - r - c, cy: y + 2 * h / 3, cx: xr + (c + 1) * s });
+  }
+}
+const key = (r, c, up) => `${r},${c},${up ? "u" : "d"}`;
+// Solution: a hexagon round the centre plus the three corners.
+const solution = new Set([
+  key(1, 1, true), key(1, 2, false), key(1, 2, true), key(2, 1, false), key(2, 1, true), key(2, 2, false),
+  key(0, 0, false), key(0, N - 1, false), key(N - 1, 0, false),
+]);
+// Mid-solve: the bottom corner still unknown, some blanks crossed.
+const unknown = new Set([key(N - 1, 0, false), key(4, 0, false), key(4, 0, true), key(4, 1, false), key(3, 1, true), key(3, 2, false), key(0, 3, false), key(0, 2, true), key(3, 0, true)]);
+const COLORS = { fill: "#ff8a00", empty: "#4a4a4a", cross: "#161616", line: "#000" };
+for (const cell of cells) {
+  const k = key(cell.r, cell.c, cell.up), filled = solution.has(k), open = unknown.has(k);
+  add("polygon", { points: poly(cell.pts), fill: open ? COLORS.empty : filled ? COLORS.fill : COLORS.cross, stroke: COLORS.line, "stroke-width": Math.max(1.5, s * .03), "stroke-linejoin": "round" });
+  if (!open && !filled) {
+    const d = s * .07, g = add("g", { stroke: "#6a6a6a", "stroke-width": Math.max(1, s * .022), "stroke-linecap": "round" });
+    add("line", { x1: cell.cx - d, y1: cell.cy - d, x2: cell.cx + d, y2: cell.cy + d }, g);
+    add("line", { x1: cell.cx - d, y1: cell.cy + d, x2: cell.cx + d, y2: cell.cy - d }, g);
+  }
+}
+
+// Clues: runs of the solution along each line.
+const runs = line => {
+  const out = []; let run = 0;
+  for (const cell of line) {
+    if (solution.has(key(cell.r, cell.c, cell.up))) run++;
+    else if (run) { out.push(run); run = 0; }
+  }
+  if (run) out.push(run);
+  return out.length ? out : [0];
+};
+const clueSize = s * .26;
+const clue = (x, y, values, anchor) => {
+  const t = add("text", { x, y, "text-anchor": anchor, "dominant-baseline": "central", fill: "#fff", "font-size": clueSize, style: "font: 500 " + clueSize + "px system-ui, -apple-system, sans-serif" });
+  t.textContent = values.join("\u2002");
+};
+// Each diagonal's clue sits where it meets a side, as in the game: lines
+// parallel to the right edge end on the left, and vice versa.
+for (let r = 0; r < N; r++) {
+  const left = cells.filter(cell => cell.b === N - 1 - r).sort((p, q) => p.cy - q.cy);
+  const right = cells.filter(cell => cell.a === N - 1 - r).sort((p, q) => p.cy - q.cy);
+  clue(px + r * s / 2 - s * .12, py + (r + .5) * h, runs(left), "end");
+  clue(px + side - BANNER * s - r * s / 2 + s * .12, py + (r + .5) * h, runs(right), "start");
+}
+
+// Title: fit to the banner, then a tagline letter-spaced to the title's width.
+const fit = () => {
+  let size = h * .62;
+  title.setAttribute("font-size", size);
+  const room = (side - BANNER * s) * .9;
+  const width = title.getBBox().width;
+  if (width > room) { size *= room / width; title.setAttribute("font-size", size); }
+  const box = title.getBBox();
+  const tagSize = size * .19, gap = size * .16;
+  const block = size * .74 + gap + tagSize * .75;
+  const baseline = top + (BANNER * h - block) / 2 + size * .74;
+  title.setAttribute("y", baseline);
+  const tag = "TRIANGULAR NONOGRAMS", ink = title.getBBox();
+  const letters = [...tag];
+  const probe = add("text", { "font-size": tagSize });
+  const widths = letters.map(ch => { probe.textContent = ch === " " ? "" : ch; return ch === " " ? 0 : probe.getComputedTextLength(); });
+  probe.remove();
+  const x0 = ink.x + size * .02, x1 = ink.x + ink.width - size * .04;
+  const spare = (x1 - x0 - widths.reduce((a, b) => a + b, 0)) / (letters.length - 1);
+  let x = x0;
+  letters.forEach((ch, i) => {
+    if (ch !== " ") add("text", { x, y: baseline + gap + tagSize * .75, "font-size": tagSize, fill: "#000" }).textContent = ch;
+    x += widths[i] + spare;
+  });
+  document.body.dataset.ready = "1";
+};
+document.fonts.load(`700 10px Michroma`).then(fit);
+}
+</script>

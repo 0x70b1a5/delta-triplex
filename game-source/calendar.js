@@ -70,7 +70,7 @@
     if (!selected.startsWith(month + "-")) selected = "";
     el("calendar-status").textContent = selected
       ? TriCopy.t("calendar.selection", { date: dateLabel(new Date(year, number - 1, Number(selected.slice(-2)), 12)) })
-      : TriCopy.t(grid.querySelector("[data-daily]") ? "calendar.pick" : "calendar.unassigned");
+      : TriCopy.t(grid.querySelector("[data-daily]") ? "calendar.pick" : window.triOnlineOff?.() ? "online.off" : "calendar.unassigned");
   }
   window.triCalendarRefresh = () => { if (!el("home-calendar").hidden) render(); };
   picker.addEventListener("change", render);

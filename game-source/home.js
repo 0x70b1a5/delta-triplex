@@ -5,6 +5,15 @@
   let hue = Math.random() * 360, elapsed = 0, previous = null, frame = 0;
   let pending = null, zoom = null;
   const scenes = [...home.querySelectorAll(".home-triangle")];
+  // One flex item per character so the tagline tracks the title's width;
+  // screen readers get the words from the hidden copy.
+  for (const tagline of home.querySelectorAll(".home-tagline")) {
+    const text = tagline.textContent, letters = document.createElement("span");
+    letters.setAttribute("aria-hidden", "true");
+    letters.style.display = "contents";
+    for (const char of text) letters.append(Object.assign(document.createElement("span"), { textContent: char.trim() }));
+    tagline.replaceChildren(Object.assign(document.createElement("span"), { className: "theme-sr-only", textContent: text }), letters);
+  }
   const trigger = { endless: "endless-mode", get calendar() { return window.triCalendarSource || "today-puzzle"; } };
   function cell(node, x, y, row) {
     node.classList.add("home-cell");

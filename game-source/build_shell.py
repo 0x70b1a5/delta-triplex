@@ -30,6 +30,21 @@ def load_catalog(locale="en"):
     return messages
 
 
+def reflow(text):
+    """Join hard-wrapped lines so license text wraps to the dialog width.
+    Rulers, indented lines and short all-caps headings keep their own lines."""
+    out = []
+    for line in text.strip().splitlines():
+        line = line.rstrip()
+        keep = not line or not out or not out[-1] or line[0].isspace() or set(line) <= set("-= ") \
+            or set(out[-1]) <= set("-= ") or (out[-1].isupper() and len(out[-1]) < 40)
+        if keep:
+            out.append(line)
+        else:
+            out[-1] += " " + line
+    return "\n".join(out)
+
+
 def build_shell(locale="en"):
     messages = load_catalog(locale)
     shell = (ROOT / "shell.html").read_text()
@@ -39,6 +54,8 @@ def build_shell(locale="en"):
             raise ValueError(f"Static copy {match[1]} cannot have plural forms")
         return html.escape(value, quote=True).replace("\n", "<br>")
     shell = re.sub(r"\{\{copy:([\w.-]+)\}\}", text, shell)
+    # Third-party and project licenses shown verbatim in the Credits dialog.
+    shell = re.sub(r"\{\{license:([\w./-]+)\}\}", lambda match: html.escape(reflow((ROOT / match[1]).read_text())), shell)
     shell = shell.replace('<html lang="en">', f'<html lang="{locale}">')
     # Prevent catalog text from terminating its script element in standalone HTML.
     catalog = json.dumps({"locale": locale, "messages": messages}, ensure_ascii=False).replace("<", "\\u003c")

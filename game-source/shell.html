@@ -1097,7 +1097,14 @@
         clip-path: polygon(.2% .5%, 99.8% .5%, calc(100% - var(--tip) - .2%) 99.5%, calc(var(--tip) + .2%) 99.5%);
         display: grid; place-items: center;
       }
-      .home-banner h1, .home-banner h2 { position: relative; z-index: 1; font: 700 clamp(30px, 6.6vw, 102px)/1.2 Michroma, sans-serif; letter-spacing: .025em; margin: 0; }
+      .home-banner h1, .home-banner h2, .home-title { position: relative; z-index: 1; font: 700 clamp(30px, 6.6vw, 102px)/1.2 Michroma, sans-serif; letter-spacing: .025em; margin: 0; }
+      /* The tagline spans the title's glyphs: h1 drops its trailing letter-spacing,
+         and home.js splits the tagline into evenly spaced letters. */
+      /* Sized from the triangle so the tagline clears the banner's slanted sides. */
+      #home-main { container-type: inline-size; }
+      .home-banner .home-title { display: grid; font-size: clamp(30px, min(7.2cqw, 6.6vw), 102px); }
+      .home-title h1 { font-size: 1em; margin-inline-end: -.025em; }
+      .home-banner .home-tagline { display: flex; justify-content: space-between; margin: .12em 0 0; color: inherit; font-size: max(.19em, 9px); font-weight: 400; line-height: 1; letter-spacing: 0; }
       #home .home-cell {
         display: block; position: absolute; left: var(--x); top: var(--y);
         width: calc(100% / var(--rows)); height: calc(100% / var(--rows)); margin: 0; padding: 0; border: 0; border-radius: 0;
@@ -1141,7 +1148,7 @@
       }
       @media (max-height: 450px) {
         .home-triangle { --top: 8px; }
-        .home-banner h1, .home-banner h2 { font-size: clamp(27px, 9dvh, 45px); }
+        .home-banner h1, .home-banner h2, .home-banner .home-title { font-size: clamp(27px, 9dvh, 45px); }
       }
       #home .home-triangle .home-up { background: var(--flash-fill, var(--home-dim)); color: var(--row-ink, var(--home-dim-ink)); }
       #home .home-up > span { top: 66%; }
@@ -1230,6 +1237,23 @@
       #solubility-dialog::backdrop { background: #0009; }
       #solubility-dialog p { margin: 12px 0 0; font-size: 14px; line-height: 1.5; }
       #solubility-note { color: var(--muted); font-size: 13px !important; }
+      #online-notice { box-sizing: border-box; width: min(420px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 20px 22px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); color: var(--ink); }
+      #online-notice::backdrop { background: #0009; }
+      #online-notice h2 { margin: 0 0 10px; font-size: 20px; }
+      #online-notice p { margin: 0 0 10px; font-size: 14px; line-height: 1.5; color: var(--muted); }
+      #online-notice p:first-of-type { color: var(--ink); }
+      #online-notice label { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 14px 0 0; font-size: 14px; }
+      #credits-dialog { box-sizing: border-box; width: min(520px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 18px 20px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); color: var(--ink); }
+      #credits-dialog::backdrop { background: #0009; }
+      #credits-dialog h2 { margin: 0; font-size: 20px; }
+      #credits-dialog section { padding: 12px 0; border-bottom: 1px solid var(--border); }
+      #credits-dialog section:last-child { border-bottom: 0; }
+      #credits-dialog p { margin: 0 0 6px; font-size: 14px; line-height: 1.5; }
+      #credits-dialog summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+      #credits-dialog pre { max-height: 40dvh; overflow: auto; margin: 8px 0 0; padding: 10px; background: var(--surface); border-radius: 6px; font: 12px/1.5 system-ui, sans-serif; white-space: pre-wrap; overflow-wrap: anywhere; }
+      #menu-about p { margin: 0 0 8px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+      #menu-about .menu-actions { align-items: center; }
+      #menu-about a { color: var(--ink); font-size: 13px; }
       #endless-record-list { list-style: none; margin: 12px 0 0; padding: 0; }
       #endless-record-list li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 15px; }
       #endless-record-list strong { font-variant-numeric: tabular-nums; }
@@ -1425,11 +1449,20 @@
       </section>
       <h3>{{copy:ui.tools}}</h3>
       <div id="menu-tools"></div>
+      <section id="menu-about" aria-labelledby="about-title">
+        <h3 id="about-title">{{copy:about.title}}</h3>
+        <p>{{copy:about.blurb}}</p>
+        <p>{{copy:about.copyright}}</p>
+        <div class="menu-actions">
+          <button id="credits-open" type="button">{{copy:about.credits}}</button>
+          <a href="https://lovecrypt.itch.io/" target="_blank" rel="noopener noreferrer">{{copy:about.more}}</a>
+        </div>
+      </section>
     </aside>
     <section id="home" aria-label="{{copy:ui.main-menu}}" data-view="main">
       <div class="home-card">
         <div id="home-main" class="home-actions home-triangle">
-          <header class="home-banner"><h1>{{copy:home.brand}}</h1></header>
+          <header class="home-banner"><div class="home-title"><h1>{{copy:home.brand}}</h1><p class="home-tagline">{{copy:home.tagline}}</p></div></header>
           <button id="today-puzzle" class="home-cell" style="--x:12.5%;--y:25%"><span>{{copy:home.today}}</span></button>
           <button id="how-to-play" class="home-cell" style="--x:37.5%;--y:25%"><span>{{copy:home.howToPlay}}</span></button>
           <button id="endless-mode" class="home-cell" style="--x:62.5%;--y:25%"><span>{{copy:home.endlessMode}}</span></button>
@@ -1548,6 +1581,23 @@
           <button id="new-puzzle-cancel" type="button">{{copy:load.cancel}}</button>
         </div>
       </form>
+    </dialog>
+    <dialog id="online-notice" aria-labelledby="online-notice-title" aria-describedby="online-notice-text">
+      <h2 id="online-notice-title">{{copy:online.title}}</h2>
+      <p id="online-notice-text">{{copy:online.notice}}</p>
+      <p>{{copy:online.noticeOff}}</p>
+      <label for="online-notice-switch">{{copy:online.switch}} <input id="online-notice-switch" type="checkbox" role="switch" checked></label>
+      <div class="load-actions"><button id="online-notice-continue" type="button">{{copy:online.continue}}</button></div>
+    </dialog>
+    <dialog id="credits-dialog" aria-labelledby="credits-title">
+      <div class="daily-stats-heading">
+        <h2 id="credits-title">{{copy:credits.title}}</h2>
+        <button id="credits-close" type="button">{{copy:daily.close}}</button>
+      </div>
+      <section><p>{{copy:credits.game}}</p><details><summary>{{copy:credits.licenseText}}</summary><pre>{{license:../LICENSE}}</pre></details></section>
+      <section><p>{{copy:credits.fonts}}</p><details><summary>{{copy:credits.licenseText}}</summary><pre>{{license:fonts/OFL-Michroma.txt}}</pre></details></section>
+      <section><p>{{copy:credits.raylib}}</p><details><summary>{{copy:credits.licenseText}}</summary><pre>{{license:RAYLIB-LICENSE.txt}}</pre></details></section>
+      <section><p>{{copy:credits.emscripten}}</p><details><summary>{{copy:credits.licenseText}}</summary><pre>{{license:EMSCRIPTEN-LICENSE.txt}}</pre></details></section>
     </dialog>
     <dialog id="solubility-dialog" aria-labelledby="solubility-title" aria-describedby="solubility-text">
       <div class="daily-stats-heading">

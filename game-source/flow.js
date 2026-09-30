@@ -274,6 +274,24 @@ window.triCloseEndlessRecord = () => {
 el("endless-stats").onclick = window.triOpenEndlessRecord;
 el("endless-record-close").onclick = window.triCloseEndlessRecord;
 recordDialog.addEventListener("cancel", event => { event.preventDefault(); window.triCloseEndlessRecord(); });
+// Credits open over the menu; closing returns to it.
+const creditsDialog = el("credits-dialog");
+window.triOpenCredits = () => {
+  el("app").inert = true;
+  if (!creditsDialog.open) creditsDialog.showModal();
+  el("credits-close").focus();
+  window.triSyncHistory?.();
+};
+window.triCloseCredits = () => {
+  if (!creditsDialog.open) return;
+  creditsDialog.close();
+  el("app").inert = !!window.triMenuOpen || el("theme-welcome").open;
+  el("credits-open")?.focus({ preventScroll: true });
+  window.triSyncHistory?.();
+};
+el("credits-open").onclick = window.triOpenCredits;
+el("credits-close").onclick = window.triCloseCredits;
+creditsDialog.addEventListener("cancel", event => { event.preventDefault(); window.triCloseCredits(); });
 el("puzzle-file").onchange = async () => {
   const file = el("puzzle-file").files?.[0];
   if (!file) return;
