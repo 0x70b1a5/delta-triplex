@@ -129,7 +129,7 @@ menu.insertBefore(settings, el("menu-tools").previousElementSibling);
 const workshop = document.createElement("section");
 workshop.id = "workshop";
 workshop.hidden = true;
-workshop.innerHTML = `<div id="workshop-title"></div><p id="workshop-help"></p><div class="lesson-actions" id="workshop-actions"><button id="editor-test">${TriCopy.html("editor.try")}</button><button id="editor-solubility" type="button" aria-haspopup="dialog" hidden></button></div>`;
+workshop.innerHTML = `<div id="workshop-title"></div><p id="workshop-help"></p><div class="lesson-actions" id="workshop-actions"><button id="editor-new" type="button" aria-haspopup="dialog">${TriCopy.html("editor.new")}</button><button id="editor-test">${TriCopy.html("editor.try")}</button><button id="editor-solubility" type="button" aria-haspopup="dialog" hidden></button></div>`;
 el("side").insertBefore(workshop, el("corner"));
 el("bottom-controls").prepend(el("workshop-actions"));
 const shareHelp = document.createElement("button");
@@ -236,6 +236,7 @@ function syncVisitorControls(next) {
   const author = authorSession && !window.triEndlessRun;
   const showHelp = sharedArrival && !!next?.custom && !authorSession && !next.editing && !next.won && el("home").hidden;
   el("editor-test").hidden = !author;
+  el("editor-new").hidden = !author || !next?.editing;
   shareHelp.hidden = !showHelp;
   el("workshop-actions").hidden = !next?.custom || !author;
 }
@@ -283,9 +284,53 @@ window.triSetPuzzleOrientation = (view) => {
   draft = normalizePuzzle(currentPuzzle);
   saveDraft();
 };
-el("editor-open").onclick = () => {
+// New puzzle: name and size, or back to the saved draft when one exists.
+const newDialog = el("new-puzzle-dialog");
+el("new-puzzle-size").innerHTML = Array.from({ length: 9 }, (_, i) => `<option>${i + 2}</option>`).join("");
+let newOpener = null;
+const draftStarted = () => draft.solution.some(Boolean);
+window.triOpenNewPuzzle = (opener) => {
+  newOpener = opener;
+  const editingDraft = authorSession && !!state?.custom && state.editing;
+  el("new-puzzle-name").value = "";
+  el("new-puzzle-name").placeholder = TriCopy.t("editor.my-puzzle");
+  el("new-puzzle-size").value = String(draft.size);
+  // From the editor the draft is already open; elsewhere it can be resumed.
+  el("new-puzzle-continue").hidden = editingDraft || !draftStarted();
+  el("new-puzzle-continue").textContent = TriCopy.t("editor.newContinue", { name: draft.name });
+  el("new-puzzle-replaces").hidden = !draftStarted();
+  el("new-puzzle-replaces").textContent = TriCopy.t("editor.newReplaces", { name: draft.name });
+  el("app").inert = true;
+  if (!newDialog.open) newDialog.showModal();
+  call("sync");
+  el("new-puzzle-name").focus();
+  window.triSyncHistory?.();
+};
+window.triCloseNewPuzzle = (focus = true) => {
+  if (!newDialog.open) return;
+  newDialog.close();
+  el("app").inert = !!window.triMenuOpen || el("theme-welcome").open;
+  call("sync");
+  if (focus) newOpener?.focus({ preventScroll: true });
+  window.triSyncHistory?.();
+};
+el("new-puzzle-cancel").onclick = () => window.triCloseNewPuzzle();
+newDialog.addEventListener("cancel", event => { event.preventDefault(); window.triCloseNewPuzzle(); });
+el("new-puzzle-continue").onclick = () => {
+  window.triCloseNewPuzzle(false);
   loadCustom(draft, true, true);
+};
+el("new-puzzle-form").addEventListener("submit", event => {
+  event.preventDefault();
+  const size = Number(el("new-puzzle-size").value);
+  window.triCloseNewPuzzle(false);
+  loadCustom({ name: el("new-puzzle-name").value.trim() || TriCopy.t("editor.my-puzzle"), size, solution: Array(size * size).fill(0) },
+    true, true);
+});
+el("editor-new").onclick = () => window.triOpenNewPuzzle(el("editor-new"));
+el("editor-open").onclick = () => {
   toggleMenu(false);
+  window.triOpenNewPuzzle(el("menu-toggle"));
 };
 el("editor-test").onclick = () => {
   if (!state?.custom || !authorSession) return;

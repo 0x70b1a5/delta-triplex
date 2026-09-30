@@ -1220,6 +1220,12 @@
       #load-dialog::backdrop { background: #0009; }
       #endless-record { box-sizing: border-box; width: min(320px, calc(100vw - 32px)); padding: 14px 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--ink); }
       #endless-record::backdrop { background: #0009; }
+      #new-puzzle-dialog { box-sizing: border-box; width: min(400px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 22px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg); color: var(--ink); }
+      #new-puzzle-dialog::backdrop { background: #0009; }
+      #new-puzzle-dialog h2 { margin: 0 0 12px; font-size: 22px; }
+      #new-puzzle-dialog label { display: block; margin: 12px 0 6px; font-size: 13px; }
+      #new-puzzle-name, #new-puzzle-size { box-sizing: border-box; width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font: inherit; background: var(--surface); color: var(--ink); }
+      #new-puzzle-replaces { margin: 12px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
       #solubility-dialog { box-sizing: border-box; width: min(400px, calc(100vw - 32px)); padding: 14px 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--ink); }
       #solubility-dialog::backdrop { background: #0009; }
       #solubility-dialog p { margin: 12px 0 0; font-size: 14px; line-height: 1.5; }
@@ -1527,6 +1533,21 @@
       </div>
       <ul id="endless-record-list"></ul>
       <p id="endless-record-total"></p>
+    </dialog>
+    <dialog id="new-puzzle-dialog" aria-labelledby="new-puzzle-title">
+      <form id="new-puzzle-form">
+        <h2 id="new-puzzle-title">{{copy:editor.newTitle}}</h2>
+        <label for="new-puzzle-name">{{copy:editor.name}}</label>
+        <input id="new-puzzle-name" type="text" maxlength="80" autocomplete="off">
+        <label for="new-puzzle-size">{{copy:editor.size}}</label>
+        <select id="new-puzzle-size"></select>
+        <p id="new-puzzle-replaces" hidden></p>
+        <div class="load-actions">
+          <button type="submit">{{copy:editor.newCreate}}</button>
+          <button id="new-puzzle-continue" type="button" hidden></button>
+          <button id="new-puzzle-cancel" type="button">{{copy:load.cancel}}</button>
+        </div>
+      </form>
     </dialog>
     <dialog id="solubility-dialog" aria-labelledby="solubility-title" aria-describedby="solubility-text">
       <div class="daily-stats-heading">

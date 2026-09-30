@@ -16,6 +16,7 @@ const button = h => h.d.getElementById('editor-solubility');
 {
   const h = harness(source, 'https://tri.test/', draft([0, 0, 0, 1, 0, 1, 0, 0, 0]));
   h.click('create-puzzle');
+  h.click('new-puzzle-continue');
   assert(h.state.editing);
   assert(button(h).hidden, 'no warning until painting pauses');
   checks(h);
@@ -37,6 +38,7 @@ const button = h => h.d.getElementById('editor-solubility');
 {
   const h = harness(source, 'https://tri.test/', draft([1, 1, 0, 0, 1, 0, 0, 0, 1]));
   h.click('create-puzzle');
+  h.click('new-puzzle-continue');
   checks(h);
   assert(button(h).hidden, 'line-solvable boards show nothing');
   h.close();

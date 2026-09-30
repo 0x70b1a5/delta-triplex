@@ -215,6 +215,13 @@ function harness(html, url = "https://tri.test/", storage = {}, options = {}) {
       return latest;
     },
     startPuzzle: () => { w.__startPuzzle(); flush(); },
+    // Completes the New puzzle dialog opened by Create or the Level editor.
+    newPuzzle: ({ name = "", size } = {}) => {
+      d.getElementById("new-puzzle-name").value = name;
+      if (size) d.getElementById("new-puzzle-size").value = String(size);
+      d.getElementById("new-puzzle-form").requestSubmit();
+      flush();
+    },
     click: (id) => {
       d.getElementById(id).click();
       flush();

@@ -77,6 +77,7 @@ const { harness, source } = require('./test_rotation_harness.cjs');
   // The author sets orientation by turning the board while editing.
   const author = harness(source);
   author.click('create-puzzle');
+  author.newPuzzle();
   assert(author.state.editing);
   author.click('turn-right'); author.frame(700);
   author.click('turn-right'); author.frame(700);
@@ -94,6 +95,7 @@ const { harness, source } = require('./test_rotation_harness.cjs');
   author.close();
   const reopened = harness(source, 'https://tri.test/', { 'tri-rotate-editor-v1': JSON.stringify({ size: 3, solution: puzzle.solution, orientation: 1 }) });
   reopened.click('create-puzzle');
+  reopened.click('new-puzzle-continue');
   assert.equal(reopened.w.TriRotation.stats.view, 1, 'a saved draft reopens facing its orientation');
   reopened.close();
   console.log('PASS: orientation in links and JSON, opens and reveals facing home on desktop and mobile, full-turn spin, palette, reduced motion and author control.');

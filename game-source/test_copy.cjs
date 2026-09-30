@@ -41,6 +41,7 @@ assert.equal(russian.t('count', { count: 5 }), 'many');
   h.click('turn-right');
   assert.equal(h.d.getElementById('session-clock').textContent, '1 tour / 00:00');
   h.click('editor-open');
+  h.newPuzzle();
   assert.equal(h.d.querySelector('#editor-settings h3').textContent, '<Réglages>');
   assert.equal(h.d.querySelector('#editor-settings h3').children.length, 0);
   h.click('editor-export');

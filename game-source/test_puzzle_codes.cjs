@@ -200,6 +200,7 @@ const { harness, source } = require('./test_rotation_harness.cjs');
 
   const author = harness(source);
   author.click('create-puzzle');
+  author.newPuzzle();
   assert.equal(author.d.getElementById('editor-test').hidden, false, 'the author still has Edit');
   assert.equal(author.d.getElementById('editor-test').textContent, 'Try');
   assert.equal(author.d.getElementById('share-help').hidden, true);

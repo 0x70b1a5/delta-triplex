@@ -154,7 +154,7 @@ el("skip").onclick = () => window.triShowHome();
 el("endless-mode").onclick = () => window.triShowHome("endless");
 el("home-back").onclick = () => window.triShowHome();
 el("return-home").onclick = () => window.triShowHome();
-el("create-puzzle").onclick = () => el("editor-open").click();
+el("create-puzzle").onclick = () => window.triOpenNewPuzzle(el("create-puzzle"));
 const loadDialog = el("load-dialog");
 window.triOpenPuzzleLoader = (code = "") => {
   el("puzzle-code").value = code;

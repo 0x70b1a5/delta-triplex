@@ -214,7 +214,7 @@ console.log('PASS: opaque three-field menu backdrop, shared archive background, 
   h.click('menu-close');h.click('return-home');h.click('home-settings');h.click('menu-close');
   assert(!get('home').inert);
   // Puzzle Settings belong to editing; the Solving switch to everything else.
-  h.startPuzzle();h.click('menu-toggle');h.click('editor-open');h.click('menu-toggle');
+  h.startPuzzle();h.click('menu-toggle');h.click('editor-open');h.newPuzzle();h.click('menu-toggle');
   assert(h.state.editing && !get('editor-settings').hidden && get('solving-settings').hidden);
   h.click('menu-close');h.click('editor-test');h.click('menu-toggle');
   assert(!h.state.editing && get('editor-settings').hidden && !get('solving-settings').hidden);
