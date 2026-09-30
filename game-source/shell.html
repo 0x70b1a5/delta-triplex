@@ -1181,6 +1181,10 @@
       .daily-stat-value { font-size: 17px; font-weight: 650; margin-top: 2px !important; }
       .daily-stat-foot, .daily-stats-note { font-size: 12px; color: var(--muted); margin-top: 6px !important; }
       .daily-stats-note { font-size: 14px; color: var(--ink); margin-top: 14px !important; }
+      .daily-stats-loading::before { content: ""; display: inline-block; width: 11px; height: 11px; margin-right: 8px; vertical-align: -1px; border: 2px solid var(--border); border-top-color: var(--ink); border-radius: 50%; animation: daily-spin .8s linear infinite; }
+      @keyframes daily-spin { to { transform: rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) { .daily-stats-loading::before { animation-duration: 3s; } }
+      .daily-stats-retry { margin-top: 10px; min-height: 32px; padding: 4px 12px; }
       .daily-chart { display: block; width: 100%; height: auto; margin-top: 6px; overflow: visible; }
       .daily-chart-axis { stroke: var(--border); stroke-width: 1; }
       .daily-bar path { fill: var(--cell); opacity: .35; }

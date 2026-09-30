@@ -163,6 +163,58 @@ const storageOf = h => Object.fromEntries(Array.from({ length: h.w.localStorage.
   assert.equal(offline.d.getElementById('calendar-status').textContent, "Daily puzzles need a connection. Try again when you're online.");
   offline.close();
 
+  // A weak connection: proxy errors and cut-off replies are retried with a
+  // spinner and the reason shown; once retries run out, Try again is offered.
+  const failures = [];
+  const flaky = async (url, init) => {
+    if (url.endsWith('/api/solve') && failures.length) {
+      const failure = failures.shift();
+      if (failure === 'offline') throw new TypeError('fetch failed');
+      return new Response(failure.body, { status: failure.status });
+    }
+    return fetch(url, init);
+  };
+  failures.push({ status: 502, body: '<html>Bad Gateway</html>' }, { status: 200, body: '{"solvers":' });
+  const weak = harness(source, 'https://tri.test/', {}, { now: NOW, fetch: flaky });
+  const fire = ms => { for (const [id, timer] of [...weak.timers]) if (timer.ms === ms) { weak.timers.delete(id); timer.fn(); } };
+  const panel = weak.d.getElementById('daily-stats');
+  weak.click('today-puzzle');
+  await until(() => weak.state.custom && weak.d.getElementById('home').hidden, 'weak daily opens');
+  solve(weak);
+  fire(2200);
+  await until(() => panel.textContent.includes('error 502'), 'proxy error shown');
+  assert(panel.querySelector('.daily-stats-loading'), 'a spinner shows while retrying');
+  assert(panel.textContent.includes('Counting your solve…'), panel.textContent);
+  assert(panel.textContent.includes('Retry 1 of 5'), panel.textContent);
+  assert(!panel.querySelector('.daily-stats-retry'), 'no button while retrying automatically');
+  fire(2000);
+  await until(() => panel.textContent.includes('cut off or unreadable'), 'cut-off reply shown');
+  assert(!JSON.parse(storageOf(weak)['tri-daily-v1']).days['2026-09-20'].submitted, 'a cut-off reply is not a result');
+  fire(5000);
+  await until(() => panel.textContent.includes('3 solvers so far'), 'retry succeeds');
+  assert(!panel.querySelector('.daily-stats-loading'));
+  weak.close();
+
+  // Retries run out while offline; Try again sends the solve once back.
+  failures.push(...Array(6).fill('offline'));
+  const gone = harness(source, 'https://tri.test/', {}, { now: NOW, fetch: flaky });
+  const goneFire = ms => { for (const [id, timer] of [...gone.timers]) if (timer.ms === ms) { gone.timers.delete(id); timer.fn(); } };
+  const gonePanel = gone.d.getElementById('daily-stats');
+  gone.click('today-puzzle');
+  await until(() => gone.state.custom && gone.d.getElementById('home').hidden, 'offline daily opens');
+  solve(gone);
+  goneFire(2200);
+  for (const [attempt, delay] of [2000, 5000, 10000, 20000, 40000].entries()) {
+    await until(() => gonePanel.textContent.includes(`Retry ${attempt + 1} of 5`), 'retry ' + (attempt + 1));
+    goneFire(delay);
+  }
+  await until(() => gonePanel.querySelector('.daily-stats-retry'), 'Try again after the last retry');
+  assert(gonePanel.textContent.includes("Couldn't reach the server."), gonePanel.textContent);
+  assert(gonePanel.textContent.includes('counted once you'), gonePanel.textContent);
+  gonePanel.querySelector('.daily-stats-retry').click();
+  await until(() => gonePanel.textContent.includes('4 solvers so far'), 'Try again succeeds');
+  gone.close();
+
   server.close();
-  console.log('PASS: dailies from the API, calendar states, #daily= links, first-solve submission and ranking, stats charts, share text, resume without resubmitting, sync codes, spark rules and offline fallback.');
+  console.log('PASS: dailies from the API, calendar states, #daily= links, first-solve submission and ranking, stats charts, share text, resume without resubmitting, sync codes, spark rules, offline fallback and retries on a weak connection.');
 })().catch(error => { console.error(error); process.exit(1); });

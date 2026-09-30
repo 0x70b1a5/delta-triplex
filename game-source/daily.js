@@ -47,17 +47,28 @@
   const dateLabel = (key, options = { dateStyle: "long" }) => new Intl.DateTimeFormat(TriCopy.locale, options).format(toDate(key));
   const formatTime = ms => window.TriRotation?.formatTime(ms) ?? String(Math.round(ms / 1000));
 
+  // Errors carry a `reason`: "offline" (no connection), "timeout" (no complete
+  // reply in time), "http" (an error status) or "badReply" (an unreadable reply).
+  const TIMEOUT = 15e3;
+  const requestError = (reason, status = 0, detail = "") => Object.assign(Error(detail || reason), { reason, status, detail });
   async function request(path, body) {
-    if (typeof fetch !== "function") throw Object.assign(Error("offline"), { status: 0 });
-    let response;
-    try {
-      response = await fetch(API + path, body === undefined ? {} : {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-      });
-    } catch { throw Object.assign(Error("offline"), { status: 0 }); }
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw Object.assign(Error(data.error || "HTTP " + response.status), { status: response.status });
-    return data;
+    if (typeof fetch !== "function") throw requestError("offline");
+    let timer;
+    const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(requestError("timeout")), TIMEOUT); });
+    const exchange = (async () => {
+      let response;
+      try {
+        response = await fetch(API + path, body === undefined ? {} : {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+        });
+      } catch { throw requestError("offline"); }
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw requestError("http", response.status, typeof data?.error === "string" ? data.error : "");
+      // A reply cut short on a weak connection can still arrive with a 200.
+      if (!data || typeof data !== "object") throw requestError("badReply", response.status);
+      return data;
+    })();
+    try { return await Promise.race([exchange, timeout]); } finally { clearTimeout(timer); }
   }
 
   // Dates the server has released, with their names. null until first fetched.
@@ -92,7 +103,7 @@
       if (!el("home").hidden && !el("home-calendar").hidden) el("calendar-status").textContent = TriCopy.t("calendar.loading");
       try { entry = await request("daily/" + date); } catch (error) {
         if (job !== opening) return;
-        const message = error.status === 0 ? TriCopy.t("calendar.offline")
+        const message = error.reason !== "http" ? TriCopy.t("calendar.offline")
           : isToday ? TriCopy.t("calendar.todayMissing")
           : TriCopy.t("calendar.selection", { date: dateLabel(date) });
         // A link or Today's Puzzle lands on the calendar so the player has somewhere to go.
@@ -112,7 +123,7 @@
     updateDay(date, { code: entry.code, name: entry.name });
     statsOpen = false;
     loadCustom(puzzle, false, false, null, fromLink, date);
-    refreshStats(date);
+    refresh("daily/" + date);
   };
   window.triPlayToday = () => window.triOpenDaily(today());
 
@@ -147,91 +158,124 @@
       }, STATS_DELAY);
       syncSpark();
     }
-    submit(date);
+    submit("daily/" + date);
     renderStats();
   };
-  const inflight = new Set();
-  async function submit(date) {
-    const record = day(date);
-    if (!record?.solve || record.submitted || inflight.has("daily/" + date)) return;
-    const secret = playerCode(true);
-    if (!record.solve.filled) {
-      // Solves learned from a sync code are already on the server.
-      updateDay(date, { submitted: true });
-      return refreshStats(date);
-    }
-    inflight.add("daily/" + date);
-    try {
-      const stats = await request("solve", {
-        secret, date, elapsedMs: record.solve.elapsed, turns: record.solve.turns, filled: record.solve.filled,
-      });
-      updateDay(date, { submitted: true, stats });
-    } catch (error) {
-      // A refused board or date will never succeed; stop retrying it.
-      if (error.status >= 400 && error.status < 500) updateDay(date, { submitted: true, stats: null });
-    } finally {
-      inflight.delete("daily/" + date);
-      renderStats();
-    }
-  }
-  async function refreshStats(date) {
-    const record = day(date);
-    if (!record?.solve || !record.submitted) return;
-    try {
-      const stats = await request("stats", { date, secret: playerCode() || undefined });
-      updateDay(date, { stats });
-      renderStats();
-    } catch {}
-  }
-  function retryPending() {
-    for (const [date, record] of Object.entries(read().days)) if (record.solve && !record.submitted) submit(date);
-    for (const [key, record] of Object.entries(window.TriEndless.read().puzzles))
-      if (record.solve && !record.submitted) submitEndless(key);
-  }
 
-  // ---- Endless solves --------------------------------------------------------
-  // Only the first solve of each number counts, as with dailies. The stats open
-  // from the completion row rather than by themselves, so Next stays one tap away.
+  // ---- Submitting solves and fetching stats ---------------------------------
+  // Ids are "daily/<date>" or "endless/<key>"; each kind says where its records
+  // live and how to ask the server about them.
   const endlessRecord = key => window.TriEndless.record(key);
-  window.triEndlessFinished = (key, finished) => {
-    const record = endlessRecord(key);
-    if (!record) return;
-    if (!record.solve)
-      window.TriEndless.update(key, { solve: { elapsed: Math.round(finished.elapsed), turns: finished.turns, filled: filledBits(state) } });
-    submitEndless(key);
-    renderStats();
+  const kinds = {
+    daily: {
+      record: day, update: updateDay,
+      submit: (date, { solve }, secret) => request("solve", { secret, date, elapsedMs: solve.elapsed, turns: solve.turns, filled: solve.filled }),
+      stats: date => request("stats", { date, secret: playerCode() || undefined }),
+    },
+    endless: {
+      record: endlessRecord, update: (key, patch) => window.TriEndless.update(key, patch),
+      submit: (key, { difficulty, number, solve }, secret) => request("endless/solve", {
+        secret, difficulty, number, elapsedMs: solve.elapsed, turns: solve.turns, filled: solve.filled }),
+      stats: (key, { difficulty, number }) => request("endless/stats", { difficulty, number, secret: playerCode() || undefined }),
+    },
   };
-  async function submitEndless(key) {
-    const record = endlessRecord(key), id = "endless/" + key;
+  const split = id => { const at = id.indexOf("/"); return [kinds[id.slice(0, at)], id.slice(at + 1)]; };
+  // The server's own refusals (a wrong board, an unknown puzzle) will never
+  // succeed. Anything else (no connection, a timeout, a proxy error, a reply cut
+  // short) may, so it is retried after growing gaps, and again when the device
+  // comes back online.
+  const refusal = error => [400, 404, 413, 422].includes(error.status);
+  const RETRY_DELAYS = [2e3, 5e3, 10e3, 20e3, 40e3];
+  const inflight = new Set();
+  const trouble = new Map(); // id -> { error, attempt, timer }
+  function retryLater(id, error) {
+    const entry = trouble.get(id) || { attempt: 0, timer: 0 };
+    clearTimeout(entry.timer);
+    entry.error = error;
+    entry.timer = entry.attempt < RETRY_DELAYS.length
+      ? setTimeout(() => { entry.timer = 0; entry.attempt++; load(id); }, RETRY_DELAYS[entry.attempt]) : 0;
+    trouble.set(id, entry);
+  }
+  function settle(id, error) {
+    clearTimeout(trouble.get(id)?.timer);
+    if (error) trouble.set(id, { error, attempt: RETRY_DELAYS.length, timer: 0 });
+    else trouble.delete(id);
+  }
+  function load(id) {
+    const [kind, key] = split(id);
+    return kind.record(key)?.submitted ? refresh(id) : submit(id);
+  }
+  async function submit(id) {
+    const [kind, key] = split(id), record = kind.record(key);
     if (!record?.solve || record.submitted || inflight.has(id)) return;
     const secret = playerCode(true);
     if (!record.solve.filled) {
-      window.TriEndless.update(key, { submitted: true });
-      return refreshEndlessStats(key);
+      // Solves learned from a sync code are already on the server.
+      kind.update(key, { submitted: true });
+      return refresh(id);
     }
     inflight.add(id);
+    renderStats();
     try {
-      const stats = await request("endless/solve", {
-        secret, difficulty: record.difficulty, number: record.number,
-        elapsedMs: record.solve.elapsed, turns: record.solve.turns, filled: record.solve.filled,
-      });
-      window.TriEndless.update(key, { submitted: true, stats });
+      const stats = await kind.submit(key, record, secret);
+      if (!stats.you) throw requestError("badReply", 200);
+      kind.update(key, { submitted: true, stats, refused: undefined });
+      settle(id);
     } catch (error) {
-      if (error.status >= 400 && error.status < 500) window.TriEndless.update(key, { submitted: true, stats: null });
+      if (refusal(error)) {
+        kind.update(key, { submitted: true, stats: null, refused: error.detail || "HTTP " + error.status });
+        settle(id);
+      } else retryLater(id, error);
     } finally {
       inflight.delete(id);
       renderStats();
     }
   }
-  async function refreshEndlessStats(key) {
-    const record = endlessRecord(key);
-    if (!record?.solve || !record.submitted) return;
+  // Brings a submitted solve's standing up to date. When the server turns out
+  // not to have the solve (an earlier submission was lost), it is sent again.
+  async function refresh(id) {
+    const [kind, key] = split(id), record = kind.record(key);
+    if (!record?.solve || !record.submitted || inflight.has(id)) return;
+    inflight.add(id);
+    renderStats();
+    let resend = false;
     try {
-      const stats = await request("endless/stats", { difficulty: record.difficulty, number: record.number, secret: playerCode() || undefined });
-      window.TriEndless.update(key, { stats });
+      const stats = await kind.stats(key, record);
+      if (stats.you) { kind.update(key, { stats, refused: undefined }); settle(id); }
+      else if (record.solve.filled) resend = true;
+      else { kind.update(key, { stats }); settle(id, requestError("missing")); }
+    } catch (error) {
+      // Standings already shown stay up; only a missing result is worth retrying.
+      if (kind.record(key)?.stats?.you) settle(id);
+      else if (refusal(error)) settle(id, error);
+      else retryLater(id, error);
+    } finally {
+      inflight.delete(id);
       renderStats();
-    } catch {}
+    }
+    if (resend) { kind.update(key, { submitted: false }); submit(id); }
   }
+  function retryPending() {
+    for (const [date, record] of Object.entries(read().days)) if (record.solve && !record.submitted) submit("daily/" + date);
+    for (const [key, record] of Object.entries(window.TriEndless.read().puzzles))
+      if (record.solve && !record.submitted) submit("endless/" + key);
+  }
+  window.addEventListener("online", () => {
+    for (const [id, entry] of trouble) { clearTimeout(entry.timer); trouble.set(id, { ...entry, attempt: 0, timer: 0 }); load(id); }
+    retryPending();
+  });
+
+  // ---- Endless solves --------------------------------------------------------
+  // Only the first solve of each number counts, as with dailies. The stats open
+  // from the completion row rather than by themselves, so Next stays one tap away.
+  window.triEndlessFinished = (key, finished) => {
+    const record = endlessRecord(key);
+    if (!record) return;
+    if (!record.solve)
+      window.TriEndless.update(key, { solve: { elapsed: Math.round(finished.elapsed), turns: finished.turns, filled: filledBits(state) } });
+    submit("endless/" + key);
+    renderStats();
+  };
 
   // ---- Stats popover ---------------------------------------------------------
   const panel = document.createElement("section");
@@ -364,6 +408,35 @@
     heading.textContent = text;
     return heading;
   }
+  function describeError(error) {
+    if (error.reason === "timeout") return TriCopy.t("daily.error.timeout", { seconds: TIMEOUT / 1000 });
+    if (error.reason === "offline") return TriCopy.t(navigator.onLine === false ? "daily.error.noConnection" : "daily.error.offline");
+    if (error.reason === "badReply") return TriCopy.t("daily.error.badReply");
+    if (error.reason === "missing") return TriCopy.t("daily.error.missing");
+    return TriCopy.t(error.detail ? "daily.error.httpDetail" : "daily.error.http", { status: error.status, message: error.detail });
+  }
+  // In place of the standings: what is happening, what last went wrong and,
+  // once automatic retries stop, a way to try again.
+  function unavailable(current, entry) {
+    const record = current.record, busy = inflight.has(current.id), waiting = busy || !!entry?.timer;
+    const nodes = [line(TriCopy.t(waiting ? (record.submitted ? "daily.loadingResults" : "daily.loadingStats")
+      : record.submitted ? "daily.failed" : "daily.pending"), waiting ? "daily-stats-note daily-stats-loading" : "daily-stats-note")];
+    if (waiting) nodes[0].setAttribute("role", "status");
+    const reason = entry?.error ? describeError(entry.error)
+      : record.refused ? TriCopy.t("daily.error.refused", { message: record.refused }) : "";
+    if (reason) nodes.push(line(reason, "daily-stat-foot"));
+    const attempt = entry ? entry.attempt + (busy ? 0 : 1) : 0;
+    if (waiting && attempt > 0) nodes.push(line(TriCopy.t("daily.retrying", { attempt, max: RETRY_DELAYS.length }), "daily-stat-foot"));
+    if (!waiting) {
+      const retry = document.createElement("button");
+      retry.type = "button";
+      retry.className = "daily-stats-retry";
+      retry.textContent = TriCopy.t("daily.retry");
+      retry.onclick = () => { settle(current.id); load(current.id); };
+      nodes.push(retry);
+    }
+    return nodes;
+  }
   function renderStats() {
     const current = subject(), record = current?.record;
     const available = !!(record?.solve && state?.won && !window.triMenuOpen);
@@ -372,7 +445,9 @@
     panel.hidden = !(available && statsOpen);
     if (panel.hidden) { renderedKey = ""; return; }
     // Engine state changes (hover, effects) arrive constantly; rebuild only on new content.
-    const key = JSON.stringify([current.id, record.stats, record.submitted, inflight.has(current.id), TriCopy.locale]);
+    const entry = trouble.get(current.id);
+    const key = JSON.stringify([current.id, record.stats, record.submitted, record.refused, inflight.has(current.id),
+      entry?.attempt, !!entry?.timer, entry?.error?.message, TriCopy.locale]);
     if (key === renderedKey) return;
     renderedKey = key;
     const stats = record.stats, you = stats?.you;
@@ -384,7 +459,7 @@
     const body = [heading];
     const solvers = () => section(TriCopy.t("daily.solvers", { count: stats.solvers }));
     if (!you) {
-      body.push(line(TriCopy.t(record.submitted ? "daily.failed" : inflight.has(current.id) ? "daily.loadingStats" : "daily.pending"), "daily-stats-note"));
+      body.push(...unavailable(current, entry));
     } else if (current.difficulty === undefined) {
       if (stats.solvers < 2) body.push(line(TriCopy.t("daily.first"), "daily-stats-note"));
       else body.push(solvers(), ...statBlocks(stats, you));
@@ -438,7 +513,7 @@
     const current = subject();
     if (current?.id !== shownSubject) {
       shownSubject = current?.id || "";
-      if (current?.id.startsWith("endless/")) { statsOpen = false; refreshEndlessStats(current.id.slice("endless/".length)); }
+      if (current?.id.startsWith("endless/")) { statsOpen = false; refresh(current.id); }
     }
     const date = activeDaily();
     if (date && day(date)) {
@@ -521,10 +596,8 @@
     retryPending();
     window.triCalendarRefresh?.();
     syncSpark();
-    const date = activeDaily();
-    if (date) refreshStats(date);
     const shown = subject();
-    if (shown?.id.startsWith("endless/")) refreshEndlessStats(shown.id.slice("endless/".length));
+    if (shown) refresh(shown.id);
   });
 
   // ---- Today's Puzzle spark --------------------------------------------------
