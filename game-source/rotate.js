@@ -160,14 +160,17 @@
       "data-endpoint": endpoint,
     };
   }
-  let attemptKey = "", lastSaved = -Infinity;
+  // attemptMarks is the attempt's own board. app.js hands over the next board
+  // before triRotateState moves attemptKey, so saving `state` there would file
+  // one puzzle's marks under another.
+  let attemptKey = "", attemptMarks, lastSaved = -Infinity;
   let attempts = {};
   try { attempts = JSON.parse(localStorage.getItem("tri-rotate-attempts-v1")) || {}; } catch {}
   function saveAttempt(force = false) {
     if (!attemptKey || (!force && performance.now() - lastSaved < 1000)) return;
     attempts[attemptKey] = { elapsed, turns, view, finished };
     try { localStorage.setItem("tri-rotate-attempts-v1", JSON.stringify(attempts)); } catch {}
-    const progress = { elapsed, turns, view, finished, marks: state?.cells?.map(cell => cell.state).join("") };
+    const progress = { elapsed, turns, view, finished, marks: attemptMarks };
     if (attemptKey.startsWith("endless/")) window.triSaveEndlessProgress?.(attemptKey.slice("endless/".length), progress);
     if (attemptKey.startsWith("daily/")) window.triSaveDailyProgress?.(attemptKey.slice("daily/".length), progress);
     lastSaved = performance.now();
@@ -207,7 +210,7 @@
   const baseCall = call;
   call = function (name, ...args) {
     if (["new", "replay", "reset"].includes(name)) restart = true;
-    if (["new", "replay"].includes(name)) { attempts = {}; attemptKey = ""; resetCarries = []; }
+    if (["new", "replay"].includes(name)) { attempts = {}; attemptKey = ""; attemptMarks = undefined; resetCarries = []; }
     if (name !== "reset" || !state || state.editing) return baseCall(name, ...args);
     clock();
     const carry = { elapsed, turns };
@@ -230,9 +233,10 @@
   window.addEventListener("blur", cancelGesture);
 
   window.triRotateState = (next, previous) => {
-    clock();
     const boardKey = `${next.custom}/${next.revision}/${next.level}/${next.tutorial}/${next.editing}`;
     const freshBoard = restart || key !== boardKey;
+    if (!freshBoard) attemptMarks = next.cells?.map(cell => cell.state).join("");
+    clock();
     if (freshBoard) {
       cancelGesture();
       saveAttempt(true);
@@ -248,6 +252,7 @@
       attemptKey = !next.custom
         ? `${next.tutorial}/${next.level}/${next.solution.join("")}`
         : endlessKey ? `endless/${endlessKey}` : dailyDate ? `daily/${dailyDate}` : "";
+      attemptMarks = next.cells?.map(cell => cell.state).join("");
       const record = forceFresh ? null
         : endlessKey ? window.triReadEndlessProgress?.(endlessKey)
         : dailyDate ? window.triReadDailyProgress?.(dailyDate) : null;
