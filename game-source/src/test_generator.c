@@ -27,6 +27,37 @@ int main(void){
             assert(matches==1);
         }
     }
+    // Solubility agrees with exhaustive enumeration on every 9- and 16-cell board.
+    for(int n=3;n<=4;n++){
+        static char all[1<<16][40];static int kinds[4];memset(kinds,0,sizeof kinds);
+        int total=1<<(n*n);Board b;char pattern[MAX_TILES+1];
+        for(int bits=0;bits<total;bits++){
+            for(int t=0;t<n*n;t++)pattern[t]='0'+((bits>>t)&1);
+            pattern[n*n]=0;board_init(&b,n,pattern);signature(&b,all[bits]);
+        }
+        for(int bits=0;bits<total;bits++){
+            for(int t=0;t<n*n;t++)pattern[t]='0'+((bits>>t)&1);
+            pattern[n*n]=0;board_init(&b,n,pattern);
+            Solubility s=puzzle_solubility(&b);kinds[s]++;
+            if(n==3){
+                int matches=0;for(int other=0;other<total;other++)matches+=!strcmp(all[bits],all[other]);
+                assert((matches>1)==(s==SOLUBLE_AMBIGUOUS));
+            }
+        }
+        if(n==3)assert(kinds[SOLUBLE_LINES]==503&&kinds[SOLUBLE_GUESSING]==0&&kinds[SOLUBLE_AMBIGUOUS]==9);
+        else assert(kinds[SOLUBLE_LINES]==62715&&kinds[SOLUBLE_GUESSING]==222&&kinds[SOLUBLE_AMBIGUOUS]==2599);
+        assert(!kinds[SOLUBLE_UNKNOWN]);
+    }
+    {
+        // Largest boards finish within the search budget.
+        Board b;char pattern[MAX_TILES+1];unsigned int x=12345;int kinds[4]={0};
+        for(int k=0;k<300;k++){
+            for(int t=0;t<100;t++){x^=x<<13;x^=x>>17;x^=x<<5;pattern[t]='0'+(x%100<(unsigned)(30+k%40));}
+            pattern[100]=0;board_init(&b,10,pattern);kinds[puzzle_solubility(&b)]++;
+        }
+        printf("n=10 random: lines %d guessing %d ambiguous %d unknown %d\n",kinds[0],kinds[1],kinds[2],kinds[3]);
+        assert(!kinds[SOLUBLE_UNKNOWN]);
+    }
     for(int d=0;d<5;d++){
         Board b,again;Deduction rating;int accepted=0;
         for(unsigned int s=1;s<4000&&accepted<100;s++){
@@ -61,5 +92,6 @@ int main(void){
     }
     {Board b;assert(!endless_puzzle(4,415,&b,NULL)&&!endless_puzzle(0,52533,&b,NULL)&&endless_puzzle(0,52532,&b,NULL));}
     puts("PASS: fixed Endless numbering: every Sprout board once, distinct Easy boards, reproducible larger sizes.");
+    puts("PASS: solubility matches exhaustive enumeration on 3- and 4-sized boards.");
     puts("PASS: exhaustive small-board uniqueness certificates and 100 reproducible, solvable generated puzzles per difficulty.");
 }

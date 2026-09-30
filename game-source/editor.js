@@ -129,7 +129,7 @@ menu.insertBefore(settings, el("menu-tools").previousElementSibling);
 const workshop = document.createElement("section");
 workshop.id = "workshop";
 workshop.hidden = true;
-workshop.innerHTML = `<div id="workshop-title"></div><p id="workshop-help"></p><div class="lesson-actions" id="workshop-actions"><button id="editor-test">${TriCopy.html("editor.try")}</button></div>`;
+workshop.innerHTML = `<div id="workshop-title"></div><p id="workshop-help"></p><div class="lesson-actions" id="workshop-actions"><button id="editor-test">${TriCopy.html("editor.try")}</button><button id="editor-solubility" type="button" aria-haspopup="dialog" hidden></button></div>`;
 el("side").insertBefore(workshop, el("corner"));
 el("bottom-controls").prepend(el("workshop-actions"));
 const shareHelp = document.createElement("button");
@@ -191,6 +191,47 @@ function loadCustom(puzzle, editing, ownsDraft, endlessRun = null, fromLink = fa
   );
   if (!ok) toast(TriCopy.t("editor.the-puzzle-could-not-be-loaded"));
 }
+// Warns while editing when the clues have several answers or need guessing.
+// Large boards can take a moment to check, so it waits for painting to pause.
+const solubilityKinds = [null, "guessing", "ambiguous", "unknown"];
+let solubilityKey = "", solubilityKind = null, solubilityTimer = 0;
+function syncSolubility(next) {
+  const button = el("editor-solubility");
+  const active = !!next?.custom && next.editing && authorSession && !window.triEndlessRun && !!currentPuzzle;
+  clearTimeout(solubilityTimer);
+  if (!active) { button.hidden = true; return; }
+  const key = currentPuzzle.size + ":" + currentPuzzle.solution.join("");
+  const show = () => {
+    button.hidden = !solubilityKind;
+    if (solubilityKind) button.textContent = TriCopy.t("editor.solubility." + solubilityKind);
+  };
+  if (key === solubilityKey) return show();
+  solubilityTimer = setTimeout(() => {
+    solubilityKey = key;
+    solubilityKind = solubilityKinds[Module.ccall("game_solubility", "number", ["number", "string"],
+      [currentPuzzle.size, currentPuzzle.solution.join("")])] || null;
+    show();
+  }, 200);
+}
+const solubilityDialog = el("solubility-dialog");
+el("editor-solubility").onclick = () => {
+  if (!solubilityKind) return;
+  el("solubility-title").textContent = TriCopy.t(`editor.solubility.${solubilityKind}Title`);
+  el("solubility-text").textContent = TriCopy.t(`editor.solubility.${solubilityKind}Text`);
+  el("app").inert = true;
+  if (!solubilityDialog.open) solubilityDialog.showModal();
+  el("solubility-close").focus();
+  window.triSyncHistory?.();
+};
+window.triCloseSolubility = () => {
+  if (!solubilityDialog.open) return;
+  solubilityDialog.close();
+  el("app").inert = !!window.triMenuOpen || el("theme-welcome").open;
+  el("editor-solubility").focus({ preventScroll: true });
+  window.triSyncHistory?.();
+};
+el("solubility-close").onclick = window.triCloseSolubility;
+solubilityDialog.addEventListener("cancel", event => { event.preventDefault(); window.triCloseSolubility(); });
 function syncVisitorControls(next) {
   const author = authorSession && !window.triEndlessRun;
   const showHelp = sharedArrival && !!next?.custom && !authorSession && !next.editing && !next.won && el("home").hidden;
@@ -227,6 +268,7 @@ window.triCustomState = (next) => {
     ? TriCopy.t("editor.paintHelp")
     : TriCopy.t("editor.playHelp");
   el("editor-test").textContent = next.editing ? TriCopy.t("editor.try") : TriCopy.t("editor.edit");
+  syncSolubility(next);
   el("editor-name").value = currentPuzzle.name;
   el("editor-size").value = String(next.n);
   el("editor-size").disabled = !!homeMenuState || !next.editing;

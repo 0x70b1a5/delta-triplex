@@ -442,16 +442,28 @@ API void game_resume_marks(const char *marks){
     memcpy(resume_marks,marks,(size_t)n);
     resume_marks[n]=0;resume_mark_count=n;
 }
-API int game_custom(int n,int direction,const char *canonical,int author){
-    if(n<2||n>MAX_N||direction<0||direction>3||!canonical||(int)strlen(canonical)!=n*n){resume_mark_count=0;return 0;}
-    for(int t=0;t<n*n;t++)if(canonical[t]!='0'&&canonical[t]!='1'){resume_mark_count=0;return 0;}
-    game_up();persist();
-    char pattern[MAX_TILES+1];int t=0;
+// Canonical 0/1 text to board_init's tile order; 0 when malformed.
+static int canonical_pattern(int n,const char *canonical,char *pattern){
+    if(n<2||n>MAX_N||!canonical||(int)strlen(canonical)!=n*n)return 0;
+    for(int t=0;t<n*n;t++)if(canonical[t]!='0'&&canonical[t]!='1')return 0;
+    int t=0;
     for(int i=0;i<n;i++)for(int j=0;j<n-i;j++)for(int o=0;o<2;o++){
         if(i+j+o>=n)continue;
         pattern[t++]=canonical[canonical_id((Tile){.i=i,.j=j,.o=o})];
     }
-    pattern[t]=0;custom=true;editing=author!=0;orientation=direction;custom_revision++;
+    pattern[t]=0;return 1;
+}
+// Solubility of a canonical solution's clues; -1 when malformed.
+API int game_solubility(int n,const char *canonical){
+    char pattern[MAX_TILES+1];Board check;
+    if(!canonical_pattern(n,canonical,pattern))return -1;
+    board_init(&check,n,pattern);return puzzle_solubility(&check);
+}
+API int game_custom(int n,int direction,const char *canonical,int author){
+    char pattern[MAX_TILES+1];
+    if(direction<0||direction>3||!canonical_pattern(n,canonical,pattern)){resume_mark_count=0;return 0;}
+    game_up();persist();
+    custom=true;editing=author!=0;orientation=direction;custom_revision++;
     board_init(&board,n,pattern);
     for(int i=0;i<board.count;i++)board.tiles[i].state=editing?board.tiles[i].solution:0;
     if(!editing&&resume_mark_count==board.count)for(int i=0;i<board.count;i++)board.tiles[i].state=resume_marks[i]-'0';

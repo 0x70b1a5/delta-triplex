@@ -54,6 +54,51 @@ Deduction puzzle_deduce(const Board *b){
     }
     return result;
 }
+// Sequential line propagation over known[] (-1 unknown). Returns 0 on contradiction.
+static int propagate(const Board *b,int *known){
+    for(int changed=1;changed;){
+        changed=0;
+        for(int a=0;a<3;a++)for(int r=0;r<b->n;r++){
+            const Line *l=&b->lines[a][r];
+            Options o={.line=l,.all=(1u<<l->count)-1};
+            for(int p=0;p<l->count;p++){
+                int v=known[l->tile[p]];
+                if(v==1)o.filled|=1u<<p;
+                if(v==0)o.empty|=1u<<p;
+            }
+            placements(&o,0,0,0);
+            if(!o.count)return 0;
+            for(int p=0;p<l->count;p++){
+                int *k=&known[l->tile[p]],v=(o.all>>p)&1?1:!((o.any>>p)&1)?0:-1;
+                if(v>=0&&*k<0){*k=v;changed=1;}
+            }
+        }
+    }
+    return 1;
+}
+// Counts boards matching the clues up to limit; -1 once *budget searches are spent.
+static int count_from(const Board *b,const int *given,int limit,int *budget){
+    if(--*budget<0)return -1;
+    int known[MAX_TILES];memcpy(known,given,sizeof known);
+    if(!propagate(b,known))return 0;
+    int t=0;while(t<b->count&&known[t]>=0)t++;
+    if(t==b->count)return 1;
+    int total=0;
+    for(int v=1;v>=0&&total<limit;v--){
+        known[t]=v;
+        int c=count_from(b,known,limit-total,budget);
+        if(c<0)return -1;
+        total+=c;
+    }
+    return total;
+}
+Solubility puzzle_solubility(const Board *b){
+    if(puzzle_deduce(b).solved)return SOLUBLE_LINES;
+    int known[MAX_TILES],budget=20000;
+    for(int t=0;t<b->count;t++)known[t]=b->tiles[t].active?-1:0;
+    int c=count_from(b,known,2,&budget);
+    return c<0?SOLUBLE_UNKNOWN:c==1?SOLUBLE_GUESSING:SOLUBLE_AMBIGUOUS;
+}
 static uint32_t random_word(uint32_t *state){
     uint32_t x=*state;x^=x<<13;x^=x>>17;x^=x<<5;return *state=x;
 }

@@ -51,7 +51,7 @@ window.triConsumeTraversal = function (href) {
 function uiDepth() {
   const playing = !el("home").hidden ? 0 : 1;
   const section = !el("home-back").hidden && !el("home").hidden;
-  const dialog = el("load-dialog").open || el("endless-record").open || el("theme-welcome").open || !el("puzzle-menu").hidden || !el("memory-panel").hidden;
+  const dialog = el("load-dialog").open || el("endless-record").open || el("solubility-dialog").open || el("theme-welcome").open || !el("puzzle-menu").hidden || !el("memory-panel").hidden;
   return (playing || section ? 1 : 0) + (dialog ? 1 : 0);
 }
 function record(value) {
@@ -92,6 +92,7 @@ function handleHistoryPop(event) {
     if (uiDepth() > depth) {
       window.triClosePuzzleLoader?.();
       window.triCloseEndlessRecord?.();
+      window.triCloseSolubility?.();
       window.triCloseThemeWelcome?.();
       if (!el("puzzle-menu").hidden) toggleMenu(false);
       if (!el("memory-panel").hidden) memoryToggle(false);

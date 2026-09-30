@@ -1220,6 +1220,10 @@
       #load-dialog::backdrop { background: #0009; }
       #endless-record { box-sizing: border-box; width: min(320px, calc(100vw - 32px)); padding: 14px 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--ink); }
       #endless-record::backdrop { background: #0009; }
+      #solubility-dialog { box-sizing: border-box; width: min(400px, calc(100vw - 32px)); padding: 14px 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--ink); }
+      #solubility-dialog::backdrop { background: #0009; }
+      #solubility-dialog p { margin: 12px 0 0; font-size: 14px; line-height: 1.5; }
+      #solubility-note { color: var(--muted); font-size: 13px !important; }
       #endless-record-list { list-style: none; margin: 12px 0 0; padding: 0; }
       #endless-record-list li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 15px; }
       #endless-record-list strong { font-variant-numeric: tabular-nums; }
@@ -1523,6 +1527,14 @@
       </div>
       <ul id="endless-record-list"></ul>
       <p id="endless-record-total"></p>
+    </dialog>
+    <dialog id="solubility-dialog" aria-labelledby="solubility-title" aria-describedby="solubility-text">
+      <div class="daily-stats-heading">
+        <h2 id="solubility-title"></h2>
+        <button id="solubility-close" type="button">{{copy:daily.close}}</button>
+      </div>
+      <p id="solubility-text"></p>
+      <p id="solubility-note">{{copy:editor.solubility.note}}</p>
     </dialog>
     <dialog id="theme-welcome" aria-labelledby="theme-welcome-title" aria-describedby="theme-welcome-help">
       <form method="dialog">
