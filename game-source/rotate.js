@@ -10,7 +10,7 @@
   // Column-boundary numerals draw half again as large as the pitch they sit on.
   const COLUMN_NUMERAL = 1.5;
   // A solved row flashes from the outside numeral inward, then rests at this opacity.
-  const SOLVED_OPACITY = 37.5;
+  const SOLVED_OPACITY = .375;
   const NUMERAL_STEP = 180;
   const NUMERAL_PULSE = 240;
   const screenEdge = desktop => desktop ? EDGE : MOBILE_EDGE;
