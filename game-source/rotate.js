@@ -9,7 +9,8 @@
   const MOBILE_EDGE = 8;
   // Column-boundary numerals draw half again as large as the pitch they sit on.
   const COLUMN_NUMERAL = 1.5;
-  // A solved row flashes from the outside numeral inward, then rests at half opacity.
+  // A solved row flashes from the outside numeral inward, then rests at this opacity.
+  const SOLVED_OPACITY = 37.5;
   const NUMERAL_STEP = 180;
   const NUMERAL_PULSE = 240;
   const screenEdge = desktop => desktop ? EDGE : MOBILE_EDGE;
@@ -63,23 +64,78 @@
   let resetCarries = [];
   // axis:row -> { start, count }. start < 0 means the row was already solved, so it stays dim.
   const solvedRows = new Map();
+  // axis:row:run (clue order) -> { at, start }: one run the marks pin to a
+  // single filled place. at is when it was first pinned; start as above.
+  const solvedRuns = new Map();
+  // Canonical cells of one strip in clue order, as the engine orders them.
+  function lineCells(board, axis, row) {
+    const key = c => 2 * (axis === 0 ? c.j : c.i) + c.o;
+    return board.cells.filter(c => axisRow(c, axis, board.n) === row).sort((a, b) => key(b) - key(a));
+  }
+  // Clue indices whose every placement consistent with the marks is the same
+  // run of filled cells. Inactive cells are gaps, as in the engine. A line the
+  // marks contradict pins nothing.
+  function pinnedRuns(states, runs) {
+    const L = states.length, k = runs.length;
+    const filledBefore = [0];
+    for (const s of states) filledBefore.push(filledBefore.at(-1) + (s === 1));
+    const noFilled = (a, b) => b <= a || filledBefore[b] === filledBefore[a];
+    const open = (a, b) => { for (let p = a; p < b; p++) if (states[p] === 2) return false; return true; };
+    // head[j][p]: runs 0..j-1 fit cells [0, p); tail[j][p]: runs j.. fit [p, L).
+    const head = Array.from({ length: k + 1 }, () => Array(L + 1).fill(false));
+    const tail = Array.from({ length: k + 2 }, () => Array(L + 2).fill(false));
+    for (let p = 0; p <= L; p++) head[0][p] = noFilled(0, p);
+    for (let j = 1; j <= k; j++) for (let p = 1; p <= L; p++) {
+      const start = p - runs[j - 1];
+      head[j][p] = (head[j][p - 1] && states[p - 1] !== 1) || (start >= 0 && open(start, p)
+        && (j === 1 ? noFilled(0, start) : start >= 1 && states[start - 1] !== 1 && head[j - 1][start - 1]));
+    }
+    for (let p = L; p >= 0; p--) tail[k][p] = noFilled(p, L);
+    for (let j = k - 1; j >= 0; j--) for (let p = L - 1; p >= 0; p--) {
+      const end = p + runs[j];
+      tail[j][p] = (tail[j][p + 1] && states[p] !== 1) || (end <= L && open(p, end)
+        && (j === k - 1 ? noFilled(end, L) : end < L && states[end] !== 1 && tail[j + 1][end + 1]));
+    }
+    const pinned = [];
+    if (!k || !head[k][L]) return pinned;
+    for (let j = 0; j < k; j++) {
+      const starts = [];
+      for (let s = 0; s + runs[j] <= L && starts.length < 2; s++) {
+        const end = s + runs[j];
+        if (!open(s, end)) continue;
+        if (!(j === 0 ? noFilled(0, s) : s >= 1 && states[s - 1] !== 1 && head[j][s - 1])) continue;
+        if (!(j === k - 1 ? noFilled(end, L) : end < L && states[end] !== 1 && tail[j + 1][end + 1])) continue;
+        starts.push(s);
+      }
+      if (starts.length === 1 && filledBefore[starts[0] + runs[j]] - filledBefore[starts[0]] === runs[j]) pinned.push(j);
+    }
+    return pinned;
+  }
   function syncSolvedRows(next, flashNew) {
-    if (!next?.clues || next.editing) { solvedRows.clear(); return; }
+    if (!next?.clues || next.editing) { solvedRows.clear(); solvedRuns.clear(); return; }
     // A finished board hides its clues, so keep the pre-win flashes for undo.
     if (next.won) return;
     const now = performance.now();
-    const live = new Set();
+    const flash = flashNew && motionEnabled ? now : -1;
+    const live = new Set(), liveRuns = new Set();
     for (let axis = 0; axis < 3; axis++) for (let row = 0; row < next.n; row++) {
       const clue = next.clues[axis][row];
-      if (!clue.match) continue;
       const id = `${axis}:${row}`;
-      live.add(id);
-      if (!solvedRows.has(id)) {
-        const count = Math.max(1, clue.runs.length);
-        solvedRows.set(id, { start: flashNew && motionEnabled ? now : -1, count });
+      // A run pinned by the same mark that completes its row flashes with the row.
+      const rowFlash = clue.match && !solvedRows.has(id);
+      if (clue.match) {
+        live.add(id);
+        if (rowFlash) solvedRows.set(id, { start: flash, count: Math.max(1, clue.runs.length) });
+      }
+      const states = lineCells(next, axis, row).map(c => c.active ? c.state : 2);
+      for (const run of pinnedRuns(states, clue.runs)) {
+        const runId = `${id}:${run}`;
+        liveRuns.add(runId);
+        if (!solvedRuns.has(runId)) solvedRuns.set(runId, { at: now, start: rowFlash ? -1 : flash });
       }
     }
     for (const id of solvedRows.keys()) if (!live.has(id)) solvedRows.delete(id);
+    for (const id of solvedRuns.keys()) if (!liveRuns.has(id)) solvedRuns.delete(id);
   }
   function clueFlashPending() {
     if (!motionEnabled) return false;
@@ -88,6 +144,7 @@
       if (entry.start < 0) continue;
       if (now - entry.start < (entry.count - 1) * NUMERAL_STEP + NUMERAL_PULSE) return true;
     }
+    for (const entry of solvedRuns.values()) if (entry.start >= 0 && now - entry.start < NUMERAL_PULSE) return true;
     return false;
   }
   function numeralFill(cellColor, stage, glow) {
@@ -97,7 +154,7 @@
     return TriPalette.flash(cellColor, stage, glow, themeMode);
   }
   // glow*3 is how a full numeral reaches the flash color. Smoothstep keeps the
-  // ends flat so a dim glyph eases out of its half-opacity composite and back.
+  // ends flat so a dim glyph eases out of its dim composite and back.
   function flashEase(glow) {
     const x = Math.min(1, Math.max(0, glow * 3));
     return x * x * (3 - 2 * x);
@@ -105,36 +162,40 @@
   function dimFlashPaint(cellColor, stage, glow, mode = themeMode) {
     const t = flashEase(glow);
     const bg = document.documentElement.style.getPropertyValue("--bg").trim() || "#000000";
-    const rest = TriPalette.mix(bg, cellColor, .5);
+    const rest = TriPalette.mix(bg, cellColor, SOLVED_OPACITY);
     const peak = mode === "colorful" ? "#ffffff" : TriPalette.rainbow[((stage % 7) + 7) % 7];
     return { fill: TriPalette.mix(rest, peak, t), opacity: 1, amount: t };
   }
-  function numeralAttrs(axis, row, run, count, cellColor, endpoint) {
+  // reversed: the drawn runs are the clue read backwards (clueRows' reversed).
+  function numeralAttrs(axis, row, run, count, cellColor, endpoint, reversed = false) {
     // Both layouts place run 0 nearest the board and the last run on the outside.
     // A fill ripple keeps going outward: the nearest numeral is the next hop.
     const order = count - 1 - run;
     const entry = solvedRows.get(`${axis}:${row}`);
+    const own = solvedRuns.get(`${axis}:${row}:${reversed ? count - 1 - run : run}`);
     let opacity = 1, glow = 0, stage = order, dimmed = false, settle = false;
-    if (entry) {
-      dimmed = true;
-      opacity = .5;
-      if (motionEnabled && entry.start >= 0) {
-        const age = performance.now() - entry.start - order * NUMERAL_STEP;
-        if (age < NUMERAL_PULSE) {
-          if (age <= 0) {
-            // Waiting numerals stay readable until their own pulse.
-            dimmed = false;
-            opacity = 1;
-          } else {
-            const wave = Math.sin(age / NUMERAL_PULSE * Math.PI);
-            glow = wave * wave;
-            if (age <= NUMERAL_PULSE / 2) {
-              dimmed = false;
-              opacity = 1;
-            } else settle = true;
-          }
-        }
+    // wasDim: a run pinned before its row matched stays dim through the row's
+    // flash, so the pulse eases its composited color instead of jumping to full.
+    const pulse = (age, wasDim) => {
+      if (age >= NUMERAL_PULSE) return;
+      if (age <= 0) {
+        // Waiting numerals stay readable until their own pulse.
+        if (!wasDim) { dimmed = false; opacity = 1; }
+        return;
       }
+      const wave = Math.sin(age / NUMERAL_PULSE * Math.PI);
+      glow = wave * wave;
+      if (!wasDim && age <= NUMERAL_PULSE / 2) {
+        dimmed = false;
+        opacity = 1;
+      } else settle = true;
+    };
+    if (entry || own) {
+      dimmed = true;
+      opacity = SOLVED_OPACITY;
+      const now = performance.now();
+      if (motionEnabled && entry?.start >= 0) pulse(now - entry.start - order * NUMERAL_STEP, !!own && own.at < entry.start);
+      else if (motionEnabled && !entry && own.start >= 0) pulse(now - own.start, false);
     }
     if (motionEnabled && endpoint >= 0) {
       const echo = Number(call("echo_light", endpoint, run + 1)) || 0;
@@ -363,7 +424,7 @@
         const runs = board.clues[axis][row].runs.length ? [...board.clues[axis][row].runs] : [0];
         if (first) runs.reverse();
         const segment = exitSegment(endpoint, board.n, outward) || [edge, edge];
-        result.push({ axis, row, center, edge, outward, runs, segment, echoIndex });
+        result.push({ axis, row, center, edge, outward, runs, segment, echoIndex, reversed: first });
       }
     }
     return result;
@@ -377,7 +438,7 @@
     if (saved === "corner" || saved === "curve") columnStyle = saved;
   } catch {}
   // Center spacing is three times the previous pitch; very short screens
-  // tighten it (see chooseMobileLayout). The inner numeral keeps its original
+  // tighten it (see chooseClueLayout). The inner numeral keeps its original
   // offset from the corner joint the rail already measures.
   const COLUMN_SPREADS = [3, 2, 1.5];
   function columnMetrics(font, spread = COLUMN_SPREADS[0]) {
@@ -387,7 +448,12 @@
     const offset = i => gap + (i * spread + .5) * pitch;
     return { pitch, gap, tail, offset, reach: count => offset(count - 1) + pitch * .5 + tail };
   }
-  function columnBands(clues, angle, font, numeralFont = font, spread, n = state.n) {
+  // Desktop rows are the phone's columns turned a quarter: they are laid out
+  // in a frame 90° behind the screen and turned back, keeping numerals upright.
+  const QUARTER = 90;
+  const unturn = (p, turned) => turned ? rotatePoint(p, QUARTER) : p;
+  function columnBands(clues, angle, font, numeralFont = font, spread, n = state.n, turned = false) {
+    if (turned) angle -= QUARTER;
     const radius = .8 * 2 / n;
     const shift = radius / 2;
     const corner = columnStyle === "corner";
@@ -436,8 +502,10 @@
         });
         return { vertex, x, line, neighbors };
       });
-      sides.push({ below, sign, O: items[0].O, rise, radius, gap, pitch, offset, lines, items, corner });
+      sides.push({ below, sign, O: unturn(items[0].O, turned), rise, radius, gap, pitch, offset, lines, items, corner });
     });
+    // Text boxes stay upright, so only the anchor and its offset turn.
+    if (turned) for (const c of constraints) { c.p = unturn(c.p, true); c.extra = unturn(c.extra, true); }
     return { constraints, sides };
   }
   function clueAnchor(desktop, direction, font, value) {
@@ -461,9 +529,11 @@
   }
   function pose(angle, desktop, font, withClues, columns, numeralFont = font, spread) {
     const outer = [vertex(0, 0, state.n), vertex(state.n, 0, state.n), vertex(0, state.n, state.n)].map(p => rotatePoint(p, angle));
-    const clues = withClues ? clueRows(angle, desktop) : [];
+    // Desktop rows pick their strips as the phone does in the turned frame.
+    const turned = desktop && columns;
+    const clues = withClues ? clueRows(turned ? angle - QUARTER : angle, desktop && !columns) : [];
     const constraints = outer.map(p => ({ p, extra: [0, 0], min: [0, 0], max: [0, 0] }));
-    if (columns && clues.length) constraints.push(...columnBands(clues, angle, font, numeralFont, spread).constraints);
+    if (columns && clues.length) constraints.push(...columnBands(clues, angle, font, numeralFont, spread, state.n, turned).constraints);
     else for (const clue of clues) constraints.push(...diagonalNumerals(clue, angle, desktop, font));
     return { clues, constraints };
   }
@@ -518,12 +588,13 @@
       digits = Math.max(digits, String(run).length);
     return digits;
   }
-  function chooseMobileLayout(width, height, base) {
-    const key = JSON.stringify([width, height, base, columnStyle, state.n, state.clues.map(axis => axis.map(row => row.runs))]);
+  // Desktop always uses rows; across a row a numeral is one glyph tall.
+  function chooseClueLayout(width, height, base, desktop) {
+    const key = JSON.stringify([width, height, base, desktop, columnStyle, state.n, state.clues.map(axis => axis.map(row => row.runs))]);
     if (mobileChoice?.key === key) return mobileChoice;
-    const digits = widestRun();
+    const digits = desktop ? 1 : widestRun();
     const pack = (columns, spread) => {
-      const fit = font => fitBoard(width, height, base, false, font, false, columns, font, spread);
+      const fit = font => fitBoard(width, height, base, desktop, font, false, columns, font, spread);
       const roomy = font => {
         const scale = fit(font).scale;
         const textWidth = font * .72 * digits;
@@ -535,13 +606,14 @@
         const scale = fit(candidate).scale;
         if (scale + 1e-6 >= maxScale * .97 && roomy(candidate)) { font = candidate; break; }
       }
-      const fits = !columns || fitBoard(width, height, base, false, font, false, true, font * COLUMN_NUMERAL, spread).fits;
+      const fits = !columns || fitBoard(width, height, base, desktop, font, false, true, font * COLUMN_NUMERAL, spread).fits;
       return { columns, font, spread, fits, scale: fit(font).scale };
     };
     // Tall stacks on a short screen tighten from the full spacing only as far
     // as they must to stay on screen.
     let stacked;
     for (const spread of COLUMN_SPREADS) if ((stacked = pack(true, spread)).fits) break;
+    if (desktop) return (mobileChoice = { key, ...stacked });
     const diagonal = pack(false);
     // Column clues are the portrait for every difficulty. A short, wide stage
     // still keeps diagonals when that leaves the cells larger.
@@ -555,12 +627,9 @@
     // corner pointing up-right on desktop points right on a phone.
     const base = desktop ? 0 : 30;
     const angle = base + visualTurn + preview;
-    const maxRuns = Math.max(1, ...state.clues.flat().map(line => line.runs.length));
     const solved = state.won && !state.editing;
-    let font, columns = false, spread;
-    if (desktop) font = Math.max(8, Math.min(20, width / (state.n * 2.5), (height - 80) / (2.8 * maxRuns)));
-    else if (solved) font = 8;
-    else ({ font, columns, spread } = chooseMobileLayout(width, height, base));
+    let font = 8, columns = false, spread;
+    if (!solved) ({ font, columns, spread } = chooseClueLayout(width, height, base, desktop));
     const numeralFont = columns ? font * COLUMN_NUMERAL : font;
     const fitted = fitBoard(width, height, base, desktop, font, solved, columns, numeralFont, spread);
     const resting = fitted.poses[view];
@@ -577,7 +646,7 @@
       }
     }
     const toScreen = p => rotatePoint(p, angle).map((v, axis) => center[axis] + v * scale);
-    return { width, height, desktop, angle, scale, center, font, columns, spread, toScreen, clues: moving ? [] : resting.clues,
+    return { width, height, desktop, angle, scale, center, font, columns, spread, turned: desktop && columns, toScreen, clues: moving ? [] : resting.clues,
       moving, outer: vertices.map(toScreen) };
   }
   // A solved column stays bright until its outside-in pulse has finished.
@@ -592,13 +661,14 @@
   function drawColumns(fragment, geometry, cellColor, options = {}) {
     const {
       n = state.n, idPrefix = "clue-line", restingDim = columnRestingDim,
-      numeral = (item, i) => numeralAttrs(item.axis, item.row, i, item.runs.length, cellColor, item.echoIndex),
+      numeral = (item, i) => numeralAttrs(item.axis, item.row, i, item.runs.length, cellColor, item.echoIndex, item.reversed),
     } = options;
-    const place = (p, extra = [0, 0]) => [
-      geometry.center[0] + p[0] * geometry.scale + extra[0],
-      geometry.center[1] + p[1] * geometry.scale + extra[1],
-    ];
-    const { sides } = columnBands(geometry.clues, geometry.angle, geometry.font, geometry.font, geometry.spread, n);
+    const turned = !!geometry.turned;
+    const place = (p, extra = [0, 0]) => {
+      [p, extra] = [unturn(p, turned), unturn(extra, turned)];
+      return [geometry.center[0] + p[0] * geometry.scale + extra[0], geometry.center[1] + p[1] * geometry.scale + extra[1]];
+    };
+    const { sides } = columnBands(geometry.clues, geometry.angle, geometry.font, geometry.font, geometry.spread, n, turned);
     const defs = node("defs", {});
     fragment.append(defs);
     const font = geometry.font;
@@ -606,18 +676,20 @@
       const sideName = side.below ? "below" : "above";
       for (const line of side.lines) {
         const start = place([line.x, line.vertex[1] + side.sign * side.rise]);
-        const far = place([line.x, line.neighbors[0].anchor], [0, side.sign * line.neighbors[0].reach]);
+        // The farthest reach of the line's columns, measured along the column.
+        const along = p => turned ? -p[0] : p[1];
+        let far = place([line.x, line.neighbors[0].anchor], [0, side.sign * line.neighbors[0].reach]);
         for (const item of line.neighbors) {
-          const y = place([line.x, item.anchor], [0, side.sign * item.reach])[1];
-          if (side.below ? y > far[1] : y < far[1]) far[1] = y;
+          const at = place([line.x, item.anchor], [0, side.sign * item.reach]);
+          if (side.below ? along(at) > along(far) : along(at) < along(far)) far = at;
         }
         const end = place(line.vertex);
         const id = `${idPrefix}-${sideName}-${line.line}`;
-        const span = Math.abs(far[1] - start[1]) || 1;
+        const span = Math.hypot(far[0] - start[0], far[1] - start[1]) || 1;
         // Twice the former 0.62-pitch ramp, so the fade begins closer to the triangle.
         const solidAt = Math.min(.8, font * 1.24 / span);
         const gradient = node("linearGradient", {
-          id, gradientUnits: "userSpaceOnUse", x1: 0, y1: far[1], x2: 0, y2: start[1],
+          id, gradientUnits: "userSpaceOnUse", x1: far[0], y1: far[1], x2: start[0], y2: start[1],
         });
         for (const [offset, opacity] of [["0", "0"], [solidAt.toFixed(4), "1"], ["1", "1"]])
           gradient.append(node("stop", { offset, "stop-color": cellColor, "stop-opacity": opacity }));
@@ -635,7 +707,7 @@
           "data-end-x": end[0], "data-end-y": end[1],
         };
         if (dimLine) {
-          attrs.opacity = .5;
+          attrs.opacity = SOLVED_OPACITY;
           attrs["data-dim"] = "1";
         }
         if (side.corner) attrs.d = `M ${far[0]} ${far[1]} L ${start[0]} ${start[1]} L ${end[0]} ${end[1]}`;
@@ -737,7 +809,7 @@
             "data-axis": clue.axis, "data-row": clue.row, "data-run": i,
             "data-center-x": center[0], "data-center-y": center[1],
             "data-direction-x": direction[0], "data-direction-y": direction[1],
-            ...numeralAttrs(clue.axis, clue.row, i, clue.runs.length, colours[1] || "#ffffff", clue.echoIndex),
+            ...numeralAttrs(clue.axis, clue.row, i, clue.runs.length, colours[1] || "#ffffff", clue.echoIndex, clue.reversed),
           }, value));
         }
       }
@@ -883,10 +955,6 @@
   const clueStyle = document.getElementById("clue-style");
   if (clueStyle) {
     clueStyle.value = columnStyle;
-    const phoneClueLabel = clueStyle.closest("label");
-    const syncPhoneClueSetting = () => { if (phoneClueLabel) phoneClueLabel.hidden = window.innerWidth >= 900; };
-    syncPhoneClueSetting();
-    window.addEventListener("resize", syncPhoneClueSetting);
     clueStyle.addEventListener("change", () => {
       columnStyle = clueStyle.value === "corner" ? "corner" : "curve";
       try { localStorage.setItem("delta-triplex-clue-style", columnStyle); } catch {}

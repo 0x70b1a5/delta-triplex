@@ -214,7 +214,7 @@
   "ui.clues-in-three-directions": "Clues in three directions",
   "ui.autoCross": "Auto-cross solved lines",
   "ui.autoCrossHelp": "Crosses the remaining cells of any line whose clue is met. Clues are matched by pattern only, so a run filled in the wrong place spreads its mistake.",
-  "ui.clueStyle": "Phone clues",
+  "ui.clueStyle": "Clue lines",
   "ui.solving": "Solving",
   "ui.clueStyle.corner": "Corner",
   "ui.clueStyle.curve": "Curve",

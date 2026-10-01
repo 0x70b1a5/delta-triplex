@@ -52,6 +52,28 @@ const { harness, source } = require("./test_rotation_harness.cjs");
     const cd = orient(c, d, a) * orient(c, d, b);
     return ab < -1e-4 && cd < -1e-4;
   }
+  // Desktop rows are the phone's columns turned a quarter clockwise. Turning a
+  // copy of the board back lets the column checks read rows in the same frame.
+  function assertClueBands(board, geometry, width, height, n, composition) {
+    if (!geometry.turned) return assertColumnClues(board, geometry, width, height, n, composition);
+    const frame = ([x, y]) => [y, width - x], back = ([x, y]) => [width - y, x];
+    const copy = board.cloneNode(true);
+    for (const label of copy.querySelectorAll("text[data-column]")) {
+      const [x, y] = frame([Number(label.getAttribute("x")), Number(label.getAttribute("y"))]);
+      label.setAttribute("x", x); label.setAttribute("y", y);
+    }
+    for (const rail of copy.querySelectorAll("path[data-rail]")) {
+      for (const key of ["far", "near", "end"]) {
+        const [x, y] = frame([Number(rail.dataset[key + "X"]), Number(rail.dataset[key + "Y"])]);
+        rail.dataset[key + "X"] = x; rail.dataset[key + "Y"] = y;
+      }
+      if (rail.dataset.cx !== undefined) [rail.dataset.cx, rail.dataset.cy] = frame([Number(rail.dataset.cx), Number(rail.dataset.cy)]);
+      [rail.dataset.directionX, rail.dataset.directionY] = [Number(rail.dataset.directionY), -Number(rail.dataset.directionX)];
+    }
+    const local = [];
+    assertColumnClues(copy, { ...geometry, outer: geometry.outer.map(frame) }, height, width, n, local);
+    composition.push(...local.map(back));
+  }
   function assertColumnClues(board, geometry, width, height, n, composition) {
     const rails = [...board.querySelectorAll("path[data-rail]")];
     assert.equal(rails.length, (n + 1) * 2, "neighboring columns share a line, and both ends of the row keep one");
@@ -105,7 +127,7 @@ const { harness, source } = require("./test_rotation_harness.cjs");
       const near = [Number(rail.dataset.nearX), Number(rail.dataset.nearY)];
       const end = [Number(rail.dataset.endX), Number(rail.dataset.endY)];
       composition.push(far);
-      const pad = width >= 900 ? 23.99 : 7.99;
+      const pad = geometry.desktop ? 23.99 : 7.99;
       assert(far[0] >= pad && far[0] <= width - pad && far[1] >= pad && far[1] <= height - pad, "column line stays inside the viewport");
       assert(far[0] > end[0] + cell * .15, "vertical line sits to the right of the vertex it meets");
       if (rail.dataset.style === "curve") {
@@ -295,7 +317,8 @@ const { harness, source } = require("./test_rotation_harness.cjs");
             assert(left >= pad && left + textWidth <= width - pad && bottom - font >= pad && bottom <= height - pad, `anchored clue inside ${width}×${height} viewport`);
           }
         }
-        if (geometry.columns) assertColumnClues(board, geometry, width, height, h.state.n, composition);
+        if (geometry.desktop) assert(geometry.columns && geometry.turned, "desktop draws every clue as a row");
+        if (geometry.columns) assertClueBands(board, geometry, width, height, h.state.n, composition);
         h.click("turn-right");
       }
       const spans = [0, 1].map(axis => {
@@ -326,7 +349,14 @@ const { harness, source } = require("./test_rotation_harness.cjs");
       assert.equal(board.querySelector("path[data-rail]").dataset.style, "corner", "the menu switches phone clues back to the corner joint");
       assert.equal(w.localStorage.getItem("delta-triplex-clue-style"), "corner");
       h.resize(1440, 760);
-      assert.equal(phoneClues.hidden, true, "phone clue setting is hidden on desktop");
+      assert.equal(phoneClues.hidden, false, "the clue line setting also applies to desktop rows");
+      select.value = "curve";
+      select.dispatchEvent(new w.Event("change"));
+      h.flush();
+      assert.equal(board.querySelector("path[data-rail]").dataset.style, "curve", "desktop rows take the curve too");
+      assertClueBands(board, w.TriRotation.geometry, 1440, 760, h.state.n, []);
+      select.value = "corner";
+      select.dispatchEvent(new w.Event("change"));
       h.resize(390, 760);
     }
     h.resize(900, 760);

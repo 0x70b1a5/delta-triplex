@@ -108,14 +108,15 @@ const points=d.querySelector('[data-demo-cell]').getAttribute('points');
 fire(get('intro-board'), 'keydown', { key:'ArrowRight' });
 assert.notEqual(d.querySelector('[data-demo-cell]').getAttribute('points'),points);
 assert.deepEqual(axes(),new Set(['0','2']));
-// Multi-number hints step outward along their own row, as on the game board.
-const multi = hints().filter(g => g.querySelectorAll('text').length > 1);
-assert(multi.length, 'the third direction has multi-number hints');
-for (const g of multi) {
-  const [a,b] = Array.from(g.querySelectorAll('text'), t => [+t.getAttribute('x'), +t.getAttribute('y')]);
-  const along = [b[0]-a[0], b[1]-a[1]], length = Math.hypot(...along);
-  assert(Math.abs(along[1]) > length * .8, 'numerals are not laid out horizontally');
+// Desktop hints are the game's rows: a multi-number hint steps outward along one y.
+const byRow = new Map();
+for (const t of d.querySelectorAll('#intro-board text[data-column]')) {
+  const key = `${t.dataset.axis}:${t.dataset.row}`;
+  byRow.set(key, [...(byRow.get(key) || []), [+t.getAttribute('x'), +t.getAttribute('y')]]);
 }
+const multi = [...byRow.values()].filter(points => points.length > 1);
+assert(multi.length, 'the third direction has multi-number hints');
+for (const points of multi) assert(points.slice(1).every(([x,y]) => Math.abs(y - points[0][1]) < 1e-6 && Math.abs(x - points[0][0]) > 1), 'numerals are laid out in a horizontal row');
 h.frame(500);
 fire(get('intro-board'), 'wheel', { deltaY:60, deltaX:0, deltaMode:0 });
 assert.deepEqual(axes(),new Set(['1','2']), 'scrolling turns the demonstration');

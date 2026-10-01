@@ -182,14 +182,14 @@ function solveVisibleRow(preferMultiple) {
   }
   h.frame(step - intoFall);
   labels = numerals(solved.axis, solved.row);
-  assert.equal(labels[0].getAttribute('opacity'), '0.5', 'a numeral dims after it flashes');
+  assert.equal(labels[0].getAttribute('opacity'), '0.25', 'a numeral dims after it flashes');
   assert.equal(Number(labels[0].dataset.glow), 0);
   assert.equal(labels[0].getAttribute('fill'), 'var(--cell)');
   assert(Number(labels[1].dataset.glow) > .9, 'the next numeral flashes after the first');
   assert.equal(labels[1].getAttribute('fill'), paintedNumeral(cellColor, 1, Number(labels[1].dataset.glow), mode));
   h.frame(step * h.state.n + pulse);
   labels = numerals(solved.axis, solved.row);
-  assert(labels.every(label => label.getAttribute('opacity') === '0.5' && Number(label.dataset.glow) === 0 && label.getAttribute('fill') === 'var(--cell)'), 'the solved clue rests at half opacity');
+  assert(labels.every(label => label.getAttribute('opacity') === '0.25' && Number(label.dataset.glow) === 0 && label.getAttribute('fill') === 'var(--cell)'), 'the solved clue rests at its solved opacity');
   {
     const nearest = labels.slice().sort((a, b) => Number(a.dataset.run) - Number(b.dataset.run))[0];
     const endpoint = Number(nearest.dataset.endpoint);
@@ -239,7 +239,7 @@ function solveVisibleRow(preferMultiple) {
         largestStep = Math.max(largestStep, Math.abs(amount - previous));
         peak = Math.max(peak, amount);
         previous = amount;
-      } else if (peak > .45 && node.getAttribute('opacity') === '0.5' && node.getAttribute('fill') === 'var(--cell)') rested = true;
+      } else if (peak > .45 && node.getAttribute('opacity') === '0.25' && node.getAttribute('fill') === 'var(--cell)') rested = true;
     }
     assert(peak > .45, 'the eased flash still becomes bright');
     assert(largestStep < .55, 'the visible color does not jump from dim to bright in one step');
@@ -251,15 +251,49 @@ function solveVisibleRow(preferMultiple) {
   for (const label of svg.querySelectorAll('text[data-axis]')) {
     const matched = h.state.clues[label.dataset.axis][label.dataset.row].match;
     if (Number(label.dataset.axis) === solved.axis && Number(label.dataset.row) === solved.row) continue;
-    assert.equal(label.getAttribute('opacity'), matched ? '0.5' : '1', 'only solved clues are dimmed');
+    if (matched) assert.equal(label.getAttribute('opacity'), '0.25', 'solved clues are dimmed');
   }
   for (let i = 0; i < solved.taps; i++) h.click('undo');
   assert.equal(h.state.clues[solved.axis][solved.row].match, false);
   assert(numerals(solved.axis, solved.row).every(label => label.getAttribute('opacity') === '1'), 'undo restores the clue');
+  // A run the marks pin to one filled place dims alone while its row is unfinished:
+  // cross every gap in a visible multi-run line, then fill only its last run.
+  {
+    let found = null;
+    for (let turn = 0; turn < 3 && !found; turn++) {
+      const visible = new Set([...svg.querySelectorAll('text[data-axis]')].map(node => Number(node.dataset.axis)));
+      for (let axis = 0; axis < 3 && !found; axis++) for (let row = 0; row < h.state.n && !found; row++) {
+        const clue = h.state.clues[axis][row];
+        if (visible.has(axis) && !clue.match && clue.runs.length >= 2) found = { axis, row, runs: clue.runs };
+      }
+      if (!found) { h.click('turn-right'); h.frame(500); }
+    }
+    assert(found, 'a visible line has several runs');
+    const key = c => 2 * (found.axis === 0 ? c.j : c.i) + c.o;
+    const line = h.state.cells.map((c, index) => ({ c, index }))
+      .filter(({ c }) => c.active && rowOf(c, found.axis, h.state.n) === found.row)
+      .sort((a, b) => key(b.c) - key(a.c))
+      .map(({ c, index }) => ({ index, filled: !!h.state.solution[(c.i + c.j + c.o) ** 2 + 2 * c.i + c.o] }));
+    const lastStart = line.findLastIndex((cell, p) => cell.filled && !line[p - 1]?.filled);
+    let taps = 0;
+    line.forEach((cell, p) => {
+      if (!cell.filled) { tap(cell.index); tap(cell.index); taps += 2; }
+      else if (p >= lastStart) { tap(cell.index); taps++; }
+    });
+    h.frame(w.TriRotation.numeralPulse + 50);
+    h.exports.game_clear_effects(); h.frame();
+    assert.equal(h.state.clues[found.axis][found.row].match, false, 'the row is still unfinished');
+    const dim = numerals(found.axis, found.row).filter(label => label.getAttribute('opacity') === '0.25' && Number(label.dataset.glow) === 0);
+    assert.equal(dim.length, 1, 'only the pinned run dims');
+    assert.equal(dim[0].textContent, String(found.runs.at(-1)), 'the dim numeral is the run that was filled');
+    for (let i = 0; i < taps; i++) h.click('undo');
+    h.frame(w.TriRotation.numeralPulse + 50);
+    assert(numerals(found.axis, found.row).every(label => label.getAttribute('opacity') === '1'), 'undo restores the pinned run');
+  }
   w.matchMedia('(prefers-reduced-motion: reduce)').change(true); h.frame();
   const quiet = solveVisibleRow(false);
   labels = numerals(quiet.axis, quiet.row);
-  assert(labels.every(label => label.getAttribute('opacity') === '0.5' && Number(label.dataset.glow) === 0), 'reduced motion dims a solved clue without flashing');
+  assert(labels.every(label => label.getAttribute('opacity') === '0.25' && Number(label.dataset.glow) === 0), 'reduced motion dims a solved clue without flashing');
   h.frame(pulse);
   assert(numerals(quiet.axis, quiet.row).every(label => Number(label.dataset.glow) === 0), 'reduced motion never flashes numerals');
   for (let i = 0; i < quiet.taps; i++) h.click('undo');
@@ -394,9 +428,13 @@ console.log('PASS: completion footer/icons, visible fill ripples, solved-row num
   const matchedShown = () => [...svg.querySelectorAll('text[data-column]')].some(node => h.state.clues[node.dataset.axis][node.dataset.row].match);
   for (let i = 0; i < 2 && !matchedShown(); i++) { h.click('turn-right'); h.frame(500); h.frame(); }
   const preset = [...svg.querySelectorAll('text[data-column]')].filter(node => h.state.clues[node.dataset.axis][node.dataset.row].match);
-  assert(preset.length > 0 && preset.every(node => node.getAttribute('opacity') === '0.5' && Number(node.dataset.glow) === 0), 'rows already solved stay dim');
+  assert(preset.length > 0 && preset.every(node => node.getAttribute('opacity') === '0.25' && Number(node.dataset.glow) === 0), 'rows already solved stay dim');
+  // A column rests once every numeral in it does; a lone pinned run leaves its lines bright.
   function restingColumns() {
-    return new Set([...svg.querySelectorAll('text[data-column]')].filter(node => node.getAttribute('opacity') === '0.5' && Number(node.dataset.glow) === 0).map(node => `${node.dataset.axis}:${node.dataset.row}`));
+    const all = [...svg.querySelectorAll('text[data-column]')];
+    const resting = node => node.getAttribute('opacity') === '0.25' && Number(node.dataset.glow) === 0;
+    const id = node => `${node.dataset.axis}:${node.dataset.row}`;
+    return new Set(all.filter(node => all.filter(other => id(other) === id(node)).every(resting)).map(id));
   }
   function assertRailDim() {
     const resting = restingColumns();
@@ -406,7 +444,7 @@ console.log('PASS: completion footer/icons, visible fill ripples, solved-row num
       const both = ids.length >= 2 && ids.every(id => resting.has(id));
       if (both) {
         dimmed++;
-        assert.equal(rail.getAttribute('opacity'), '0.5', 'the line between two dim columns is dim');
+        assert.equal(rail.getAttribute('opacity'), '0.25', 'the line between two dim columns is dim');
         assert.equal(rail.dataset.dim, '1');
         const gradient = /url\(#([^)]+)\)/.exec(rail.getAttribute('stroke'))[1];
         assert.deepEqual([...svg.querySelector('#' + gradient).querySelectorAll('stop')].map(stop => stop.getAttribute('stop-opacity')), ['0', '1', '1'], 'a dim line keeps its fade and only drops in strength');
@@ -456,7 +494,7 @@ console.log('PASS: completion footer/icons, visible fill ripples, solved-row num
     if (ids.includes(`${choice.axis}:${choice.row}`)) assert.equal(rail.dataset.dim, undefined, 'a shared line stays bright while one column is still flashing');
   }
   h.frame(w.TriRotation.numeralStep * h.state.n + w.TriRotation.numeralPulse);
-  assert(labels().every(label => label.getAttribute('opacity') === '0.5' && Number(label.dataset.glow) === 0), 'a solved column clue dims by half');
+  assert(labels().every(label => label.getAttribute('opacity') === '0.25' && Number(label.dataset.glow) === 0), 'a solved column clue dims to its solved opacity');
   const choiceId = `${choice.axis}:${choice.row}`;
   let partner = null;
   for (const rail of svg.querySelectorAll('path[data-rail]')) {
@@ -503,13 +541,13 @@ console.log('PASS: completion footer/icons, visible fill ripples, solved-row num
       const ids = (rail.dataset.columns || '').split(',');
       return ids.includes(choiceId) && ids.includes(`${partner.axis}:${partner.row}`);
     });
-    assert.equal(settled.getAttribute('opacity'), '0.5', 'the shared line dims once both columns rest');
+    assert.equal(settled.getAttribute('opacity'), '0.25', 'the shared line dims once both columns rest');
     assert.equal(settled.dataset.dim, '1');
   }
   assert(assertRailDim() > 0, 'at least one border between dim columns is dim');
   h.close();
 }
-console.log('PASS: column clues flash one by one and then sit at half opacity.');
+console.log('PASS: column clues flash one by one and then sit at their solved opacity.');
 
 // All three playable lessons must spin around their geometric centre, including
 // the nine-cell lesson whose centroid falls between cell centres.

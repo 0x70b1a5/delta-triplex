@@ -159,7 +159,9 @@
     const focusedRow = document.activeElement?.closest?.('#intro-board [data-demo-row]')?.dataset.demoRow;
     board.replaceChildren();
     board.tabIndex = page >= 2 ? 0 : -1;
-    const desktop = window.innerWidth >= 900, columns = !desktop;
+    // Hints are always the game's columns; desktop turns them into rows.
+    const desktop = window.innerWidth >= 900, columns = true, turned = desktop;
+    const stripAngle = pose => turned ? pose - 90 : pose;
     // The game's resting poses: desktop base-up, phone base-left. The lesson
     // rows are the two directions shown on the phone's third pose.
     const base = desktop ? 0 : 270;
@@ -186,8 +188,8 @@
     });
     // Numerals and rails for one pose, in the game's px-beyond-the-board units.
     const layoutAt = pose => {
-      const clues = geometry.clueRows(pose, desktop, demo);
-      const marks = columns ? geometry.columnBands(clues, pose, font, numeralFont, spread, N).constraints
+      const clues = geometry.clueRows(stripAngle(pose), false, demo);
+      const marks = columns ? geometry.columnBands(clues, pose, font, numeralFont, spread, N, turned).constraints
         : clues.flatMap(clue => geometry.diagonalNumerals(clue, pose, desktop, font));
       return { clues, marks };
     };
@@ -231,7 +233,7 @@
           text.textContent = m.value;
         }
       }
-      if (columns) geometry.drawColumns(board, { clues, angle, font, spread, center: [0,0], scale: SCALE, toScreen }, theme.cell, {
+      if (columns) geometry.drawColumns(board, { clues, angle, font, spread, turned, center: [0,0], scale: SCALE, toScreen }, theme.cell, {
         n: N, idPrefix: 'intro-clue-line', restingDim: () => false,
         numeral: item => ({ class: `intro-numeral${isActive(item) ? ' active' : ''}`, ...(rowIndex(item) >= 0 ? { 'data-demo-row': rowIndex(item) } : {}) }),
       });
@@ -240,7 +242,7 @@
     const maxX = Math.ceil(Math.max(...bounds.map(p => p[0]))+8), maxY = Math.ceil(Math.max(...bounds.map(p => p[1]))+8);
     board.setAttribute('viewBox', `${minX} ${minY} ${maxX-minX} ${maxY-minY}`);
     if (focusedRow !== undefined) board.querySelector(`g[data-demo-row="${focusedRow}"]`)?.focus({ preventScroll: true });
-    const activeClue = active && geometry.clueRows(angle, desktop, demo).find(isActive);
+    const activeClue = active && geometry.clueRows(stripAngle(angle), false, demo).find(isActive);
     el('intro-step-text').textContent = page === 1 ? TriCopy.t('intro.row', { row: active.r + 1, direction: direction(activeClue, angle) }) :
       page === 3 ? TriCopy.t('intro.rotation') : page === 2 ? stepText(step) : '';
     // The one extra control beside Home: pause while something plays, replay a finished solve.
