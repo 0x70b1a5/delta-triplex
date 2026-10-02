@@ -1,6 +1,6 @@
 # Delta Triplex
 
-A rotating triangular nonogram with a shared C rules engine, an SVG board and DOM controls. The standalone HTML embeds its Emscripten WebAssembly engine and has no runtime network dependencies. The Site wrapper serves `public/game.html`.
+A rotating triangular nonogram with a shared C rules engine, an SVG board and DOM controls. The standalone HTML embeds its Emscripten WebAssembly engine and has no runtime network dependencies. `../build.sh` also copies it to `public/game.html`, which `server/api.mjs --static public` and some tests use.
 
 ## Homepage
 
@@ -67,6 +67,13 @@ The share origin is `https://deltatriplex.com/`. A shared link opens straight in
 - `rotate.js`: current SVG renderer, fit/anchor calculations, gestures, timing, completion UI and brag sharing.
 - `app.js`, `editor.js`, `flow.js`, `share.js`, `back.js`: browser bridge, palettes, editor/import/export, navigation/generation, link formats and history.
 - `shell.html`: document structure and responsive layout.
+- `build_shell.py`: embeds JavaScript, fonts and the favicon into the build shell.
+- `home.js`, `menu-background.js`: triangle menu layout, submenu zoom transitions, row flashes, hue drift and the lattice backdrop.
+- `calendar.js`: Past Puzzles archive and month/year selection.
+- `tutorial-intro.js`: onboarding screens (copy under `intro.*` in the locale catalog).
+- `palette.js`: palette generation, overrides, contrast and flash mixing.
+- `copy.js`, `locales/en.json`: copy catalog, interpolation, plural rules and safe HTML insertion.
+- `../server/`: the daily API (Node + SQLite), curated designs and deploy files.
 
 ## Build and checks
 
