@@ -12,7 +12,7 @@ console.log('PASS: actual compiled WASM tap cycle, fill-only ripple, right-click
 {
   // Size 2 with the tip and far corner filled: filling the tip alone meets its row's clue.
   const bytes=s=>{const p=x.malloc(s.length+1);new Uint8Array(x.memory.buffer).set([...Buffer.from(s),0],p);return p};
-  x.game_motion(1);x.game_custom(2,0,bytes('1001'),0);
+  x.game_motion(1);x.game_custom(2,0,bytes('1001'),0);x.game_visible_axes(7);
   const d2=half/2,tipY=(760-h)/2+h-d2*Math.sqrt(3)*2/3,tip=()=>{x.game_down(px,tipY,1);x.game_up()};
   const line=(c,a)=>a===0?c.i:a===1?c.j:state.n-1-c.i-c.j-c.o;
   const unresolved=()=>state.cells.some(c=>c.active&&c.state===0&&[0,1,2].some(a=>state.clues[a][line(c,a)].match));
@@ -23,7 +23,20 @@ console.log('PASS: actual compiled WASM tap cycle, fill-only ripple, right-click
   tip();assert.equal(state.cells[0].state,1);assert(!unresolved(),'a stroke meeting a clue crosses the rest of its line');
   assert(!state.won&&state.cells.some(c=>c.state===2));
   x.game_undo();assert.equal(state.cells[0].state,0);assert.equal(state.cells.filter(c=>c.state===2).length,0,'undo removes the stroke with its crosses');
+  // Only clue sides on screen count: a hidden clue must not decide any cross.
+  const visible=mask=>a=>mask>>a&1;
+  const held=(mask,c)=>[0,1,2].some(a=>visible(mask)(a)&&state.clues[a][line(c,a)].match);
+  for(const hidden of [0,1,2]){
+    const mask=7&~(1<<hidden);
+    x.game_auto_cross(0);x.game_reset();x.game_visible_axes(mask);x.game_auto_cross(1);tip();
+    assert(state.cells.filter(c=>c.state===2).every(c=>held(mask,c)),`axis ${hidden} hidden: every cross is held by a visible met line`);
+    assert(!state.cells.some(c=>c.active&&c.state===0&&held(mask,c)),`axis ${hidden} hidden: visible met lines are crossed`);
+    const before=state.history;x.game_visible_axes(7);
+    assert(!unresolved(),'showing a side applies its met lines');
+    if(state.history>before){x.game_undo();assert.equal(state.history,before,'showing a side is one undoable step');}
+  }
+  x.game_auto_cross(0);x.game_reset();x.game_visible_axes(7);x.game_auto_cross(1);
   x.game_editing(1);x.game_auto_cross(1);assert(!state.cells.some(c=>c.state===2),'the editor never auto-crosses');
   x.game_auto_cross(0);x.game_skip();
 }
-console.log('PASS: opt-in auto-cross of met lines, undone with its stroke, applied on enable, never while editing.');
+console.log('PASS: opt-in auto-cross of met lines on visible sides only, undone with its stroke, applied on enable or reveal, never while editing.');

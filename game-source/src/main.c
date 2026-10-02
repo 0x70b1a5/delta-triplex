@@ -42,8 +42,9 @@ static const char *demo_patterns[]={"1110","101010101","1101010110001110"};
 static Board board;
 static int level=0,tutorial=0,selected_axis=0,selected_row=0,hovered=-1;
 static int history[HISTORY][MAX_TILES],history_count=0;
-// Crosses placed by auto-cross rather than by hand; only meaningful while state is 2.
-static bool auto_x[MAX_TILES],history_auto[HISTORY][MAX_TILES];
+// Crosses placed by auto-cross rather than by hand, as a mask of the axes whose
+// met lines hold them; only meaningful while state is 2.
+static unsigned char auto_x[MAX_TILES],history_auto[HISTORY][MAX_TILES];
 static int saved[PUZZLE_COUNT][SAVE_TILES],demo_saved[3][SAVE_TILES];
 static bool intro_done=false,won=false,stroke=false;
 static bool custom=false,editing=false;
@@ -394,22 +395,25 @@ API void game_move(float x,float y){
 // the stroke's snapshot undoes its crosses too. Matching is by run pattern only,
 // so a clue met in the wrong place propagates that mistake. An auto cross whose
 // lines all stop matching reverts to unknown; crosses placed by hand never do.
+//
+// Only the clue sides on screen count (visible_axes, set by the view), so a
+// hidden clue's state never leaks through crosses appearing or reverting. A
+// hidden axis keeps the hold it had when last seen until it is turned back.
 static bool auto_cross=false;
+static int visible_axes=0;
 static bool apply_auto_cross(void){
     if(!auto_cross||editing||won||(!custom&&tutorial>=0))return false;
-    bool changed=false,keep[MAX_TILES]={0};
-    for(int a=0;a<3;a++)for(int r=0;r<board.n;r++){
-        Line *l=&board.lines[a][r];if(!line_matches(&board,l))continue;
+    bool changed=false;unsigned char before[MAX_TILES];memcpy(before,auto_x,sizeof before);
+    for(int a=0;a<3;a++)if(visible_axes>>a&1)for(int r=0;r<board.n;r++){
+        Line *l=&board.lines[a][r];bool met=line_matches(&board,l);
         for(int p=0;p<l->count;p++){
             int i=l->tile[p];Tile *t=&board.tiles[i];if(!t->active)continue;
-            if(t->state==0){t->state=2;auto_x[i]=true;changed=true;}
-            if(auto_x[i])keep[i]=true;
+            if(met&&t->state==0){t->state=2;auto_x[i]=1<<a;changed=true;}
+            else if(auto_x[i]){if(met)auto_x[i]|=1<<a;else auto_x[i]&=~(1<<a);}
         }
     }
     // Crosses and unknowns count alike for matching, so reverting cannot change which lines match.
-    for(int i=0;i<board.count;i++)if(auto_x[i]&&!keep[i]){
-        auto_x[i]=false;if(board.tiles[i].state==2){board.tiles[i].state=0;changed=true;}
-    }
+    for(int i=0;i<board.count;i++)if(before[i]&&!auto_x[i]&&board.tiles[i].state==2){board.tiles[i].state=0;changed=true;}
     return changed;
 }
 API void game_up(void){if(stroke){stroke=false;if(apply_auto_cross())sync_state();persist();}}
@@ -417,6 +421,15 @@ API void game_auto_cross(int enabled){
     auto_cross=enabled!=0;
     if(stroke)return;
     // Turning it on crosses already-met lines as one undoable step.
+    snapshot();
+    if(!apply_auto_cross()){history_count--;return;}
+    persist();sync_state();
+}
+// The view reports which clue sides are on screen (bit per axis). Newly shown
+// sides are applied at once, as one undoable step like enabling.
+API void game_visible_axes(int mask){
+    mask&=7;if(mask==visible_axes)return;visible_axes=mask;
+    if(stroke||!auto_cross)return;
     snapshot();
     if(!apply_auto_cross()){history_count--;return;}
     persist();sync_state();

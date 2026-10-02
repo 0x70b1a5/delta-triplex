@@ -756,6 +756,8 @@
     const effects = call("effects", performance.now());
     const victory = !!call("celebrating");
     geometry = layout(Math.max(160, rect.width), Math.max(160, rect.height));
+    // Auto-cross may only act on the clue sides on screen; turning settles before it updates.
+    if (!geometry.moving && geometry.clues.length) call("visible_axes", geometry.clues.reduce((mask, clue) => mask | 1 << clue.axis, 0));
     const style = document.documentElement.style;
     const colours = ["--empty", "--cell"].map(key => style.getPropertyValue(key).trim());
     if (state.won && !state.editing) {
