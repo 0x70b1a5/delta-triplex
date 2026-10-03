@@ -43,6 +43,31 @@
   }
   el("bottom-controls").insertBefore(controls, el("undo"));
   el("bottom-controls").prepend(el("completion"));
+  // Solving needs an explicit submission; it takes the footer's left slot until then.
+  const submit = document.createElement("button");
+  submit.id = "submit-solution";
+  submit.type = "button";
+  submit.className = "icon";
+  submit.textContent = TriCopy.t("ui.submit");
+  submit.setAttribute("aria-label", TriCopy.t("ui.submit-solution"));
+  submit.title = TriCopy.t("ui.submit-solution");
+  el("completion").after(submit);
+  // Clue sides on screen, as last reported to the engine once a turn settled.
+  let visibleAxes = 0;
+  // Submit appears only once every clue on screen is met, so it never offers a
+  // guess on a board the player can see is unfinished. While it shows it takes
+  // the footer's left slot from a shared link's How to Play.
+  function syncSubmit() {
+    const ready = !!state && !state.won && !state.editing && visibleAxes > 0
+      && [0, 1, 2].every(axis => !(visibleAxes >> axis & 1) || state.clues[axis].every(row => row.match));
+    submit.hidden = !ready;
+    el("app").dataset.submitReady = String(ready);
+  }
+  // Next's hue cycle as a CSS animation, so an unsolved board needs no frames to drive it.
+  const submitHues = document.createElement("style");
+  submitHues.textContent = `@keyframes submit-hue {${Array.from({ length: 25 }, (_, i) =>
+    `${(i / 24 * 100).toFixed(3)}%{background-color:${TriPalette.oklch(.7, .16, i * 15)}}`).join("")}}`;
+  document.head.append(submitHues);
   const copyPanel = document.createElement("div");
   copyPanel.id = "result-copy";
   copyPanel.hidden = true;
@@ -353,6 +378,8 @@
     if (attemptKey.startsWith("daily/") && finished && !finished.unknown) window.triDailyFinished?.(attemptKey.slice("daily/".length), finished);
     if (attemptKey.startsWith("endless/") && finished && !finished.unknown) window.triEndlessFinished?.(attemptKey.slice("endless/".length), finished);
     controls.hidden = next.won && !next.editing;
+    if (freshBoard) visibleAxes = 0;
+    syncSubmit();
     el("app").dataset.solved = String(next.won && !next.editing);
     el("share-result").disabled = !!finished?.unknown;
     el("solve-details").textContent = finished?.unknown
@@ -757,7 +784,11 @@
     const victory = !!call("celebrating");
     geometry = layout(Math.max(160, rect.width), Math.max(160, rect.height));
     // Auto-cross may only act on the clue sides on screen; turning settles before it updates.
-    if (!geometry.moving && geometry.clues.length) call("visible_axes", geometry.clues.reduce((mask, clue) => mask | 1 << clue.axis, 0));
+    if (!geometry.moving && geometry.clues.length) {
+      visibleAxes = geometry.clues.reduce((mask, clue) => mask | 1 << clue.axis, 0);
+      call("visible_axes", visibleAxes);
+    }
+    syncSubmit();
     const style = document.documentElement.style;
     const colours = ["--empty", "--cell"].map(key => style.getPropertyValue(key).trim());
     if (state.won && !state.editing) {
@@ -767,7 +798,7 @@
     }
     const shareHelp = el("share-help");
     if (shareHelp && !shareHelp.hidden && (state.undo || turns > 0)) shareHelpSettled = true;
-    const shareHelpAttention = shareHelp && !shareHelp.hidden && !shareHelpSettled && !state.editing && !state.won;
+    const shareHelpAttention = shareHelp && !shareHelp.hidden && submit.hidden && !shareHelpSettled && !state.editing && !state.won;
     if (shareHelpAttention) {
       const helpFill = TriPalette.oklch(.7, .16, motionEnabled ? performance.now() / 24 % 360 : 145);
       shareHelp.style.setProperty("--next-fill", helpFill);
@@ -843,6 +874,19 @@
     }
     clock(); saveAttempt(true); requestFrame();
   }
+  // A wrong answer clears the board, its undo chain and the rotation count; the
+  // stopwatch keeps running so a guess still costs time.
+  submit.onclick = () => {
+    if (!mayPlay() || submit.hidden) return;
+    cancelGesture(); clock();
+    // A wrong answer empties the undo chain, so no earlier reset's time may return.
+    const carries = resetCarries;
+    resetCarries = [];
+    if (Number(baseCall("submit")) !== 0) { resetCarries = carries; return; }
+    turns = 0;
+    clock(); saveAttempt(true); requestFrame();
+    toast(TriCopy.t("rotate.wrongSubmit"));
+  };
   el("turn-left").onclick = () => turn(-1);
   el("turn-right").onclick = () => turn(1);
   svg.addEventListener("keydown", e => {

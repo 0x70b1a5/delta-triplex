@@ -63,6 +63,7 @@ for (let tutorial = 0; tutorial < 3; tutorial++) {
       target.dispatchEvent(event); h.frame();
     }
   }
+  h.click('submit-solution');
   assert(h.state.won);
   h.click('next-puzzle');
 }

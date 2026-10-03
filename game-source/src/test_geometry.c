@@ -10,7 +10,7 @@ static int read_text(const char *key,char *value,int cap){const char *s=strstr(k
 static void deliver_state(const char *s){assert(s[0]=='{');notifications++;}
 static void fill_solution(void){
  for(int t=0;t<board.count;t++)if(board.tiles[t].solution){Vector2 p=center(t);game_down(p.x,p.y,1);game_up();}
- assert(won);
+ assert(!won);assert(game_submit()==1);assert(won);assert(game_submit()==-1);
 }
 int main(void){
  int accepted_seeds=0;
@@ -158,13 +158,23 @@ int main(void){
  assert(game_custom(2,0,"1000",0));
  Vector2 cross_point=center(1), winning_point=center(0);
  game_down(cross_point.x,cross_point.y,2);game_up();assert(board.tiles[1].state==2);
- game_down(winning_point.x,winning_point.y,1);game_up();assert(won);
+ game_down(winning_point.x,winning_point.y,1);game_up();assert(!won&&board_solved(&board));
+ assert(game_submit()==1&&won);
  for(int t=0;t<board.count;t++)assert(board.tiles[t].state!=2);
  game_undo();assert(!won&&board.tiles[1].state==2&&board.tiles[0].state==0);
+ // Redoing the winning mark still needs another submission.
+ game_down(winning_point.x,winning_point.y,1);game_up();assert(!won);
+ // A wrong submission clears the marks and the undo chain.
+ assert(game_custom(2,0,"1000",0));
+ game_down(cross_point.x,cross_point.y,1);game_up();game_down(winning_point.x,winning_point.y,1);game_up();
+ assert(history_count==2);assert(game_submit()==0);assert(!won&&history_count==0);
+ for(int t=0;t<board.count;t++)assert(board.tiles[t].state==0);
+ game_undo();for(int t=0;t<board.count;t++)assert(board.tiles[t].state==0);
+ assert(game_custom(2,0,"1000",1));assert(game_submit()==-1);
  // Auto crosses revert once no line through them matches; hand crosses stay.
- assert(game_custom(4,0,"1010011010011001",0));game_auto_cross(1);srand(7);int reverts=0;
+ assert(game_custom(4,0,"1010011010011001",0));game_visible_axes(7);game_auto_cross(1);srand(7);int reverts=0;
  for(int step=0;step<400&&!won;step++){
-  int t=rand()%board.count,prior[MAX_TILES];bool prior_auto[MAX_TILES];
+  int t=rand()%board.count,prior[MAX_TILES];unsigned char prior_auto[MAX_TILES];
   for(int i=0;i<board.count;i++){prior[i]=board.tiles[i].state;prior_auto[i]=auto_x[i];}
   Vector2 q=center(t);game_down(q.x,q.y,rand()%2+1);game_up();if(won)break;
   for(int i=0;i<board.count;i++){
@@ -204,6 +214,11 @@ int main(void){
  assert(!game_custom(11,0,asymmetric,0));assert(!game_custom(2,0,"1x00",0));
  game_resume_marks("1201");assert(game_custom(2,0,"1000",0));
  assert(board.tiles[0].state==1&&board.tiles[1].state==2&&board.tiles[2].state==0&&board.tiles[3].state==1);
+ // Solved marks reopen solved only when an earlier visit submitted them.
+ game_resume_marks("1000");assert(game_custom(2,0,"1000",0));assert(!won&&board_solved(&board));
+ game_resume_solved(1);game_resume_marks("1000");assert(!resume_solved);
+ game_resume_marks("1000");game_resume_solved(1);assert(game_custom(2,0,"1000",0));assert(won);
+ assert(game_custom(2,0,"1000",0));assert(!won);
  game_resume_marks("99");assert(game_custom(2,0,"1000",0));assert(board.tiles[0].state==0&&board.tiles[1].state==0);
  game_resume_marks("1201");assert(!game_custom(2,0,"1x00",0));assert(game_custom(2,0,"1000",0));assert(board.tiles[0].state==0);
  game_resume_marks("1201");assert(game_custom(2,0,"1000",1));assert(board.tiles[0].state==board.tiles[0].solution);

@@ -313,6 +313,7 @@ for (let view = 0; view < 3; view++) {
     const c = h.state.cells[i], r = c.i + c.j + c.o;
     if (c.active && h.state.solution[r * r + 2 * c.i + c.o]) tap(i);
   }
+  h.click('submit-solution');
   assert(h.state.won);
   const initialNextFill = d.getElementById('next-puzzle').style.getPropertyValue('--next-fill');
   assert(initialNextFill);
@@ -569,6 +570,7 @@ for (const width of [390, 1000]) {
         (type === 'pointerdown' ? target : board).dispatchEvent(event);h.frame();
       }
     }
+    h.click('submit-solution');
     assert(h.state.won);
     for(const elapsed of [0,100,150]) {
       h.frame(elapsed);

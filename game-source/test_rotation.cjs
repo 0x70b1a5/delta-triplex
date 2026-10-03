@@ -220,6 +220,7 @@ const { harness, source } = require("./test_rotation_harness.cjs");
     const c = h.state.cells[t], row = c.i + c.j + c.o, id = row * row + 2 * c.i + c.o;
     if (c.active && h.state.solution[id]) tap(t);
   }
+  h.click('submit-solution');
   assert(h.state.won);
   assert.equal(d.getElementById("solve-result").textContent, "Solved: 01:05 / 7 rotations");
   h.advance(120000);
@@ -251,6 +252,74 @@ const { harness, source } = require("./test_rotation_harness.cjs");
   assert.equal(w.TriRotation.stats.turns, 7);
   assert.notEqual(JSON.stringify(h.state.cells.map(c => c.state)), beforeReset);
   h.click("reset"); assert.equal(w.TriRotation.stats.elapsed, 0);
+  // Submit shows only while every clue on screen is met, and a finished board
+  // only counts once submitted.
+  const submitButton = d.getElementById("submit-solution");
+  const solutionAt = (st, c) => { const r = c.i + c.j + c.o; return st.solution[r * r + 2 * c.i + c.o]; };
+  assert(d.getElementById("bottom-controls").contains(submitButton));
+  assert(submitButton.hidden && d.getElementById("app").dataset.submitReady === "false", "an empty board offers no Submit");
+  h.state.cells.forEach((c, t) => { if (c.active && solutionAt(h.state, c)) tap(t); });
+  h.frame();
+  assert(!h.state.won && !submitButton.hidden, "a complete board waits for Submit");
+  const atSubmit = w.TriRotation.stats.elapsed;
+  h.click("submit-solution");
+  assert(h.state.won && submitButton.hidden);
+  assert.equal(w.TriRotation.stats.finished.elapsed, atSubmit);
+  h.click("undo"); h.frame();
+  assert(!h.state.won, "undoing a solve needs another submission");
+  h.click("reset");
+  // A wrong answer clears the board, its undo chain and the rotation count, but
+  // the stopwatch keeps its time. This puzzle's two opening sides admit a wrong board.
+  {
+    const link = w.TriShare.url({ format: "tri-logic", version: 3, cellOrder: "north-row-major", size: 3, name: "Submit", orientation: 0, solution: [1, 1, 0, 1, 0, 0, 0, 0, 0] });
+    const v = harness(source, link.replace(w.TriShare.base, "https://tri.test/")), vd = v.d, st = () => v.state;
+    const vBoard = vd.getElementById("rotate-board"), vSubmit = vd.getElementById("submit-solution");
+    vBoard.setPointerCapture = () => {};
+    const vTap = index => {
+      for (const type of ["pointerdown", "pointerup"]) {
+        const event = new v.w.Event(type, { bubbles: true, cancelable: true });
+        Object.assign(event, { clientX: 200, clientY: 200, pointerId: 1, pointerType: "touch", button: 0 });
+        (type === "pointerdown" ? vBoard.querySelector(`[data-cell="${index}"]`) : vBoard).dispatchEvent(event); v.flush();
+      }
+    };
+    const n = st().n, shown = new Set([...vBoard.querySelectorAll("text[data-axis]")].map(e => Number(e.dataset.axis)));
+    const axisRow = (c, axis) => axis === 0 ? c.i : axis === 1 ? c.j : n - 1 - c.i - c.j - c.o;
+    const runsOf = bits => bits.join("").split("0").filter(Boolean).map(r => r.length);
+    const meets = (marks, axis) => st().clues[axis].every((clue, row) => {
+      const line = st().cells.map((c, i) => [c, i]).filter(([c]) => axisRow(c, axis) === row)
+        .sort(([a], [b]) => (2 * (axis === 0 ? b.j : b.i) + b.o) - (2 * (axis === 0 ? a.j : a.i) + a.o));
+      return JSON.stringify(runsOf(line.map(([c, i]) => c.active ? marks[i] : 0))) === JSON.stringify(clue.runs);
+    });
+    const count = st().cells.length;
+    let wrongBoard;
+    for (let mask = 0; mask < 1 << count && !wrongBoard; mask++) {
+      const marks = Array.from({ length: count }, (_, i) => mask >> i & 1);
+      if ([...shown].every(axis => meets(marks, axis)) && ![0, 1, 2].every(axis => meets(marks, axis))) wrongBoard = marks;
+    }
+    assert(wrongBoard, "a wrong board meets the visible clues");
+    wrongBoard.forEach((filled, i) => { if (filled) vTap(i); });
+    v.frame();
+    assert(!vSubmit.hidden && !st().won, "met visible clues offer Submit");
+    assert.equal(vd.getElementById("app").dataset.submitReady, "true", "Submit takes How to Play's slot");
+    // A full circle returns to the sides it meets; the side it breaks hides Submit on the way.
+    let hiddenOnTheWay = false;
+    for (let k = 0; k < 3; k++) { v.click("turn-right"); v.frame(500); hiddenOnTheWay ||= vSubmit.hidden; }
+    assert(hiddenOnTheWay && !vSubmit.hidden);
+    v.advance(3000);
+    assert.equal(v.w.TriRotation.stats.turns, 3);
+    const beforeSubmit = v.w.TriRotation.stats.elapsed;
+    assert(beforeSubmit >= 3000);
+    v.click("submit-solution");
+    assert(!st().won && !st().undo);
+    assert(st().cells.every(c => c.state === 0), "a wrong answer clears the board");
+    assert.equal(v.w.TriRotation.stats.turns, 0, "a wrong answer clears the rotation count");
+    assert.equal(v.w.TriRotation.stats.elapsed, beforeSubmit, "a wrong answer keeps the stopwatch");
+    assert.equal(vd.getElementById("toast").textContent, "Not solved. The board, its undo history and the rotation count were reset.");
+    v.frame();
+    assert(vSubmit.hidden, "a cleared board hides Submit");
+    v.click("undo"); assert(st().cells.every(c => c.state === 0), "a wrong answer cannot be undone");
+    v.close();
+  }
   for (let difficulty = 0; difficulty < 5; difficulty++) {
     h.click("return-home"); h.click("endless-mode");
     d.querySelector(`#difficulties button[data-difficulty="${difficulty}"]`).click();

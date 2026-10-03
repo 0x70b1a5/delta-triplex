@@ -47,6 +47,10 @@ static int history[HISTORY][MAX_TILES],history_count=0;
 static unsigned char auto_x[MAX_TILES],history_auto[HISTORY][MAX_TILES];
 static int saved[PUZZLE_COUNT][SAVE_TILES],demo_saved[3][SAVE_TILES];
 static bool intro_done=false,won=false,stroke=false;
+// A board only counts as solved once the player submits it (or it reopens
+// already solved), so near-complete boards cannot be finished by guessing
+// for free. Any change to the marks withdraws the submission.
+static bool submitted=false,resume_solved=false;
 static bool custom=false,editing=false;
 // 0 South, 1 East, 2 North, 3 West: rotations of the canonical point-down view.
 static int orientation=0,custom_revision=0;
@@ -60,7 +64,7 @@ static void refresh_editor_solution(void){
         for(int t=0;t<board.count;t++)board.tiles[t].solution=board.tiles[t].state==1;
         board_rebuild_lines(&board);
     }
-    won=!editing&&board_solved(&board);
+    won=!editing&&submitted&&board_solved(&board);
     // Crosses are annotations, so clearing them does not alter the solution.
     // The winning stroke's existing undo snapshot retains them for undo.
     if(won)for(int t=0;t<board.count;t++)if(board.tiles[t].state==2)board.tiles[t].state=0;
@@ -256,7 +260,8 @@ static void load_board(void){
     int *source=tutorial>=0?demo_saved[tutorial]:saved[level];
     for(int t=0;t<board.count;t++)if(board.tiles[t].active)board.tiles[t].state=source[t];
     memset(auto_x,0,sizeof auto_x);
-    history_count=0;selected_axis=0;selected_row=0;hovered=-1;stroke=false;refresh_editor_solution();
+    history_count=0;selected_axis=0;selected_row=0;hovered=-1;stroke=false;
+    submitted=board_solved(&board);refresh_editor_solution();
     sync_state();
 }
 API void game_boot(void){
@@ -376,7 +381,7 @@ API void game_limit(float half){half_limit=half;}
 API void game_hover(float x,float y){int t=hit((Vector2){x,y});if(t!=hovered){hovered=t;sync_state();}}
 API void game_down(float x,float y,int tool){
     Vector2 p={x,y};int t=hit(p);if(t<0)return;
-    paint=editing?(board.tiles[t].state==1?0:1):(tool==2?(board.tiles[t].state==2?0:2):(board.tiles[t].state+1)%3);snapshot();stroke=true;last_pointer=p;
+    paint=editing?(board.tiles[t].state==1?0:1):(tool==2?(board.tiles[t].state==2?0:2):(board.tiles[t].state+1)%3);snapshot();stroke=true;last_pointer=p;submitted=false;
     if(paint==1)ripple(t);
     mark(p);hovered=t;refresh_editor_solution();sync_state();
 }
@@ -437,17 +442,32 @@ API void game_visible_axes(int mask){
 API void game_select(int a,int r){if(a>=0&&a<3&&r>=0&&r<board.n){selected_axis=a;selected_row=r;shine=false;sync_state();}}
 API void game_undo(void){
     game_up();if(!history_count)return;
-    history_count--;for(int t=0;t<board.count;t++){board.tiles[t].state=history[history_count][t];auto_x[t]=history_auto[history_count][t];}
+    history_count--;submitted=false;for(int t=0;t<board.count;t++){board.tiles[t].state=history[history_count][t];auto_x[t]=history_auto[history_count][t];}
     refresh_editor_solution();persist();sync_state();
 }
 API void game_reset(void){
-    game_up();snapshot();memset(auto_x,0,sizeof auto_x);for(int t=0;t<board.count;t++)board.tiles[t].state=0;
+    game_up();snapshot();submitted=false;memset(auto_x,0,sizeof auto_x);for(int t=0;t<board.count;t++)board.tiles[t].state=0;
     refresh_editor_solution();persist();sync_state();
+}
+// 1 solved, 0 wrong, -1 nothing to submit. A wrong answer clears the board and
+// the undo chain, so the attempt cannot be recovered and guessed again.
+API int game_submit(void){
+    game_up();
+    if(editing||won)return -1;
+    submitted=true;refresh_editor_solution();
+    if(!won){
+        submitted=false;history_count=0;memset(auto_x,0,sizeof auto_x);
+        for(int t=0;t<board.count;t++)board.tiles[t].state=0;
+        game_clear_effects();
+    }
+    persist();sync_state();return won;
 }
 // Custom puzzles use the same board, rules, rendering and history as built-in levels.
 // Empty or invalid input drops any queued resume so it cannot leak onto a later board.
+// solved: the queued marks are a solve already submitted on an earlier visit.
+API void game_resume_solved(int solved){resume_solved=solved!=0;}
 API void game_resume_marks(const char *marks){
-    resume_mark_count=0;
+    resume_mark_count=0;resume_solved=false;
     if(!marks)return;
     int n=(int)strlen(marks);
     if(n<1||n>MAX_TILES)return;
@@ -474,13 +494,17 @@ API int game_solubility(int n,const char *canonical){
 }
 API int game_custom(int n,int direction,const char *canonical,int author){
     char pattern[MAX_TILES+1];
-    if(direction<0||direction>3||!canonical_pattern(n,canonical,pattern)){resume_mark_count=0;return 0;}
+    if(direction<0||direction>3||!canonical_pattern(n,canonical,pattern)){resume_mark_count=0;resume_solved=false;return 0;}
     game_up();persist();
     custom=true;editing=author!=0;orientation=direction;custom_revision++;
     board_init(&board,n,pattern);
     for(int i=0;i<board.count;i++)board.tiles[i].state=editing?board.tiles[i].solution:0;
-    if(!editing&&resume_mark_count==board.count)for(int i=0;i<board.count;i++)board.tiles[i].state=resume_marks[i]-'0';
-    resume_mark_count=0;
+    submitted=false;
+    if(!editing&&resume_mark_count==board.count){
+        for(int i=0;i<board.count;i++)board.tiles[i].state=resume_marks[i]-'0';
+        submitted=resume_solved;
+    }
+    resume_mark_count=0;resume_solved=false;
     memset(auto_x,0,sizeof auto_x);
     history_count=author_history_count=0;selected_axis=selected_row=0;hovered=-1;stroke=false;
     game_clear_effects();refresh_editor_solution();sync_state();return 1;
@@ -491,7 +515,7 @@ API void game_editing(int author){
     if(editing){memcpy(history,author_history,sizeof history);history_count=author_history_count;}
     else {memcpy(author_history,history,sizeof history);author_history_count=history_count;history_count=0;}
     for(int t=0;t<board.count;t++)board.tiles[t].state=editing?board.tiles[t].solution:0;
-    memset(auto_x,0,sizeof auto_x);hovered=-1;refresh_editor_solution();sync_state();
+    submitted=false;memset(auto_x,0,sizeof auto_x);hovered=-1;refresh_editor_solution();sync_state();
 }
 API void game_orientation(int direction){
     if(!custom||direction<0||direction>3)return;
@@ -575,7 +599,7 @@ int main(void){
         if(IsMouseButtonDown(MOUSE_BUTTON_LEFT)||IsMouseButtonDown(MOUSE_BUTTON_RIGHT))game_move(m.x,m.y);
         if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT)||IsMouseButtonReleased(MOUSE_BUTTON_RIGHT))game_up();
         if(IsKeyPressed(KEY_Z))game_undo();if(IsKeyPressed(KEY_R))game_reset();
-        if(IsKeyPressed(KEY_ENTER))game_next();if(IsKeyPressed(KEY_S))game_skip();
+        if(IsKeyPressed(KEY_ENTER)){if(won)game_next();else game_submit();}if(IsKeyPressed(KEY_S))game_skip();
         game_effects(GetTime()*1000);game_render();WaitTime(0.02);
     }
     CloseWindow();

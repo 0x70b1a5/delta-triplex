@@ -1054,7 +1054,7 @@
       #app[data-solved="true"] #workshop { bottom: 78px; max-width: calc(100vw - 48px); }
       /* A shared link's How to Play button takes the footer's left slot, as completion does. */
       @media (min-width: 701px) {
-        #app:has(#share-help:not([hidden])) #workshop { bottom: 78px; }
+        #app:has(#share-help:not([hidden])) #workshop, #app[data-submit-ready="true"] #workshop { bottom: 78px; }
       }
       #toast { bottom: max(78px, env(safe-area-inset-bottom)); }
       @media (max-width: 899px) {
@@ -1200,7 +1200,8 @@
       .daily-chart-tick, .daily-chart-title { fill: var(--muted); font-size: 10px; font-family: system-ui, sans-serif; font-variant-numeric: tabular-nums; }
       .daily-chart-title { font-size: 10.5px; }
       .daily-stats-share { margin-top: 14px; display: inline-flex; align-items: center; gap: 7px; }
-      .daily-stats-share svg { width: 20px; height: 20px; flex-shrink: 0; }
+      /* The clone drops .icon, so restate its outline-glyph styling. */
+      .daily-stats-share svg { width: 20px; height: 20px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
       .daily-stats-share .mobile-share-suffix { display: none; }
       .daily-stats-share .desktop-share-label { display: inline; }
       #daily-stats-toggle[aria-expanded="true"] { background: var(--cell); color: var(--home-cell-ink, var(--bg)); }
@@ -1217,6 +1218,12 @@
       #sync-input { flex: 1; min-width: 0; min-height: 40px; padding: 6px 8px; font: 13px ui-monospace, monospace; text-transform: uppercase; background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 6px; }
       #sync-status { font-size: 12px; color: var(--muted); margin: 6px 0 0; min-height: 1em; }
       #puzzle-menu .sync-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      /* Submit cycles hues like Next and replaces How to Play while it shows. */
+      #submit-solution { width: auto; margin-right: auto; padding: 8px 14px; font-weight: 650; white-space: nowrap; color: #000; background: #54b85b; animation: submit-hue 8.64s linear infinite; }
+      #submit-solution[hidden] { display: none; }
+      #app[data-submit-ready="true"] #share-help { display: none; }
+      @media (prefers-reduced-motion: reduce) { #submit-solution { animation: none; } }
+      @media (max-width: 700px) and (orientation: portrait) { #bottom-controls #submit-solution { flex: 0 0 auto; width: auto; padding: 7px 10px; } }
       #share-help { margin-right: auto; padding: 8px 12px; font-weight: 650; white-space: nowrap; background: var(--next-fill, var(--surface)); color: var(--next-ink, var(--ink)); }
       @media (max-width: 360px) { #completion #next-puzzle { width: auto; flex-basis: auto; } #session-bar { left: 16px; right: 16px; } }
       #load-dialog { box-sizing: border-box; width: min(440px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 22px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg); color: var(--ink); }

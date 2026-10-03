@@ -174,6 +174,8 @@ function loadCustom(puzzle, editing, ownsDraft, endlessRun = null, fromLink = fa
   const marks = resumed?.solve ? solvedMarks(currentPuzzle) : resumed?.marks;
   const resumeMarks = typeof marks === "string" && marks.length === currentPuzzle.size * currentPuzzle.size && /^[012]+$/.test(marks) ? marks : "";
   Module.ccall("game_resume_marks", null, ["string"], [resumeMarks]);
+  // The counted solve was submitted on an earlier visit, so it reopens solved.
+  if (resumeMarks && resumed?.solve) Module.ccall("game_resume_solved", null, ["number"], [1]);
   window.triShowPlay?.();
   authorSession = !!ownsDraft;
   window.triAuthorSession = authorSession;

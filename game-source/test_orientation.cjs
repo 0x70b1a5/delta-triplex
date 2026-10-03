@@ -35,6 +35,7 @@ const { harness, source } = require('./test_rotation_harness.cjs');
         h.flush();
       }
     }
+    h.click('submit-solution');
     assert(h.state.won);
   }
   const hueTurn = h => ((h.w.triPuzzleHue() % 360) + 360) % 360;

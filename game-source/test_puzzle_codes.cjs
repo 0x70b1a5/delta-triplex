@@ -179,6 +179,7 @@ const { harness, source } = require('./test_rotation_harness.cjs');
       }
     }
   }
+  visitor.click('submit-solution');
   assert(visitor.state.won);
   assert(help.hidden, 'How to Play steps aside once the puzzle is solved');
   visitor.click('next-puzzle');

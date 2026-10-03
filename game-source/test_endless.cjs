@@ -29,6 +29,7 @@ function solve(h) {
       board.querySelector(`[data-cell="${index}"]`).dispatchEvent(event); h.frame();
     }
   });
+  h.click('submit-solution');
   assert(h.state.won, 'the board is solved');
 }
 const storageOf = h => Object.fromEntries(Array.from({ length: h.w.localStorage.length }, (_, i) => {
