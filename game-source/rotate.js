@@ -77,7 +77,8 @@
 
   let view = 0, visualTurn = 0, preview = 0, animation = null, key = "", restart = false;
   // A crafted puzzle faces its author's chosen way: it opens there and the
-  // victory spin always lands there. reveal holds the extra turn that spin adds.
+  // victory spin always lands there. reveal holds the extra turn that spin adds
+  // and the spin's total; a wrong submission spins -360 instead.
   let reveal = null;
   const homeView = () => state?.custom ? currentPuzzle?.orientation || 0 : 0;
   let elapsed = 0, turns = 0, lastTick = performance.now(), running = false;
@@ -884,6 +885,10 @@
     resetCarries = [];
     if (Number(baseCall("submit")) !== 0) { resetCarries = carries; return; }
     turns = 0;
+    // The victory spin in reverse: one full counterclockwise turn of the cleared
+    // board, with the same scale pulse, and no hue shift since it lands where it began.
+    reveal = { extra: 0, total: -360 };
+    call("celebrate");
     clock(); saveAttempt(true); requestFrame();
     toast(TriCopy.t("rotate.wrongSubmit"));
   };
