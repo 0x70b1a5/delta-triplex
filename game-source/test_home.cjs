@@ -12,7 +12,7 @@ for (const reducedMotion of [false, true]) {
   assert.equal(before, after, 'homepage base colours remain monochrome');
   assert.equal(h.d.documentElement.style.cssText, gameColours, 'homepage flashes do not change game colours');
   assert.equal(h.d.querySelectorAll('#home-main button').length, 7);
-  assert.equal(h.d.querySelector('.home-credit').href, 'https://lovecrypt.itch.io/');
+  assert(!h.d.querySelector('.home-credit').matches('a'), 'credit cell is not a link');
   h.click('past-puzzles'); assert.equal(home.dataset.view, 'calendar');
   h.click('home-back'); assert.equal(home.dataset.view, 'main');
   h.click('endless-mode'); assert.equal(home.dataset.view, 'endless');

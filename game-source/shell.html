@@ -1120,7 +1120,7 @@
       #home .solve-badge[data-digits="3"] { --badge: 4.4em; }
       #home .solve-badge[data-digits="4"] { --badge: 5.4em; }
       #home .home-up { clip-path: polygon(50% 1%, 99% 99.5%, 1% 99.5%); }
-      #home .home-filler { pointer-events: none; }
+      #home .home-filler, #home .home-credit { pointer-events: none; }
       #home .home-credit, #home .home-back { font-size: var(--label-size, clamp(9px, 1.1vw, 17px)); }
       #home .home-credit > span, #home .home-back > span { top: 24%; }
       #home .home-credit > span { font-size: 75%; }
@@ -1458,7 +1458,6 @@
         <p>{{copy:about.copyright}}</p>
         <div class="menu-actions">
           <button id="credits-open" type="button">{{copy:about.credits}}</button>
-          <a href="https://lovecrypt.itch.io/" target="_blank" rel="noopener noreferrer">{{copy:about.more}}</a>
         </div>
       </section>
     </aside>
@@ -1474,7 +1473,7 @@
           <button id="home-settings" class="home-cell home-up" style="--x:25%;--y:25%" aria-controls="puzzle-menu" aria-expanded="false"><span>{{copy:home.settings}}</span></button>
           <i class="home-cell home-filler" style="--x:50%;--y:25%" aria-hidden="true"></i>
           <button id="create-puzzle" class="home-cell home-up" style="--x:37.5%;--y:50%"><span>{{copy:home.createPuzzle}}</span></button>
-          <a class="home-cell home-credit" style="--x:37.5%;--y:75%" href="https://lovecrypt.itch.io/" target="_blank" rel="noopener noreferrer"><span><small>{{copy:ui.by}}</small> {{copy:ui.lovecrypt}}</span></a>
+          <i class="home-cell home-credit" style="--x:37.5%;--y:75%" aria-hidden="true"></i>
         </div>
         <section id="home-calendar" class="home-triangle" aria-labelledby="calendar-title" hidden>
           <header class="home-banner calendar-heading">
