@@ -283,6 +283,7 @@
     if (running) elapsed += Math.max(0, now - lastTick);
     lastTick = now;
     running = !!(mayPlay() && !state.won && !state.editing);
+    TriMusic.sync(!!(mayPlay() && !state?.editing));
     el("session-clock").textContent = TriCopy.t("rotation.clock", { time: formatTime(finished?.elapsed ?? elapsed), count: finished?.turns ?? turns });
     if (state?.editing) el("session-clock").textContent = TriCopy.t("rotate.editing");
     const seed = state?.custom && !state.editing ? currentPuzzle?.seed : undefined;
@@ -381,6 +382,7 @@
     controls.hidden = next.won && !next.editing;
     if (freshBoard) visibleAxes = 0;
     syncSubmit();
+    TriMusic.onState(next, freshBoard);
     el("app").dataset.solved = String(next.won && !next.editing);
     el("share-result").disabled = !!finished?.unknown;
     el("solve-details").textContent = finished?.unknown
@@ -883,7 +885,9 @@
     // A wrong answer empties the undo chain, so no earlier reset's time may return.
     const carries = resetCarries;
     resetCarries = [];
-    if (Number(baseCall("submit")) !== 0) { resetCarries = carries; return; }
+    const correct = Number(baseCall("submit")) !== 0;
+    TriMusic.submitted(correct);
+    if (correct) { resetCarries = carries; return; }
     turns = 0;
     // The victory spin in reverse: one full counterclockwise turn of the cleared
     // board, with the same scale pulse, and no hue shift since it lands where it began.

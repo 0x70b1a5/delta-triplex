@@ -114,7 +114,7 @@ for (const [id, key] of [["background-color", "bg"], ["cell-color", "cell"]]) {
     TriPalette.randomColor(currentTheme()[key === "bg" ? "cell" : "bg"]));
 }
 applyPalette();
-// Store volume preferences for the future audio system; no audio is started here.
+// Volume preferences; music.js reads them for its master, music and SFX gains.
 const soundLevels = { master: 100, music: 100, sfx: 100 };
 try {
   const saved = JSON.parse(localStorage.getItem("delta-triplex-sound"));

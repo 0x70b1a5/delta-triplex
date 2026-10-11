@@ -325,6 +325,8 @@
     "other": "{range}: {count} solvers"
   },
   "daily.close": "Close",
+  "music.save": "Save music",
+  "music.saveDetails": "Download the music from this solve as a MIDI file",
   "daily.error.badReply": "The server's reply was cut off or unreadable.",
   "daily.error.http": "The server replied with error {status}.",
   "daily.error.httpDetail": "The server replied with error {status}: {message}",

@@ -464,7 +464,7 @@
     // Engine state changes (hover, effects) arrive constantly; rebuild only on new content.
     const entry = trouble.get(current.id);
     const key = JSON.stringify([current.id, record.stats, record.submitted, record.refused, inflight.has(current.id),
-      entry?.attempt, !!entry?.timer, entry?.error?.message, TriCopy.locale]);
+      entry?.attempt, !!entry?.timer, entry?.error?.message, TriCopy.locale, TriMusic.canDownload]);
     if (key === renderedKey) return;
     renderedKey = key;
     const stats = record.stats, you = stats?.you;
@@ -492,6 +492,17 @@
     share.className = "daily-stats-share";
     share.onclick = () => el("share-result").click();
     body.push(share);
+    // The music this solve played, if it was heard live on this visit.
+    if (TriMusic.canDownload) {
+      const music = document.createElement("button");
+      music.type = "button";
+      music.className = "daily-stats-music";
+      music.textContent = TriCopy.t("music.save");
+      music.title = TriCopy.t("music.saveDetails");
+      const file = String(current.name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      music.onclick = () => TriMusic.download("delta-triplex" + (file ? "-" + file : ""));
+      body.push(music);
+    }
     panel.replaceChildren(...body);
     el("daily-stats-close").onclick = () => { statsOpen = false; renderStats(); toggle.focus(); };
   }
