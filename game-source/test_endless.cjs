@@ -117,6 +117,14 @@ const submitForm = (h, id) => h.d.getElementById(id).dispatchEvent(new h.w.Event
   // The menu returns to the puzzle in progress.
   d.querySelector('[data-difficulty="4"]').click();
   await until(() => w.triEndlessRun?.number === 2, 'Sprout resumes at #2');
+  // A puzzle opened far ahead doesn't skip the unsolved ones before it.
+  h.click('return-home'); h.click('load-puzzle');
+  d.getElementById('puzzle-code').value = 'sprout 40';
+  submitForm(h, 'load-code-form');
+  await until(() => w.triEndlessRun?.number === 40, 'Sprout #40 opens');
+  h.click('return-home'); h.click('endless-mode');
+  d.querySelector('[data-difficulty="4"]').click();
+  await until(() => w.triEndlessRun?.number === 2, 'Sprout returns to #2');
 
   // Reopening a solved puzzle shows its solution and the solve that counted.
   const solvedTime = w.TriEndless.record('sprout-1').solve.elapsed;

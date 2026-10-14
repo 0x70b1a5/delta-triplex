@@ -195,13 +195,13 @@ el("load-json-file").onclick = () => {
   el("puzzle-file").value = "";
   el("puzzle-file").click();
 };
-// Opens Endless puzzle `number`, by default the one this difficulty was last
-// on, or the next unsolved one after it.
+// Opens Endless puzzle `number`, by default the lowest unsolved one, so a shared
+// link far ahead doesn't skip the puzzles before it.
 function startEndless(difficulty, number, fromLink = false) {
   if (!appReady) return toast(TriCopy.t("errors.loading"));
   window.triCancelGeneration();
   const data = window.TriEndless.read();
-  if (number === undefined) number = window.TriEndless.nextUnsolved(difficulty, Number(data.current[difficulty]) || 1);
+  if (number === undefined) number = window.TriEndless.nextUnsolved(difficulty, 1);
   const puzzle = number && TriShare.endlessPuzzle(difficulty, number);
   const name = TriCopy.t("difficulty." + difficulty + ".sentence");
   if (!puzzle) {
