@@ -4,7 +4,7 @@ A rotating triangular nonogram with a shared C rules engine, an SVG board and DO
 
 ## Homepage
 
-The homepage is a four-row triangle: the top seven-cell strip is a filled DELTA TRIPLEX banner, the five downward-facing middle cells offer Today’s Puzzle, How to Play, Endless, Past Puzzles and Load. The upward cell directly above the credit opens Create; upward cells use 25% of the empty-cell color over the background (half the intensity of crossed cells), and the credit tip links to https://lovecrypt.itch.io/. On desktop, half the credit tip extends below the viewport. Mobile keeps the triangle equilateral and centered, allowing slight side bleed.
+The homepage is a four-row triangle: the top seven-cell strip is a filled DELTA TRIPLEX banner, the five downward-facing middle cells offer Today’s Puzzle, How to Play, Endless, Past Puzzles and Load. The upward cell directly above the credit opens Create; upward cells use 25% of the empty-cell color over the background (half the intensity of crossed cells), and the credit tip links to https://lovecrypt.bandcamp.com/. On desktop, half the credit tip extends below the viewport. Mobile keeps the triangle equilateral and centered, allowing slight side bleed.
 
 The title and triangle menus use bundled Michroma in uppercase (SIL Open Font License; see `fonts/OFL-Michroma.txt`). The build embeds the font and its license, preserving standalone/offline deployment. Oxanium and Space Grotesk remain alternative title options.
 
