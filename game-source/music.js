@@ -436,13 +436,18 @@ const TriMusic = (() => {
     song = live = null;
   }
 
+  // While the ♫ button's Bandcamp player is open the music is held at silence;
+  // sound effects keep their own level.
+  let hushed = false;
+  function hold(on) { hushed = !!on; sync(playing); }
+
   // Called from clock(): play while a board is on screen, pause otherwise.
   function sync(active) {
     playing = active;
     if (!ctx) return;
     const level = levels(), now = ctx.currentTime;
     mix.master.gain.setTargetAtTime(level.master / 100, now, .05);
-    mix.music.gain.setTargetAtTime(level.music / 100, now, .05);
+    mix.music.gain.setTargetAtTime(hushed ? 0 : level.music / 100, now, .05);
     mix.sfx.gain.setTargetAtTime(level.sfx / 100, now, .05);
     const run = playing && !!song && audible();
     if (run && ctx.state !== "running") ctx.resume().catch(() => {});
@@ -543,7 +548,8 @@ const TriMusic = (() => {
   }
 
   return {
-    onState, submitted, sync, download,
+    onState, submitted, sync, hold, download,
+    get held() { return hushed; },
     get canDownload() { return !!solved?.log.length; },
     get song() { return song; },
     // Pure parts, for tests and offline rendering.

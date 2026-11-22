@@ -1069,6 +1069,30 @@
         #app:has(#share-help:not([hidden])) #workshop, #app[data-submit-ready="true"] #workshop { bottom: 78px; }
       }
       #toast { bottom: max(78px, env(safe-area-inset-bottom)); }
+      /* The ♫ button's Bandcamp player sits in the footer row beside the icons, or above them on portrait phones. */
+      #jukebox-player { display: flex; align-items: center; gap: 2px; flex: 0 1 350px; min-width: 180px; height: 44px; padding: 0 2px 0 4px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); }
+      #jukebox-player[hidden], #jukebox[hidden] { display: none; }
+      #jukebox-player iframe { display: block; flex: 1 1 auto; min-width: 0; height: 42px; border: 0; }
+      #bottom-controls #jukebox-close { flex: 0 0 32px; width: 32px; min-width: 32px; height: 32px; min-height: 32px; padding: 7px; border: 0; }
+      #jukebox-close svg { width: 18px; height: 18px; }
+      #jukebox[aria-busy="true"] { opacity: .6; cursor: progress; }
+      @media (min-width: 701px), (orientation: landscape) {
+        #app:has(#jukebox-player:not([hidden])) #workshop { bottom: 78px; }
+      }
+      @media (max-width: 700px) and (orientation: portrait) {
+        #jukebox-player { position: absolute; right: 0; bottom: calc(100% + 8px); width: min(350px, 100%); }
+        /* Six icons leave a narrow phone little room: the left slot's label wraps onto two lines before anything overflows. */
+        #bottom-controls #share-help, #bottom-controls #submit-solution { flex: 0 1 auto; min-width: 0; white-space: normal; text-wrap: balance; font-size: 14px; line-height: 1.1; padding: 3px 6px; }
+      }
+      @media (max-width: 480px) and (orientation: portrait) {
+        /* A solved board's row: Share keeps only its icon, its label stays in the tooltip and for screen readers. */
+        #completion .mobile-share-suffix { display: none; }
+        #completion #share-result { flex: 0 0 40px; width: 40px; padding: 7px; justify-content: center; }
+      }
+      @media (max-width: 360px) and (orientation: portrait) {
+        #bottom-controls { gap: 3px; }
+        #completion #share-result { flex-basis: 32px; width: 32px; padding: 5px; }
+      }
       @media (max-width: 899px) {
         #solve-result { display: none; }
         .mobile-share-suffix { display: inline; }
@@ -1471,7 +1495,7 @@
         <p>{{copy:about.copyright}}</p>
         <div class="menu-actions">
           <button id="credits-open" type="button">{{copy:about.credits}}</button>
-          <a href="https://lovecrypt.bandcamp.com/" target="_blank" rel="noopener noreferrer">{{copy:about.more}}</a>
+          <a href="https://lovecrypt.net/" target="_blank" rel="noopener noreferrer">{{copy:about.more}}</a>
         </div>
       </section>
     </aside>
@@ -1487,7 +1511,7 @@
           <button id="home-settings" class="home-cell home-up" style="--x:25%;--y:25%" aria-controls="puzzle-menu" aria-expanded="false"><span>{{copy:home.settings}}</span></button>
           <i class="home-cell home-filler" style="--x:50%;--y:25%" aria-hidden="true"></i>
           <button id="create-puzzle" class="home-cell home-up" style="--x:37.5%;--y:50%"><span>{{copy:home.createPuzzle}}</span></button>
-          <a class="home-cell home-credit" style="--x:37.5%;--y:75%" href="https://lovecrypt.bandcamp.com/" target="_blank" rel="noopener noreferrer"><span><small>{{copy:ui.by}}</small> {{copy:ui.lovecrypt}}</span></a>
+          <a class="home-cell home-credit" style="--x:37.5%;--y:75%" href="https://lovecrypt.net/" target="_blank" rel="noopener noreferrer"><span><small>{{copy:ui.by}}</small> {{copy:ui.lovecrypt}}</span></a>
         </div>
         <section id="home-calendar" class="home-triangle" aria-labelledby="calendar-title" hidden>
           <header class="home-banner calendar-heading">
@@ -1672,6 +1696,7 @@
     <script src="back.js"></script>
     <script src="music.js"></script>
     <script src="rotate.js"></script>
+    <script src="jukebox.js"></script>
     <script src="menu-background.js"></script>
     <script src="home.js"></script>
     <!-- The engine loads last: it calls triReady, which routes #daily= / #endless= / #p= links

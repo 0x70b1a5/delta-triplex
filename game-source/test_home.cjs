@@ -12,8 +12,8 @@ for (const reducedMotion of [false, true]) {
   assert.equal(before, after, 'homepage base colours remain monochrome');
   assert.equal(h.d.documentElement.style.cssText, gameColours, 'homepage flashes do not change game colours');
   assert.equal(h.d.querySelectorAll('#home-main button').length, 7);
-  assert.equal(h.d.querySelector('.home-credit').href, 'https://lovecrypt.bandcamp.com/');
-  assert.equal(h.d.querySelector('#credits-open + a').href, 'https://lovecrypt.bandcamp.com/', 'About links to Bandcamp');
+  assert.equal(h.d.querySelector('.home-credit').href, 'https://lovecrypt.net/');
+  assert.equal(h.d.querySelector('#credits-open + a').href, 'https://lovecrypt.net/', 'About links to lovecrypt.net');
   h.click('past-puzzles'); assert.equal(home.dataset.view, 'calendar');
   h.click('home-back'); assert.equal(home.dataset.view, 'main');
   h.click('endless-mode'); assert.equal(home.dataset.view, 'endless');
