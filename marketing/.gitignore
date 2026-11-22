@@ -1,0 +1,5 @@
+# Rendered outputs stay out of git; the scripts here remake them (see README.md).
+*.mp4
+*.gif
+*.png
+shots/

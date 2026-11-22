@@ -1,0 +1,128 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Delta Triplex art</title>
+<!--
+  Store art, share image and video end cards. Rendered by render-art.cjs.
+  ?layout=stack|side|end  &w=&h=  &shot=<screenshot in shots/>  &crop=x,y,w,h (CSS px of the shot)
+  The pictures are real screenshots of the game (shots/, made by capture.cjs), not redrawings.
+-->
+<style>
+  @font-face { font-family: Michroma; src: url(../game-source/fonts/Michroma.ttf); }
+  @font-face { font-family: Oxanium; src: url(../game-source/fonts/Oxanium.ttf); font-weight: 200 800; }
+  :root { --u: 1px; }
+  html, body { margin: 0; background: #000; color: #fff; overflow: hidden; }
+  body { position: relative; width: var(--w); height: var(--h); font-family: Oxanium, sans-serif; }
+  #lattice { position: absolute; inset: 0; }
+  .banner { position: relative; background: #fff; color: #000; clip-path: polygon(0 0, 100% 0, calc(100% - var(--slant)) 100%, var(--slant) 100%);
+    display: grid; justify-items: center; align-content: center; }
+  .banner h1 { margin: 0; font: 400 var(--title)/1.15 Michroma, sans-serif; letter-spacing: .025em; white-space: nowrap; }
+  .tagline { display: flex; justify-content: space-between; width: var(--tagw); font: 400 calc(var(--title) * .2)/1 Michroma, sans-serif; margin-top: calc(var(--title) * .12); }
+  .tagline i { font-style: normal; }
+  .shot { position: relative; overflow: hidden; }
+  .shot img { position: absolute; mix-blend-mode: lighten; } /* the shot is black where the lattice should show */
+  .lines { display: grid; gap: .35em; justify-items: center; text-align: center; }
+  .lines .lead { font-size: var(--lead); font-weight: 600; letter-spacing: .01em; }
+  .lines .url { font: 400 var(--url) Michroma, sans-serif; letter-spacing: .04em; }
+  .lines .by { font-size: calc(var(--lead) * .62); color: #9a9a9a; letter-spacing: .18em; text-transform: uppercase; }
+  .free { display: inline-block; background: #fff; color: #000; padding: 0 .35em .06em; font-weight: 700; }
+
+  /* Stacked: banner on top, the board below it (itch cover, phone end card). */
+  body[data-layout="stack"] main, body[data-layout="end"] main { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; }
+  /* Side by side: words left, board right (share image, Newgrounds card). */
+  body[data-layout="side"] main { position: absolute; inset: 0; display: grid; grid-template-columns: var(--left) 1fr; align-items: center; justify-items: center; }
+  body[data-layout="side"] .words { display: grid; justify-items: center; gap: var(--gap); }
+</style>
+<svg id="lattice"></svg>
+<main></main>
+<script>
+(async () => {
+await Promise.all([document.fonts.load("100px Michroma"), document.fonts.load("600 20px Oxanium")]);
+const q = new URLSearchParams(location.search);
+const W = +q.get("w") || 1200, H = +q.get("h") || 630, layout = q.get("layout") || "side";
+const shot = q.get("shot"), crop = (q.get("crop") || "").split(",").map(Number);
+document.body.dataset.layout = layout;
+document.body.style.setProperty("--w", W + "px"); document.body.style.setProperty("--h", H + "px");
+const main = document.querySelector("main");
+const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+
+// The home screen's triangle lattice: three families of lines, faint grey.
+{
+  const svg = document.getElementById("lattice"), s = Math.max(W, H) / (layout === "end" ? 13 : 11), hgt = s * Math.sqrt(3) / 2;
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+  let d = "";
+  for (let y = 0; y <= H + hgt; y += hgt) d += `M0 ${y}H${W}`;
+  const reach = H / hgt * s / 2;
+  for (let x = -reach - s; x <= W + reach + s; x += s) d += `M${x} 0L${x + reach} ${H}M${x} 0L${x - reach} ${H}`;
+  svg.innerHTML = `<path d="${d}" stroke="#3b3b3b" stroke-width="${Math.max(1, W / 1280)}" fill="none"/>`;
+}
+
+// The home screen's banner: the top row of the big triangle, so its sides slope at 60 degrees.
+// Sized to a target width by measuring the title in the real font.
+function banner(parent, targetW) {
+  const b = h("div", "banner");
+  b.append(h("h1", "", "DELTA TRIPLEX"));
+  const tag = h("div", "tagline");
+  for (const ch of "TRIANGULAR\u00a0\u00a0NONOGRAMS") tag.append(h("i", "", ch));
+  b.append(tag);
+  parent.append(b);
+  b.style.setProperty("--title", "100px");
+  const per = b.querySelector("h1").getBoundingClientRect().width / 100;
+  const title = targetW / (per + 3.1);
+  b.style.setProperty("--title", title + "px");
+  b.style.setProperty("--tagw", per * title * .985 + "px");
+  b.style.padding = `${title * .34}px 0 ${title * .4}px`;
+  const height = b.getBoundingClientRect().height;
+  b.style.setProperty("--slant", height * .5774 + "px");
+  b.style.width = per * title + 2 * height * .5774 + title * .9 + "px";
+  return b;
+}
+function picture(boxW, boxH) {
+  const box = h("div", "shot"); box.style.width = boxW + "px"; box.style.height = boxH + "px";
+  if (!shot) return box;
+  const img = new Image(); img.src = "shots/" + shot;
+  const [cx, cy, cw, ch] = crop.length === 4 ? crop : [0, 0, 1280, 720];
+  const k = Math.min(boxW / cw, boxH / ch);
+  boxW = cw * k; boxH = ch * k; // show the crop and nothing beyond it
+  box.style.width = boxW + "px"; box.style.height = boxH + "px";
+  img.onload = () => {
+    const nat = img.naturalWidth / (q.get("shotw") || 1280); // screenshot scale
+    img.style.width = img.naturalWidth / nat * k + "px";
+    img.style.left = (boxW - cw * k) / 2 - cx * k + "px";
+    img.style.top = (boxH - ch * k) / 2 - cy * k + "px";
+    document.body.dataset.ready = "";
+  };
+  box.append(img);
+  return box;
+}
+function lines(lead, url, by = true) {
+  const l = h("div", "lines");
+  l.append(h("div", "lead", lead));
+  l.append(h("div", "url", "deltatriplex.com"));
+  if (by) l.append(h("div", "by", "by lovecrypt"));
+  l.style.setProperty("--lead", url * .78 + "px"); l.style.setProperty("--url", url + "px");
+  return l;
+}
+
+if (layout === "stack") {
+  const b = banner(main, W * .9); b.style.marginTop = H * .04 + "px";
+  const room = H - H * .04 - b.getBoundingClientRect().height;
+  main.append(picture(W * .96, room * .97));
+} else if (layout === "side") {
+  const left = W * .47;
+  document.body.style.setProperty("--left", left + "px");
+  document.body.style.setProperty("--gap", H * .07 + "px");
+  const words = h("div", "words");
+  main.append(words);
+  banner(words, left * .94);
+  words.append(lines(`A new triangle puzzle every day.<br><span class="free">Free</span> in your browser.`, H * .052, q.get("by") !== "0"));
+  main.append(picture(W - left, H * .96));
+} else if (layout === "end") {
+  const portrait = H > W;
+  main.style.justifyContent = "center"; main.style.gap = H * (portrait ? .035 : .055) + "px";
+  banner(main, W * (portrait ? .88 : .6));
+  main.append(lines(portrait ? `A new puzzle every day.<br><span class="free">Free</span> in your browser.` : `A new puzzle every day. <span class="free">Free</span> in your browser.`, W * (portrait ? .052 : .034)));
+  document.body.dataset.ready = "";
+}
+if (!shot) document.body.dataset.ready = "";
+})();
+</script>
