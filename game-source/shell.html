@@ -7,6 +7,17 @@
       name="viewport"
     />
     <title>{{copy:app.name}}</title>
+    <meta name="description" content="{{copy:app.description}}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="{{copy:app.name}}" />
+    <meta property="og:title" content="{{copy:app.name}}" />
+    <meta property="og:description" content="{{copy:app.description}}" />
+    <meta property="og:url" content="https://deltatriplex.com/" />
+    <meta property="og:image" content="https://deltatriplex.com/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="A Delta Triplex puzzle half solved: a triangle of cells with number clues along two sides." />
+    <meta name="twitter:card" content="summary_large_image" />
     <script data-goatcounter="https://delta.goat.theologi.ca/count" async src="https://delta.goat.theologi.ca/count.js"></script>
     <link rel="icon" type="image/svg+xml" href="../public/favicon.svg" />
     <style>
@@ -1651,7 +1662,6 @@
     <script src="palette.js"></script>
     <script src="share.js"></script>
     <script src="app.js"></script>
-    {{{ SCRIPT }}}
     <script src="editor.js"></script>
     <script src="theme-welcome.js"></script>
     <script src="flow.js"></script>
@@ -1663,5 +1673,8 @@
     <script src="rotate.js"></script>
     <script src="menu-background.js"></script>
     <script src="home.js"></script>
+    <!-- The engine loads last: it calls triReady, which routes #daily= / #endless= / #p= links
+         through functions the scripts above define. Loaded earlier, it can win that race. -->
+    {{{ SCRIPT }}}
   </body>
 </html>
